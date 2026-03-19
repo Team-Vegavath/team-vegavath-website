@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMembers, getMembersByTier } from "@/lib/services/team";
 
-export const revalidate = 120;
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {

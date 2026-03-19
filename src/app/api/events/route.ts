@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEvents, getUpcomingEvents, getPastEvents } from "@/lib/services/events";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
