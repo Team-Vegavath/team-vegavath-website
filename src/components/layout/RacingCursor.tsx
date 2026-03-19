@@ -5,22 +5,15 @@ import { useEffect, useRef, useState } from "react";
 export function RacingCursor() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const trailRef = useRef<HTMLDivElement>(null);
-  const [enabled, setEnabled] = useState(false);
-  const [isTouch, setIsTouch] = useState(() =>
+  const [isTouch] = useState(() =>
     typeof window !== "undefined"
       ? window.matchMedia("(pointer: coarse)").matches
       : true
   );
-
-  useEffect(() => {
-    // Detect touch device — disable on mobile
-    const touch = window.matchMedia("(pointer: coarse)").matches;
-    if (touch) return;
-
-    // Load preference
-    const pref = localStorage.getItem("racing-cursor");
-    setEnabled(pref !== "false");
-  }, []);
+  const enabled =
+    typeof window !== "undefined"
+      ? localStorage.getItem("racing-cursor") !== "false"
+      : false;
 
   useEffect(() => {
     if (isTouch || !enabled) return;
