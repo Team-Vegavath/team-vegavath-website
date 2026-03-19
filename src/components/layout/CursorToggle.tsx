@@ -1,20 +1,22 @@
 "use client";
 
-export function CursorToggle() {
-  const isTouch =
-    typeof window !== "undefined"
-      ? window.matchMedia("(pointer: coarse)").matches
-      : true;
-  const enabled =
-    typeof window !== "undefined"
-      ? localStorage.getItem("racing-cursor") !== "false"
-      : false;
+import { useEffect, useState } from "react";
 
-  if (isTouch) return null;
+export function CursorToggle() {
+  const [mounted, setMounted] = useState(false);
+  const [isTouch, setIsTouch] = useState(true);
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setIsTouch(window.matchMedia("(pointer: coarse)").matches);
+    setEnabled(localStorage.getItem("racing-cursor") !== "false");
+  }, []);
+
+  if (!mounted || isTouch) return null;
 
   const toggle = () => {
-    const next = !enabled;
-    localStorage.setItem("racing-cursor", String(next));
+    localStorage.setItem("racing-cursor", String(!enabled));
     window.location.reload();
   };
 

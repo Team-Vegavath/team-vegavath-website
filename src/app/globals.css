@@ -1,13 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --accent: #E8521A;
-  --accent-hover: #d4461a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --card: #f9fafb;
+  /* Backgrounds */
+  --background: #121212;
+  --background-card: #1a1a1a;
+  --background-elevated: #222222;
+
+  /* Text */
+  --text-primary: #EBEBEB;
+  --text-secondary: #9a9a9a;
+  --text-muted: #666666;
+
+  /* Accents */
+  --accent: #EF5D08;
+  --accent-hover: #d44f06;
+  --accent-secondary: #F29C04;
+  --accent-info: #07C5F0;
+
+  /* Borders */
+  --border: #2a2a2a;
+  --border-accent: #EF5D08;
 }
 
 * {
@@ -22,7 +34,7 @@ html {
 
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -36,7 +48,7 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--muted);
+  background: var(--text-muted);
   border-radius: 3px;
 }
 
@@ -66,4 +78,45 @@ body {
   to {
     transform: translateX(-50%);
   }
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-outline {
+  border: 1px solid var(--border-accent);
+  color: var(--accent);
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-outline:hover {
+  background-color: var(--accent);
+  color: white;
+}
+
+.card {
+  background-color: var(--background-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
 }

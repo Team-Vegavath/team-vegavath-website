@@ -5,18 +5,18 @@ import { useEffect, useRef, useState } from "react";
 export function RacingCursor() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const trailRef = useRef<HTMLDivElement>(null);
-  const [isTouch] = useState(() =>
-    typeof window !== "undefined"
-      ? window.matchMedia("(pointer: coarse)").matches
-      : true
-  );
-  const enabled =
-    typeof window !== "undefined"
-      ? localStorage.getItem("racing-cursor") !== "false"
-      : false;
+  const [mounted, setMounted] = useState(false);
+  const [isTouch, setIsTouch] = useState(true);
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    if (isTouch || !enabled) return;
+    setMounted(true);
+    setIsTouch(window.matchMedia("(pointer: coarse)").matches);
+    setEnabled(localStorage.getItem("racing-cursor") !== "false");
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || isTouch || !enabled) return;
 
     const cursor = cursorRef.current;
     const trail = trailRef.current;
@@ -50,13 +50,12 @@ export function RacingCursor() {
       cancelAnimationFrame(rafId);
       document.body.style.cursor = "";
     };
-  }, [enabled, isTouch]);
+  }, [mounted, isTouch, enabled]);
 
-  if (isTouch) return null;
+  if (!mounted || isTouch) return null;
 
   return (
     <>
-      {/* Main cursor dot */}
       <div
         ref={cursorRef}
         className="pointer-events-none fixed left-0 top-0 z-[9999] -translate-x-1/2 -translate-y-1/2"
@@ -65,7 +64,6 @@ export function RacingCursor() {
         <div className="h-3 w-3 rounded-full bg-orange-500" />
       </div>
 
-      {/* Trail */}
       <div
         ref={trailRef}
         className="pointer-events-none fixed left-0 top-0 z-[9998] -translate-x-1/2 -translate-y-1/2"
