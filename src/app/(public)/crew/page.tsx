@@ -89,7 +89,7 @@ export default async function CrewPage() {
       <section className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-orange-400/30 bg-zinc-900/80 p-6 sm:flex-row sm:items-center sm:p-8">
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-white">WANT TO JOIN OUR CREW?</h2>
-          <p className="text-zinc-300">We're always looking for passionate individuals</p>
+          <p className="text-zinc-300">{"We're always looking for passionate individuals"}</p>
         </div>
 
         <Link

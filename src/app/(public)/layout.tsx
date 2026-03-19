@@ -16,7 +16,7 @@ export default async function PublicLayout({
           <p className="text-6xl" aria-hidden="true">
             🔧
           </p>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight">We'll be right back</h1>
+          <h1 className="mt-6 text-4xl font-bold tracking-tight">{"We'll be right back"}</h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-zinc-700 sm:text-lg">
             {settings.maintenance_message || "We are updating the site. Check back soon."}
           </p>
