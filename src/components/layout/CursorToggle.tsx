@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 
 export function CursorToggle() {
   const [enabled, setEnabled] = useState(false);
-  const [isTouch, setIsTouch] = useState(true);
+  const [isTouch, setIsTouch] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(pointer: coarse)").matches
+      : true
+  );
 
   useEffect(() => {
     const touch = window.matchMedia("(pointer: coarse)").matches;
-    setIsTouch(touch);
     if (touch) return;
     const pref = localStorage.getItem("racing-cursor");
     setEnabled(pref !== "false");

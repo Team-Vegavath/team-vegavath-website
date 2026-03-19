@@ -6,12 +6,15 @@ export function RacingCursor() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const trailRef = useRef<HTMLDivElement>(null);
   const [enabled, setEnabled] = useState(false);
-  const [isTouch, setIsTouch] = useState(true);
+  const [isTouch, setIsTouch] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(pointer: coarse)").matches
+      : true
+  );
 
   useEffect(() => {
     // Detect touch device — disable on mobile
     const touch = window.matchMedia("(pointer: coarse)").matches;
-    setIsTouch(touch);
     if (touch) return;
 
     // Load preference
