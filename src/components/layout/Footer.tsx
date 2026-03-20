@@ -46,7 +46,7 @@ function SocialLinks({ settings }: { settings: SiteSettings | null }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-gray-500 transition-colors hover:text-orange-600"
+          className="text-sm text-[#9a9a9a] transition-colors hover:text-[#F29C04]"
         >
           {label}
         </a>
@@ -59,12 +59,12 @@ export function Footer({ settings }: FooterProps) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-gray-200 bg-gray-50">
+    <footer className="border-t border-[#2a2a2a] bg-[#1a1a1a] text-[#EBEBEB]">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
             <p className="mb-2 text-lg font-bold">VEGAVATH</p>
-            <p className="mb-4 text-sm text-gray-500">
+            <p className="mb-4 text-sm text-[#9a9a9a]">
               Racing toward innovation in automotive, robotics, design, media,
               and marketing excellence.
             </p>
@@ -78,7 +78,7 @@ export function Footer({ settings }: FooterProps) {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="text-sm text-gray-500 transition-colors hover:text-orange-600"
+                    className="text-sm text-[#9a9a9a] transition-colors hover:text-[#F29C04]"
                   >
                     {label}
                   </Link>
@@ -92,7 +92,7 @@ export function Footer({ settings }: FooterProps) {
             </p>
             <ul className="space-y-2">
               {DOMAINS.map((domain) => (
-                <li key={domain} className="text-sm text-gray-500">
+                <li key={domain} className="text-sm text-[#9a9a9a]">
                   {domain}
                 </li>
               ))}
@@ -104,27 +104,27 @@ export function Footer({ settings }: FooterProps) {
             </p>
             <SocialLinks settings={settings} />
             {settings?.contact_email ? (
-              <p className="text-sm text-gray-500">{settings.contact_email}</p>
+              <p className="text-sm text-[#9a9a9a]">{settings.contact_email}</p>
             ) : null}
             {settings?.contact_address ? (
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-[#9a9a9a]">
                 {settings.contact_address}
               </p>
             ) : null}
           </div>
         </div>
-        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-gray-200 pt-6 sm:flex-row">
-          <p className="text-xs text-gray-400">
+        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-[#2a2a2a] pt-6 sm:flex-row">
+          <p className="text-xs text-[#666666]">
             {`© ${year} Team Vegavath. All rights reserved.`}
           </p>
           <div className="flex items-center gap-4">
             <Link
               href="/legal"
-              className="text-xs text-gray-400 transition-colors hover:text-orange-600"
+              className="text-xs text-[#666666] transition-colors hover:text-[#F29C04]"
             >
               Legal
             </Link>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[#666666]">
               Made with ♥ by Vegavath Team
             </p>
           </div>

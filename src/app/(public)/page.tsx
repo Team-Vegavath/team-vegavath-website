@@ -76,69 +76,73 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main>
-      <section className="flex min-h-screen items-center justify-center px-6 py-16">
+    <main className="bg-[#121212] text-[#EBEBEB]">
+      <section className="relative flex min-h-screen items-center justify-center bg-[#121212] px-6 py-16">
         <div className="mx-auto max-w-4xl text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight text-zinc-900 sm:text-6xl md:text-7xl">
+          <h1 className="text-5xl font-black text-[#EBEBEB] md:text-7xl">
             Team Vegavath
           </h1>
-          <p className="mt-6 text-lg text-zinc-600 sm:text-xl">
+          <p className="mt-4 text-lg text-[#9a9a9a] md:text-xl">
             Innovation in Automotive, Robotics, and Technology
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/join"
-              className="rounded-md bg-orange-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+              className="rounded-lg bg-[#EF5D08] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#d44f06]"
             >
               Join Us
             </Link>
             <Link
               href="/about"
-              className="rounded-md border border-zinc-300 px-6 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+              className="rounded-lg border border-[#2a2a2a] px-8 py-3 font-semibold text-[#EBEBEB] transition-colors hover:border-[#EF5D08]"
             >
               Learn More
             </Link>
           </div>
         </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-[#1a1a1a]" />
       </section>
 
-      <section className="px-6 py-16">
+      <section className="bg-[#121212] px-6 py-20">
         <div className="mx-auto max-w-6xl">
-          <h2 className="mb-8 text-center text-3xl font-bold text-zinc-900">Our Build</h2>
+          <h2 className="mb-8 text-center text-2xl font-bold text-[#EBEBEB]">Our Build</h2>
           <KartModelWrapper />
         </div>
       </section>
 
-      <section className="px-6 py-16">
+      <section className="bg-[#1a1a1a] px-6 py-20">
         <div className="mx-auto max-w-7xl">
-          <h2 className="mb-10 text-center text-3xl font-bold text-zinc-900">Our Domains</h2>
+          <h2 className="mb-12 text-center text-3xl font-black text-[#EBEBEB]">Our Domains</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
             {domains.map((domain) => (
-              <div key={domain.name} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
+              <div
+                key={domain.name}
+                className="rounded-xl border border-[#2a2a2a] bg-[#121212] p-6 transition-colors hover:border-[#EF5D08]"
+              >
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#EF5D08] text-sm font-bold text-white">
                   {domain.name[0]}
                 </div>
-                <h3 className="text-lg font-bold text-zinc-900">{domain.name}</h3>
-                <p className="mt-2 line-clamp-1 text-sm text-zinc-600">{domain.description}</p>
+                <h3 className="text-lg font-bold text-[#EBEBEB]">{domain.name}</h3>
+                <p className="mt-2 text-sm text-[#9a9a9a]">{domain.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-6 py-16">
+      <section className="bg-[#121212] px-6 py-20">
         <div className="mx-auto max-w-7xl">
-          <h2 className="mb-8 text-center text-3xl font-bold text-zinc-900">Upcoming Events</h2>
+          <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Upcoming Events</h2>
           {upcomingEvents.length === 0 ? (
-            <p className="text-center text-zinc-600">No upcoming events. Check back soon.</p>
+            <p className="text-center text-[#9a9a9a]">No upcoming events. Check back soon.</p>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {upcomingEvents.slice(0, 3).map((event) => (
                 <article
                   key={event.id}
-                  className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] transition-colors hover:border-[#EF5D08]"
                 >
-                  <div className="relative aspect-video w-full bg-zinc-200">
+                  <div className="relative aspect-video w-full bg-[#121212]">
                     {event.cover_image_url ? (
                       <Image
                         src={event.cover_image_url}
@@ -149,11 +153,11 @@ export default async function HomePage() {
                     ) : null}
                   </div>
                   <div className="p-5">
-                    <h3 className="text-lg font-bold text-zinc-900">{event.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-600">{formatEventDate(event.event_date)}</p>
+                    <h3 className="text-lg font-bold text-[#EBEBEB]">{event.title}</h3>
+                    <p className="mt-1 text-sm text-[#9a9a9a]">{formatEventDate(event.event_date)}</p>
                     <Link
                       href={`/events/${event.slug}`}
-                      className="mt-4 inline-flex rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+                      className="mt-4 inline-flex rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#d44f06]"
                     >
                       View Details
                     </Link>
@@ -163,24 +167,26 @@ export default async function HomePage() {
             </div>
           )}
           <div className="mt-8 text-center">
-            <Link href="/events" className="text-sm font-semibold text-orange-600 hover:text-orange-700">
+            <Link href="/events" className="text-sm font-semibold text-[#EF5D08] hover:text-[#F29C04]">
               View All Events
             </Link>
           </div>
         </div>
       </section>
 
-      {pastEvents.length > 0 ? (
-        <section className="px-6 py-16">
-          <div className="mx-auto max-w-7xl">
-            <h2 className="mb-8 text-center text-3xl font-bold text-zinc-900">Past Events</h2>
+      <section className="bg-[#1a1a1a] px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Past Events</h2>
+          {pastEvents.length === 0 ? (
+            <p className="text-center text-[#9a9a9a]">No past events available yet.</p>
+          ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {pastEvents.slice(0, 3).map((event) => (
                 <article
                   key={event.id}
-                  className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] transition-colors hover:border-[#EF5D08]"
                 >
-                  <div className="relative aspect-video w-full bg-zinc-200">
+                  <div className="relative aspect-video w-full bg-[#121212]">
                     {event.cover_image_url ? (
                       <Image
                         src={event.cover_image_url}
@@ -191,11 +197,11 @@ export default async function HomePage() {
                     ) : null}
                   </div>
                   <div className="p-5">
-                    <h3 className="text-lg font-bold text-zinc-900">{event.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-600">{formatEventDate(event.event_date)}</p>
+                    <h3 className="text-lg font-bold text-[#EBEBEB]">{event.title}</h3>
+                    <p className="mt-1 text-sm text-[#9a9a9a]">{formatEventDate(event.event_date)}</p>
                     <Link
                       href={`/events/${event.slug}`}
-                      className="mt-4 inline-flex rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600"
+                      className="mt-4 inline-flex rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#d44f06]"
                     >
                       View Details
                     </Link>
@@ -203,19 +209,19 @@ export default async function HomePage() {
                 </article>
               ))}
             </div>
-            <div className="mt-8 text-center">
-              <Link href="/events" className="text-sm font-semibold text-orange-600 hover:text-orange-700">
-                View All Events
-              </Link>
-            </div>
+          )}
+          <div className="mt-8 text-center">
+            <Link href="/events" className="text-sm font-semibold text-[#EF5D08] hover:text-[#F29C04]">
+              View All Events
+            </Link>
           </div>
-        </section>
-      ) : null}
+        </div>
+      </section>
 
       {sponsors.length > 0 ? (
-        <section className="px-6 py-12">
+        <section className="bg-[#121212] px-6 py-16">
           <div className="mx-auto max-w-6xl">
-            <h2 className="mb-8 text-center text-3xl font-bold text-zinc-900">Our Partners</h2>
+            <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Our Partners</h2>
             <div className="flex flex-wrap items-center justify-center gap-6">
               {sponsors.map((sponsor) => (
                 <Link
@@ -223,14 +229,14 @@ export default async function HomePage() {
                   href={sponsor.website_url ?? "#"}
                   target={sponsor.website_url ? "_blank" : undefined}
                   rel={sponsor.website_url ? "noreferrer" : undefined}
-                  className="rounded-lg border border-zinc-200 bg-white p-4"
+                  className="rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-4"
                 >
                   <Image
                     src={sponsor.logo_url}
                     alt={sponsor.name}
                     width={120}
                     height={60}
-                    className="h-[60px] w-[120px] object-contain"
+                    className="h-[60px] w-[120px] object-contain opacity-70 transition-opacity hover:opacity-100"
                   />
                 </Link>
               ))}
@@ -239,16 +245,16 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section className="bg-zinc-950 px-6 py-20 text-white">
+      <section className="bg-[#EF5D08] px-6 py-24 text-white">
         <div className="mx-auto max-w-4xl text-center">
-          <h2 className="text-3xl font-bold sm:text-4xl">Join Team Vegavath</h2>
-          <p className="mt-4 text-zinc-300">
+          <h2 className="text-4xl font-black">Join Team Vegavath</h2>
+          <p className="mt-4 text-white/80">
             Be part of a community building the future of mobility and technology
           </p>
           <div className="mt-8">
             <Link
               href="/join"
-              className="inline-flex rounded-full bg-orange-500 px-7 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+              className="inline-flex rounded-lg bg-white px-8 py-3 font-bold text-[#EF5D08] transition-colors hover:bg-[#EBEBEB]"
             >
               Apply Now
             </Link>

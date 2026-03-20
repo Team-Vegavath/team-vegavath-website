@@ -40,13 +40,13 @@ export default async function GalleryPage() {
   ];
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+    <main className="mx-auto w-full max-w-7xl bg-[#121212] px-4 py-12 text-[#EBEBEB] sm:px-6 lg:px-8 lg:py-16">
       <section className="space-y-8">
         <header className="space-y-4 text-center">
-          <h1 className="text-4xl font-black tracking-[0.2em] text-white sm:text-5xl">
+          <h1 className="text-4xl font-black tracking-[0.2em] text-[#EBEBEB] sm:text-5xl">
             GALLERY
           </h1>
-          <p className="mx-auto max-w-3xl text-sm text-zinc-400 sm:text-base">
+          <p className="mx-auto max-w-3xl text-sm text-[#9a9a9a] sm:text-base">
             A visual journey through our projects, events, workshops, and
             memorable moments
           </p>
@@ -57,7 +57,7 @@ export default async function GalleryPage() {
             <button
               key={label}
               type="button"
-              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-200 transition-colors hover:border-orange-500 hover:text-orange-400"
+              className="rounded-full border border-[#2a2a2a] bg-[#1a1a1a] px-4 py-2 text-sm font-semibold text-[#EBEBEB] transition-colors hover:border-[#EF5D08] hover:text-[#F29C04]"
             >
               {label}
             </button>
@@ -65,7 +65,7 @@ export default async function GalleryPage() {
         </div>
 
         {galleryItems.length === 0 ? (
-          <p className="text-center text-base text-zinc-300">No photos yet.</p>
+          <p className="text-center text-base text-[#9a9a9a]">No photos yet.</p>
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
             {galleryItems.map((item) => (
@@ -89,7 +89,7 @@ export default async function GalleryPage() {
                 )}
 
                 {item.caption ? (
-                  <p className="text-sm text-zinc-400">{item.caption}</p>
+                  <p className="text-sm text-[#9a9a9a]">{item.caption}</p>
                 ) : null}
               </article>
             ))}

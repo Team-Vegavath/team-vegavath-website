@@ -46,20 +46,20 @@ export default async function EventDetailPage({ params }: EventPageProps) {
   });
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-16 text-zinc-100 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#1a1a1a] px-4 py-16 text-[#EBEBEB] sm:px-6 lg:px-8">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <Link
           href="/events"
-          className="inline-flex w-fit items-center text-sm font-medium text-orange-400 transition hover:text-orange-300"
+          className="inline-flex w-fit items-center text-sm font-medium text-[#EF5D08] transition hover:text-[#F29C04]"
         >
           ← Back to Events
         </Link>
 
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 shadow-xl shadow-black/20 sm:p-8">
+        <div className="rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a]/80 p-6 shadow-xl shadow-black/20 sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex flex-col gap-5">
               {event.logo_url ? (
-                <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/80">
+                <div className="relative h-20 w-20 overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a]/80">
                   <Image
                     src={event.logo_url}
                     alt={`${event.title} logo`}
@@ -71,14 +71,14 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               ) : null}
 
               <div className="space-y-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-orange-400">
+                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#EF5D08]">
                   {formattedDate}
                 </p>
-                <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">
+                <h1 className="text-3xl font-black tracking-tight text-[#EBEBEB] sm:text-5xl">
                   {event.title}
                 </h1>
                 {event.description ? (
-                  <p className="max-w-3xl text-sm leading-7 text-zinc-300 sm:text-base">
+                  <p className="max-w-3xl text-sm leading-7 text-[#9a9a9a] sm:text-base">
                     {event.description}
                   </p>
                 ) : null}
@@ -88,7 +88,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
             {event.registration_open ? (
               <Link
                 href={event.registration_form_url || "/join"}
-                className="inline-flex w-fit items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-semibold text-black transition hover:bg-orange-400"
+                className="inline-flex w-fit items-center justify-center rounded-xl bg-[#EF5D08] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#F29C04]"
               >
                 Register Now
               </Link>
@@ -97,7 +97,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
         </div>
 
         <section className="space-y-6">
-          <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+          <h2 className="text-2xl font-black tracking-tight text-[#EBEBEB] sm:text-3xl">
             Event Photos
           </h2>
 
@@ -106,7 +106,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               {galleryItems.map((item) => (
                 <div
                   key={item.id}
-                  className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80"
+                  className="overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a]/80"
                 >
                   <div className="relative aspect-video">
                     <Image
@@ -121,7 +121,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-zinc-400 sm:text-base">No photos yet.</p>
+            <p className="text-sm text-[#9a9a9a] sm:text-base">No photos yet.</p>
           )}
         </section>
       </section>
