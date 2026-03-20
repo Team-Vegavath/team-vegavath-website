@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 import { getEventBySlug, getEvents } from "@/lib/services/events";
 import { getGalleryByEvent } from "@/lib/services/gallery";
@@ -78,9 +79,9 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   {event.title}
                 </h1>
                 {event.description ? (
-                  <p className="max-w-3xl text-sm leading-7 text-[#9a9a9a] sm:text-base">
-                    {event.description}
-                  </p>
+                  <div className="prose prose-invert max-w-none text-[#9a9a9a]">
+                    <ReactMarkdown>{event.description}</ReactMarkdown>
+                  </div>
                 ) : null}
               </div>
             </div>

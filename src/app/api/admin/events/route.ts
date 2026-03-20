@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const event = await createEvent({
       ...body,
-      slug: slugify(body.title as string),
+      slug: body.slug || slugify(body.title as string),
     });
     return NextResponse.json(event, { status: 201 });
   } catch (error) {
@@ -63,8 +63,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const id = new URL(req.url).searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
     await archiveEvent(id);
