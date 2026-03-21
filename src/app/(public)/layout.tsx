@@ -29,7 +29,8 @@ export default async function PublicLayout({
   return (
     <>
       <Navbar />
-      <main>{children}</main>
+      <div className="h-20" />
+      <main className="w-full">{children}</main>
       <Footer settings={settings} />
     </>
   );

@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getUpcomingEvents, getPastEvents } from "@/lib/services/events";
 import { getActiveSponsors } from "@/lib/services/sponsors";
+import HeroDomains from "@/components/home/HeroDomains";
 import KartModelWrapper from "@/components/home/KartModelWrapper";
 
 export const metadata: Metadata = {
@@ -76,42 +77,68 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main className="bg-[#121212] text-[#EBEBEB]">
+    <div className="w-full bg-[#121212] text-[#EBEBEB]">
       <section className="relative flex min-h-screen items-center justify-center bg-[#121212] px-6 py-16">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="text-5xl font-black text-[#EBEBEB] md:text-7xl">
-            Team Vegavath
+        {/* Ambient glow */}
+        <div className="pointer-events-none absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-[#EF5D08]/10 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-[#EF5D08]/10 blur-3xl" />
+
+        <div className="relative z-10 text-center" style={{ maxWidth: "56rem", margin: "0 auto" }}>
+          <h1 className="font-black uppercase leading-none tracking-wide text-white" style={{ fontSize: "clamp(3rem, 8vw, 7rem)" }}>
+            WELCOME TO{" "}
+            <span style={{ backgroundImage: "linear-gradient(to right, #EF5D08, #F29C04)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              VEGAVATH
+            </span>
           </h1>
-          <p className="mt-4 text-lg text-[#9a9a9a] md:text-xl">
-            Innovation in Automotive, Robotics, and Technology
+
+          <p className="mt-6 font-light text-gray-300" style={{ fontSize: "clamp(1.2rem, 2.5vw, 2rem)" }}>
+            Life At{" "}
+            <span style={{ color: "#EF5D08", fontWeight: 600 }}>Full Throttle</span>
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/join"
-              className="rounded-lg bg-[#EF5D08] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#d44f06]"
-            >
-              Join Us
+
+          <HeroDomains />
+
+          <div style={{ marginTop: "3rem", display: "flex", justifyContent: "center", gap: "1.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <Link href="/about" className="font-semibold text-[#9a9a9a] transition-colors hover:text-[#EBEBEB]" style={{ fontSize: "1rem" }}>
+              Explore Vegavath →
             </Link>
-            <Link
-              href="/about"
-              className="rounded-lg border border-[#2a2a2a] px-8 py-3 font-semibold text-[#EBEBEB] transition-colors hover:border-[#EF5D08]"
-            >
-              Learn More
+            <Link href="/join">
+              <button style={{
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #EF5D08, #d44f06, #c44000)",
+                color: "white",
+                fontWeight: "700",
+                fontSize: "0.9rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 0 40px rgba(239,93,8,0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column" as const,
+              }}>
+                Start<br />Engine
+              </button>
             </Link>
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-[#1a1a1a]" />
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-[#121212]" />
       </section>
 
-      <section className="bg-[#121212] px-6 py-20">
-        <div className="mx-auto max-w-6xl">
+      <section className="w-full bg-[#121212] px-6 py-20">
+        <div className="w-full max-w-6xl" style={{ margin: "0 auto" }}>
           <h2 className="mb-8 text-center text-2xl font-bold text-[#EBEBEB]">Our Build</h2>
           <KartModelWrapper />
         </div>
       </section>
 
-      <section className="bg-[#1a1a1a] px-6 py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="w-full bg-[#1a1a1a] px-6 py-20">
+        <div className="w-full max-w-7xl" style={{ margin: "0 auto" }}>
           <h2 className="mb-12 text-center text-3xl font-black text-[#EBEBEB]">Our Domains</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
             {domains.map((domain) => (
@@ -130,8 +157,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#121212] px-6 py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="w-full bg-[#121212] px-6 py-20">
+        <div className="w-full max-w-7xl" style={{ margin: "0 auto" }}>
           <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Upcoming Events</h2>
           {upcomingEvents.length === 0 ? (
             <p className="text-center text-[#9a9a9a]">No upcoming events. Check back soon.</p>
@@ -174,8 +201,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#1a1a1a] px-6 py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="w-full bg-[#1a1a1a] px-6 py-20">
+        <div className="w-full max-w-7xl" style={{ margin: "0 auto" }}>
           <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Past Events</h2>
           {pastEvents.length === 0 ? (
             <p className="text-center text-[#9a9a9a]">No past events available yet.</p>
@@ -219,8 +246,8 @@ export default async function HomePage() {
       </section>
 
       {sponsors.length > 0 ? (
-        <section className="bg-[#121212] px-6 py-16">
-          <div className="mx-auto max-w-6xl">
+        <section className="w-full bg-[#121212] px-6 py-16">
+          <div className="w-full max-w-6xl" style={{ margin: "0 auto" }}>
             <h2 className="mb-8 text-center text-3xl font-black text-[#EBEBEB]">Our Partners</h2>
             <div className="flex flex-wrap items-center justify-center gap-6">
               {sponsors.map((sponsor) => (
@@ -245,8 +272,8 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section className="bg-[#EF5D08] px-6 py-24 text-white">
-        <div className="mx-auto max-w-4xl text-center">
+      <section className="w-full bg-[#EF5D08] px-6 py-24 text-white">
+        <div className="max-w-4xl text-center" style={{ margin: "0 auto" }}>
           <h2 className="text-4xl font-black">Join Team Vegavath</h2>
           <p className="mt-4 text-white/80">
             Be part of a community building the future of mobility and technology
@@ -261,6 +288,6 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

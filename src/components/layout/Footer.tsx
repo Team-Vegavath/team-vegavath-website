@@ -59,76 +59,56 @@ export function Footer({ settings }: FooterProps) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-[#2a2a2a] bg-[#1a1a1a] text-[#EBEBEB]">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div>
-            <p className="mb-2 text-lg font-bold">VEGAVATH</p>
-            <p className="mb-4 text-sm text-[#9a9a9a]">
-              Racing toward innovation in automotive, robotics, design, media,
-              and marketing excellence.
+    <footer className="border-t border-[#2a2a2a] bg-[#121212]">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-4">
+          <div className="md:col-span-1">
+            <p className="mb-3 text-xl font-black uppercase tracking-wider text-[#EF5D08]">VEGAVATH</p>
+            <p className="mb-6 text-sm leading-relaxed text-[#9a9a9a]">
+              Racing toward innovation in automotive, robotics, design, media, and marketing excellence.
             </p>
           </div>
+
           <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide">
-              Quick Links
-            </p>
-            <ul className="space-y-2">
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#EBEBEB]">Quick Links</p>
+            <ul className="space-y-3">
               {QUICK_LINKS.map(({ href, label }) => (
                 <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm text-[#9a9a9a] transition-colors hover:text-[#F29C04]"
-                  >
+                  <Link href={href} className="text-sm text-[#9a9a9a] transition-colors hover:text-[#F29C04]">
                     {label}
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
+
           <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide">
-              Our Domains
-            </p>
-            <ul className="space-y-2">
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#EBEBEB]">Our Domains</p>
+            <ul className="space-y-3">
               {DOMAINS.map((domain) => (
-                <li key={domain} className="text-sm text-[#9a9a9a]">
-                  {domain}
-                </li>
+                <li key={domain} className="text-sm text-[#9a9a9a]">{domain}</li>
               ))}
             </ul>
           </div>
+
           <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide">
-              Stay Connected
-            </p>
+            <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#EBEBEB]">Stay Connected</p>
             <SocialLinks settings={settings} />
-            {settings?.contact_email ? (
-              <p className="text-sm text-[#9a9a9a]">{settings.contact_email}</p>
-            ) : null}
-            {settings?.contact_address ? (
-              <p className="mt-1 text-sm text-[#9a9a9a]">
-                {settings.contact_address}
-              </p>
-            ) : null}
+            {settings?.contact_email && (
+              <p className="mt-3 text-sm text-[#9a9a9a]">{settings.contact_email}</p>
+            )}
           </div>
         </div>
-        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-[#2a2a2a] pt-6 sm:flex-row">
-          <p className="text-xs text-[#666666]">
-            {`© ${year} Team Vegavath. All rights reserved.`}
-          </p>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/legal"
-              className="text-xs text-[#666666] transition-colors hover:text-[#F29C04]"
-            >
-              Legal
-            </Link>
-            <p className="text-xs text-[#666666]">
-              Made with ♥ by Vegavath Team
-            </p>
+
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-[#2a2a2a] pt-8 sm:flex-row">
+          <p className="text-xs text-[#666666]">{`© ${year} Team Vegavath. All rights reserved.`}</p>
+          <div className="flex items-center gap-6">
+            <Link href="/legal" className="text-xs text-[#666666] transition-colors hover:text-[#F29C04]">Legal</Link>
+            <p className="text-xs text-[#666666]">Made with ♥ by Vegavath Team</p>
           </div>
         </div>
+
+        <div className="mt-4 h-px bg-gradient-to-r from-transparent via-[#EF5D08] to-transparent opacity-40" />
       </div>
     </footer>
   );
