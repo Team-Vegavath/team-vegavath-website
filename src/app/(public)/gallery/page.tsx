@@ -57,20 +57,18 @@ export default async function GalleryPage() {
   ];
 
   return (
-    <main className="bg-[#121212] text-[#EBEBEB]">
-      <section className="w-full py-24">
+    <main style={{ background: "#121212", color: "#EBEBEB", overflowX: "hidden" }}>
+      <section style={{ width: "100%", paddingTop: "6rem", paddingBottom: "6rem" }}>
         <Container>
-          <div className="space-y-8">
-            <header className="mx-auto w-full max-w-4xl space-y-4 border border-red-500 text-center">
-              <h1 className="text-4xl font-black tracking-[0.2em] text-[#EBEBEB] md:text-5xl">
+          <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            <header style={{ width: "100%", textAlign: "center" }}>
+              <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, letterSpacing: "0.15em", color: "#EBEBEB", textAlign: "center" }}>
                 GALLERY
               </h1>
-              <p className="mx-auto max-w-3xl text-sm text-[#9a9a9a] sm:text-base">
-                A visual journey through our projects, events, workshops, and
-                memorable moments
+              <p style={{ margin: "1rem auto 0", maxWidth: "48rem", fontSize: "1rem", color: "#9a9a9a", textAlign: "center" }}>
+                A visual journey through our projects, events, workshops, and memorable moments
               </p>
             </header>
-
             <GalleryClient items={galleryItems} filters={filters} />
           </div>
         </Container>

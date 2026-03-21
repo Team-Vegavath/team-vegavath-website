@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import Video from "yet-another-react-lightbox/plugins/video";
@@ -29,12 +29,6 @@ export default function GalleryClient({ items, filters }: Props) {
   const [activeFilter, setActiveFilter] = useState<FilterOption["id"]>("all");
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
-  const [isCustomCursorEnabled, setIsCustomCursorEnabled] = useState(false);
-
-  useEffect(() => {
-    const isTouch = window.matchMedia("(pointer: coarse)").matches;
-    setIsCustomCursorEnabled(!isTouch && localStorage.getItem("racing-cursor") !== "false");
-  }, []);
 
   const filtered =
     activeFilter === "all"
@@ -55,17 +49,35 @@ export default function GalleryClient({ items, filters }: Props) {
   return (
     <>
       {/* Filter tabs */}
-      <div className="flex flex-wrap justify-center gap-3">
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.75rem" }}>
         {filters.map((filter) => (
           <button
             key={filter.id}
             type="button"
             onClick={() => setActiveFilter(filter.id)}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-              activeFilter === filter.id
-                ? "border-[#EF5D08] bg-[#EF5D08] text-white"
-                : "border-[#2a2a2a] bg-[#1a1a1a] text-[#EBEBEB] hover:border-[#EF5D08] hover:text-[#F29C04]"
-            }`}
+            style={{
+              borderRadius: "9999px",
+              border: activeFilter === filter.id ? "1.5px solid #EF5D08" : "1.5px solid #EF5D08",
+              background: activeFilter === filter.id ? "#EF5D08" : "transparent",
+              color: activeFilter === filter.id ? "white" : "#EF5D08",
+              padding: "0.75rem 1.75rem",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={e => {
+              if (activeFilter !== filter.id) {
+                (e.currentTarget as HTMLButtonElement).style.background = "#EF5D08";
+                (e.currentTarget as HTMLButtonElement).style.color = "white";
+              }
+            }}
+            onMouseLeave={e => {
+              if (activeFilter !== filter.id) {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = "#EF5D08";
+              }
+            }}
           >
             {filter.label}
           </button>
@@ -76,7 +88,7 @@ export default function GalleryClient({ items, filters }: Props) {
       {filtered.length === 0 ? (
         <p className="text-center text-base text-[#9a9a9a]">No photos yet.</p>
       ) : (
-        <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+        <div className="gallery-columns">
           {filtered.map((item, index) => {
             const videoId = item.type === "video" ? getYouTubeId(item.url) : null;
             const thumbnail = videoId
@@ -92,9 +104,7 @@ export default function GalleryClient({ items, filters }: Props) {
             return (
               <article
                 key={item.id}
-                className={`mb-4 break-inside-avoid group relative ${
-                  isCustomCursorEnabled ? "cursor-none" : "cursor-auto"
-                }`}
+                className="mb-4 break-inside-avoid group relative cursor-auto"
                 onClick={() => {
                   if (item.type === "image") {
                     openLightbox(imageIndex);
@@ -119,9 +129,7 @@ export default function GalleryClient({ items, filters }: Props) {
                   </div>
                 ) : (
                   <div
-                    className={`relative aspect-video overflow-hidden rounded-lg bg-[#1a1a1a] transition-all group-hover:ring-2 group-hover:ring-[#EF5D08] ${
-                      isCustomCursorEnabled ? "cursor-none" : "cursor-auto"
-                    }`}
+                    className="relative aspect-video overflow-hidden rounded-lg bg-[#1a1a1a] transition-all group-hover:ring-2 group-hover:ring-[#EF5D08] cursor-auto"
                   >
                     {thumbnail ? (
                       <Image
@@ -159,11 +167,7 @@ export default function GalleryClient({ items, filters }: Props) {
       />
 
       {activeVideo && (
-        <div
-          className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 ${
-            isCustomCursorEnabled ? "cursor-none" : "cursor-auto"
-          }`}
-        >
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 cursor-auto">
           <button
             onClick={() => setActiveVideo(null)}
             className="absolute top-5 right-5 text-white text-3xl"
@@ -171,19 +175,13 @@ export default function GalleryClient({ items, filters }: Props) {
             ✕
           </button>
 
-          <div
-            className={`relative mx-auto aspect-[9/16] w-[90vw] max-w-[500px] ${
-              isCustomCursorEnabled ? "cursor-none" : "cursor-auto"
-            }`}
-          >
+          <div className="relative mx-auto aspect-[9/16] w-[90vw] max-w-[500px] cursor-auto">
             <iframe
               src={activeVideo}
               title="Video"
               allow="autoplay; encrypted-media"
               allowFullScreen
-              className={`w-full h-full pointer-events-auto ${
-                isCustomCursorEnabled ? "cursor-none" : "cursor-auto"
-              }`}
+              className="w-full h-full pointer-events-auto cursor-auto"
             />
           </div>
         </div>
