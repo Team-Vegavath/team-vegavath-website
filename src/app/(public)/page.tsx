@@ -142,7 +142,17 @@ export default async function HomePage() {
                     <p className="mt-1 text-[#9a9a9a]" style={{ fontSize: "1rem" }}>{formatEventDate(event.event_date)}</p>
                     <Link
                       href={`/events/${event.slug}`}
-                      className="mt-4 inline-flex rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#d44f06]"
+                      className="mt-4 inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
+                      style={{
+                        alignItems: "center",
+                        borderRadius: "9999px",
+                        border: "1.5px solid #EF5D08",
+                        background: "transparent",
+                        padding: "0.5rem 1.25rem",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
                     >
                       View Details
                     </Link>
@@ -152,7 +162,20 @@ export default async function HomePage() {
             </div>
           )}
           <div className="mt-10 text-center" style={{ textAlign: "center" }}>
-            <Link href="/events" className="text-sm font-semibold text-[#EF5D08] hover:text-[#F29C04]">
+            <Link
+              href="/events"
+              className="inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
+              style={{
+                alignItems: "center",
+                borderRadius: "9999px",
+                border: "1.5px solid #EF5D08",
+                background: "transparent",
+                padding: "0.6rem 1.5rem",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
               View All Events
             </Link>
           </div>
@@ -186,7 +209,17 @@ export default async function HomePage() {
                     <p className="mt-1 text-[#9a9a9a]" style={{ fontSize: "1rem" }}>{formatEventDate(event.event_date)}</p>
                     <Link
                       href={`/events/${event.slug}`}
-                      className="mt-4 inline-flex rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#d44f06]"
+                      className="mt-4 inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
+                      style={{
+                        alignItems: "center",
+                        borderRadius: "9999px",
+                        border: "1.5px solid #EF5D08",
+                        background: "transparent",
+                        padding: "0.5rem 1.25rem",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
                     >
                       View Details
                     </Link>
@@ -196,7 +229,20 @@ export default async function HomePage() {
             </div>
           )}
           <div className="mt-10 text-center" style={{ textAlign: "center" }}>
-            <Link href="/events" className="text-sm font-semibold text-[#EF5D08] hover:text-[#F29C04]">
+            <Link
+              href="/events"
+              className="inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
+              style={{
+                alignItems: "center",
+                borderRadius: "9999px",
+                border: "1.5px solid #EF5D08",
+                background: "transparent",
+                padding: "0.6rem 1.5rem",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
               View All Events
             </Link>
           </div>

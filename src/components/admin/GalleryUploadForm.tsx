@@ -181,7 +181,7 @@ export default function GalleryUploadForm() {
   };
 
   return (
-    <section className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB] sm:p-6">
+    <section style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#18181b", padding: "1.5rem", color: "#EBEBEB", boxSizing: "border-box" }}>
       <div className="space-y-8">
         <form onSubmit={handleImageUpload} className="space-y-4">
           <h2 className="text-xl font-semibold text-[#EBEBEB]">Upload Images</h2>

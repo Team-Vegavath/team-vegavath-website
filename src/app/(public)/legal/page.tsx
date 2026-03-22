@@ -11,12 +11,25 @@ export default function LegalPage() {
   return (
     <main className="min-h-screen bg-[#121212] text-[#EBEBEB]">
       <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="w-fit text-sm text-[#9a9a9a] transition-colors hover:text-[#EBEBEB]"
-        >
-          ← Back to home
-        </Link>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "2rem" }}>
+          <Link
+            href="/"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              borderRadius: "9999px",
+              border: "1px solid #3f3f46",
+              padding: "0.4rem 1rem",
+              fontSize: "0.8rem",
+              color: "#a1a1aa",
+              textDecoration: "none",
+              transition: "all 0.2s",
+              width: "fit-content",
+            }}
+          >
+            ← Back to home
+          </Link>
+        </div>
 
         <div className="mb-16 text-center">
           <h1 className="mb-4 text-4xl font-bold text-[#EBEBEB] md:text-5xl">

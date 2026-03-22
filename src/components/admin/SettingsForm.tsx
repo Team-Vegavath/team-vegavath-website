@@ -30,7 +30,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }}
-      className="rounded-xl border border-zinc-800 bg-zinc-900 p-5"
+      style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.5rem", boxSizing: "border-box" }}
     >
       <h2 className="mb-4 text-lg font-bold text-zinc-100">Recruitment &amp; Maintenance</h2>
 
@@ -39,7 +39,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         name="recruitment_open"
         value={recruitmentOpen ? "true" : "false"}
       />
-      <div className="mb-3 flex items-center justify-between rounded-lg bg-zinc-800 p-4">
+      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "0.5rem", background: "#27272a", padding: "1rem" }}>
         <span className="text-sm font-medium text-zinc-200">Recruitment Open</span>
         <div
           onClick={() => setRecruitmentOpen((prev) => !prev)}
@@ -60,7 +60,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         name="maintenance_mode"
         value={maintenanceMode ? "true" : "false"}
       />
-      <div className="mb-3 flex items-center justify-between rounded-lg bg-zinc-800 p-4">
+      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "0.5rem", background: "#27272a", padding: "1rem" }}>
         <span className="text-sm font-medium text-zinc-200">Maintenance Mode</span>
         <div
           onClick={() => setMaintenanceMode((prev) => !prev)}
@@ -87,7 +87,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         type="email"
         value={contactEmail}
         onChange={(event) => setContactEmail(event.target.value)}
-        className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-white placeholder-zinc-400 focus:border-orange-500 focus:outline-none"
+        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
       />
 
       <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="contact_address">
@@ -99,7 +99,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         type="text"
         value={contactAddress}
         onChange={(event) => setContactAddress(event.target.value)}
-        className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-white placeholder-zinc-400 focus:border-orange-500 focus:outline-none"
+        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
       />
 
       <h2 className="mt-6 mb-4 text-lg font-bold text-zinc-100">Social Media Links</h2>
@@ -113,7 +113,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         type="url"
         value={instagramUrl}
         onChange={(event) => setInstagramUrl(event.target.value)}
-        className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-white placeholder-zinc-400 focus:border-orange-500 focus:outline-none"
+        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
       />
 
       <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="linkedin_url">
@@ -125,7 +125,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         type="url"
         value={linkedinUrl}
         onChange={(event) => setLinkedinUrl(event.target.value)}
-        className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-white placeholder-zinc-400 focus:border-orange-500 focus:outline-none"
+        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
       />
 
       <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="github_url">
@@ -137,7 +137,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         type="url"
         value={githubUrl}
         onChange={(event) => setGithubUrl(event.target.value)}
-        className="mb-4 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-white placeholder-zinc-400 focus:border-orange-500 focus:outline-none"
+        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
       />
 
       <button

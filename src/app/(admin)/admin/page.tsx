@@ -43,12 +43,12 @@ export default async function AdminLoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-10">
-      <section className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl shadow-black/40">
-        <Link href="/" className="text-zinc-400 hover:text-white text-sm transition-colors">
+    <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#09090b", padding: "2.5rem 1rem" }}>
+      <section style={{ width: "100%", maxWidth: "28rem", borderRadius: "1rem", border: "1px solid #27272a", background: "#18181b", padding: "2.5rem", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
+        <Link href="/" style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", marginBottom: "1.5rem", transition: "all 0.2s" }}>
           ← Back to site
         </Link>
-        <div className="mb-8 text-center">
+        <div style={{ marginBottom: "2rem", textAlign: "center" }}>
           <div className="mb-3 text-3xl" aria-hidden="true">
             ⚠️
           </div>
@@ -60,7 +60,7 @@ export default async function AdminLoginPage({
           </p>
         </div>
 
-        <form action={handleLogin} className="space-y-4">
+        <form action={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.5rem" }}>
           <div>
             <label htmlFor="username" className="sr-only">
               Username
@@ -71,7 +71,7 @@ export default async function AdminLoginPage({
               type="text"
               placeholder="Enter username"
               required
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none"
+              style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.875rem 1rem", fontSize: "1rem", color: "#f4f4f5", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" }}
             />
           </div>
 
@@ -85,7 +85,7 @@ export default async function AdminLoginPage({
               type="password"
               placeholder="Enter password"
               required
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none"
+              style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.875rem 1rem", fontSize: "1rem", color: "#f4f4f5", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" }}
             />
           </div>
 
@@ -97,7 +97,7 @@ export default async function AdminLoginPage({
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-gradient-to-r from-red-600 to-orange-500 px-4 py-3 text-sm font-bold tracking-wide text-white transition hover:from-red-500 hover:to-orange-400 focus:outline-none"
+            style={{ width: "100%", borderRadius: "9999px", background: "linear-gradient(to right, #dc2626, #EF5D08)", padding: "0.875rem 1rem", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.05em", color: "white", border: "none", cursor: "pointer", transition: "opacity 0.2s" }}
           >
             ACCESS SYSTEM
           </button>

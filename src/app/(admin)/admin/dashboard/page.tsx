@@ -61,74 +61,54 @@ export default async function AdminDashboardPage() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-4 py-10 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-3xl font-extrabold tracking-tight">Admin Dashboard</h1>
+    <main style={{ minHeight: "100vh", background: "#09090b", color: "white" }}>
+      <div style={{ margin: "0 auto", width: "100%", maxWidth: "72rem", display: "flex", flexDirection: "column", gap: "2rem", boxSizing: "border-box", padding: "6rem 2rem 4rem" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", paddingBottom: "1rem", borderBottom: "1px solid #27272a" }}>
+          <h1 style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 900, color: "#EBEBEB" }}>Admin Dashboard</h1>
           <SignOutButton />
         </header>
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Total Events</p>
-            <p className="mt-2 text-3xl font-bold text-zinc-100">{events.length}</p>
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 12rem), 1fr))", gap: "1rem" }}>
+          <article style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem" }}>
+            <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#71717a" }}>Total Events</p>
+            <p style={{ marginTop: "0.5rem", fontSize: "2rem", fontWeight: 700, color: "#EBEBEB" }}>{events.length}</p>
           </article>
-
-          <article className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Total Members</p>
-            <p className="mt-2 text-3xl font-bold text-zinc-100">{members.length}</p>
+          <article style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem" }}>
+            <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#71717a" }}>Total Members</p>
+            <p style={{ marginTop: "0.5rem", fontSize: "2rem", fontWeight: 700, color: "#EBEBEB" }}>{members.length}</p>
           </article>
-
-          <article className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">
-              Pending Applications
-            </p>
-            <p className="mt-2 text-3xl font-bold text-zinc-100">{pendingApplications}</p>
+          <article style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem" }}>
+            <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#71717a" }}>Pending Applications</p>
+            <p style={{ marginTop: "0.5rem", fontSize: "2rem", fontWeight: 700, color: "#EBEBEB" }}>{pendingApplications}</p>
           </article>
-
-          <article className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Recruitment Status</p>
-            <p
-              className={`mt-2 text-3xl font-bold ${
-                settings.recruitment_open ? "text-emerald-400" : "text-red-400"
-              }`}
-            >
+          <article style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem" }}>
+            <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#71717a" }}>Recruitment Status</p>
+            <p style={{ marginTop: "0.5rem", fontSize: "2rem", fontWeight: 700, color: settings.recruitment_open ? "#4ade80" : "#f87171" }}>
               {settings.recruitment_open ? "OPEN" : "CLOSED"}
             </p>
           </article>
         </section>
 
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            href="/admin/events"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm font-semibold text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            Manage Events
-          </Link>
-          <Link
-            href="/admin/team"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm font-semibold text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            Manage Team
-          </Link>
-          <Link
-            href="/admin/gallery"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm font-semibold text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            Manage Gallery
-          </Link>
-          <Link
-            href="/admin/sponsors"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm font-semibold text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            Manage Sponsors
-          </Link>
-          <Link
-            href="/admin/settings"
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm font-semibold text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            Settings
-          </Link>
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 14rem), 1fr))", gap: "1rem" }}>
+          {(
+            [
+              { href: "/admin/events", label: "Manage Events", emoji: "📅" },
+              { href: "/admin/team", label: "Manage Team", emoji: "👥" },
+              { href: "/admin/gallery", label: "Manage Gallery", emoji: "🖼️" },
+              { href: "/admin/sponsors", label: "Manage Sponsors", emoji: "🤝" },
+              { href: "/admin/settings", label: "Settings", emoji: "⚙️" },
+            ] as const
+          ).map(({ href, label, emoji }) => (
+            <Link
+              key={href}
+              href={href}
+              style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, color: "#EBEBEB", textDecoration: "none", transition: "border-color 0.2s" }}
+              className="hover:border-[#EF5D08]"
+            >
+              <span style={{ fontSize: "1.25rem" }}>{emoji}</span>
+              {label}
+            </Link>
+          ))}
         </section>
 
         <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">

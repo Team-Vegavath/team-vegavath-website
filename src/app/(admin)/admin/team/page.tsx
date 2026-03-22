@@ -29,11 +29,11 @@ export default async function AdminTeamPage({
 
   if (resolvedSearchParams.new === "true") {
     return (
-      <main className="min-h-screen bg-[#121212] px-4 py-10 text-[#EBEBEB] sm:px-6 lg:px-8">
+      <main style={{ minHeight: "100vh", background: "#09090b", color: "#EBEBEB", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
           <Link
             href="/admin/team"
-            className="w-fit text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+            style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
           >
             ← Back to team list
           </Link>
@@ -47,10 +47,10 @@ export default async function AdminTeamPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#121212] px-4 py-10 text-[#EBEBEB] sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#EBEBEB]">Manage Team</h1>
+    <main style={{ minHeight: "100vh", background: "#09090b", color: "#EBEBEB", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
+      <div style={{ margin: "0 auto", width: "100%", maxWidth: "72rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", fontWeight: 900, color: "#EBEBEB" }}>Manage Team</h1>
           <Link
             href="/admin/team?new=true"
             className="w-fit rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#d84f00]"
@@ -131,7 +131,7 @@ export default async function AdminTeamPage({
 
         <Link
           href="/admin/dashboard"
-          className="w-fit text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+          style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
         >
           ← Back to dashboard
         </Link>
