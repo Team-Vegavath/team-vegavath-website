@@ -9,7 +9,7 @@ type Props = {
   events: Event[];
 };
 
-const FILTER_LABELS = ["All", "Workshops", "Competitions", "Talks"] as const;
+const FILTER_LABELS = ["All", "Workshops", "Hackathons", "Competitions", "Talks"] as const;
 type FilterLabel = (typeof FILTER_LABELS)[number];
 
 export default function EventsClient({ events }: Props) {

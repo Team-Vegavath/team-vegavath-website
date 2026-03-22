@@ -2,7 +2,7 @@ export interface Event {
   id: string;
   slug: string;
   title: string;
-  category: "workshops" | "competitions" | "talks" | "other";
+  category: "workshops" | "hackathons" | "competitions" | "talks" | "other";
   status: "upcoming" | "past" | "archived";
   description: string | null;
   event_date: string;

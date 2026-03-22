@@ -9,8 +9,8 @@ export const revalidate = 120;
 
 export default function LegalPage() {
   return (
-    <main className="min-h-screen bg-[#121212] text-[#EBEBEB]">
-      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+    <main style={{ minHeight: "100vh", background: "#121212", color: "#EBEBEB", overflowX: "hidden" }}>
+      <div style={{ margin: "0 auto", width: "100%", maxWidth: "80rem", padding: "6rem 1.5rem 4rem", boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "2rem" }}>
           <Link
             href="/"
@@ -39,8 +39,8 @@ export default function LegalPage() {
           <p className="mt-2 text-sm text-[#9a9a9a]">Last Updated: October 25, 2025</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-8">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 28rem), 1fr))", gap: "2rem" }}>
+          <div style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
             <h2 className="mb-6 flex items-center gap-3 text-3xl font-bold text-[#EBEBEB]">
               <span className="text-[#EF5D08]">🔒</span>
               Privacy Policy
@@ -119,7 +119,7 @@ export default function LegalPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-8">
+          <div style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
             <h2 className="mb-6 flex items-center gap-3 text-3xl font-bold text-[#EBEBEB]">
               <span className="text-[#EF5D08]">📜</span>
               Terms of Service
@@ -138,8 +138,11 @@ export default function LegalPage() {
               <section>
                 <h3 className="mb-3 text-xl font-semibold text-[#EBEBEB]">2. About Team Vegavath</h3>
                 <p className="text-sm leading-relaxed">
-                  Team Vegavath is a student-run technical club. We organize events, hackathons,
-                  and workshops. Participation is voluntary and subject to these terms.
+                  Team Vegavath is a student-run technical club at PES University, Electronic City
+                  Campus (PESU ECC). We organize workshops, hackathons, tech talks, and other
+                  events across domains including Coding, Automotives, Robotics, Design,
+                  Operations, and Social Media. Participation is voluntary and subject to these
+                  terms.
                 </p>
               </section>
 

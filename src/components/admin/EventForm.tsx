@@ -173,6 +173,7 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           className={inputClassName}
         >
           <option value="workshops">workshops</option>
+          <option value="hackathons">hackathons</option>
           <option value="competitions">competitions</option>
           <option value="talks">talks</option>
           <option value="other">other</option>

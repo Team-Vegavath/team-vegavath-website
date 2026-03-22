@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import AboutHeroImage from "@/components/about/AboutHeroImage";
 import { getActiveSponsors } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
@@ -116,14 +117,7 @@ export default async function AboutPage() {
             </p>
           </div>
 
-          <div className="aspect-video rounded-3xl overflow-hidden" style={{ position: "relative" }}>
-            <Image
-              src="https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/team/team-photo.jpeg"
-              alt="Team Vegavath"
-              fill
-              style={{ objectFit: "cover" }}
-            />
-          </div>
+          <AboutHeroImage />
         </section>
 
         <section className="rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a] text-center shadow-sm" style={{ padding: "2.5rem 1.5rem" }}>
@@ -211,7 +205,7 @@ export default async function AboutPage() {
                 Rooted in our racing heritage, Team Vegavath has grown into a
                 collaborative student club building across mobility, robotics,
                 software, design, and outreach. We turn ambitious ideas into
-                prototypes, competitions, and hands-on learning experiences.
+                prototypes, hackathons, and hands-on learning experiences.
               </p>
             </div>
 
