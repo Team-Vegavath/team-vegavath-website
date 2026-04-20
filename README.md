@@ -1,6 +1,6 @@
 # Team Vegavath Official Website
 
-The official website for Team Vegavath — the student innovation club of PES University, Electronic City Campus (PESU ECC). Built with Next.js 16 App Router, featuring a mobile-first design, 3D kart model viewer, and a full admin panel.
+The official website for Team Vegavath - the student innovation club of PES University, Electronic City Campus (PESU ECC). Built with Next.js 16 App Router, featuring a mobile-first design, 3D kart model viewer, and a full admin panel.
 
 ## Tech Stack
 
@@ -18,15 +18,15 @@ The official website for Team Vegavath — the student innovation club of PES Un
 
 ## Features
 
-- **Homepage** — Hero with 3D interactive go-kart model (desktop), domain pills, events preview, sponsors marquee, join banner
-- **About** — Team info, mission, domains, sponsors carousel, journey timeline, values
-- **Events** — Filter by category (Workshops, Hackathons, Competitions, Talks), event detail pages with media lightbox
-- **Gallery** — Masonry grid with lightbox, filter by event, YouTube video support
-- **Crew** — Core, Crew, and Legacy tier display with member cards
-- **Sponsors** — Premium and community partner tiers
-- **Join** — Recruitment form (when open) with DB storage, closed state when recruitment is off
-- **Legal** — Privacy policy and terms of service
-- **Admin Panel** — Full CRUD for events, team, gallery, sponsors, settings, applications
+- **Homepage** - Hero with 3D interactive go-kart model (desktop), domain pills, events preview, sponsors marquee, join banner
+- **About** - Team info, mission, domains, sponsors carousel, journey timeline, values
+- **Events** - Filter by category (Workshops, Hackathons, Competitions, Talks), event detail pages with media lightbox
+- **Gallery** - Masonry grid with lightbox, filter by event, YouTube video support
+- **Crew** - Core, Crew, and Legacy tier display with member cards
+- **Sponsors** - Premium and community partner tiers
+- **Join** - Recruitment form (when open) with DB storage, closed state when recruitment is off
+- **Legal** - Privacy policy and terms of service
+- **Admin Panel** - Full CRUD for events, team, gallery, sponsors, settings, applications
 
 ## Design System
 
@@ -133,12 +133,12 @@ src/
 ## Database Schema
 
 ```sql
-events         — id, title, slug, category, status, description, event_date, cover_image_url, registration_open
-team_members   — id, name, role, tier (core|crew|legacy), domain, photo_url, quote, linkedin_url
-gallery_items  — id, event_id, event_label, type (image|video), url, thumbnail_url, caption
-sponsors       — id, name, logo_url, website_url, description, tier (premium|community)
-applications   — id, name, email, domain_interest, portfolio_url, status
-site_settings  — key, value (recruitment_open, contact_email, social URLs, etc.)
+events         - id, title, slug, category, status, description, event_date, cover_image_url, registration_open
+team_members   - id, name, role, tier (core|crew|legacy), domain, photo_url, quote, linkedin_url
+gallery_items  - id, event_id, event_label, type (image|video), url, thumbnail_url, caption
+sponsors       - id, name, logo_url, website_url, description, tier (premium|community)
+applications   - id, name, email, domain_interest, portfolio_url, status
+site_settings  - key, value (recruitment_open, contact_email, social URLs, etc.)
 ```
 
 ## Media Storage (Cloudflare R2)
@@ -167,9 +167,9 @@ Features:
 
 ## Known Issues & Notes
 
-- Tailwind v4 `mx-auto` and responsive prefix classes do not generate CSS in this setup — all centering uses inline styles or `@utility` blocks in globals.css
+- Tailwind v4 `mx-auto` and responsive prefix classes do not generate CSS in this setup - all centering uses inline styles or `@utility` blocks in globals.css
 - 3D kart model is desktop-only (mobile shows placeholder)
-- Neon free tier suspends after 5 min inactivity — first request after suspension takes 2-5 seconds to wake
+- Neon free tier suspends after 5 min inactivity - first request after suspension takes 2-5 seconds to wake
 
 ## Browser Support
 
