@@ -31,7 +31,7 @@ export default function KartModelSection() {
             <Stage
               environment="city"
               intensity={0.6}
-              adjustCamera={4}
+              adjustCamera={2}
               preset="rembrandt"
             >
               <KartModel />

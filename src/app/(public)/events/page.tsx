@@ -21,7 +21,7 @@ export default async function EventsPage() {
 
   return (
     <main className="bg-[#121212] text-[#EBEBEB]">
-      <section className="w-full py-24">
+      <section style={{ width: "100%", padding: "6rem 0 8rem" }}>
         <Container>
           <div className="space-y-8">
             <header style={{ width: "100%", textAlign: "center", marginBottom: "1rem" }}>

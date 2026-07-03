@@ -63,9 +63,9 @@ export default async function HomePage() {
         <div className="relative z-10 text-center" style={{ maxWidth: "56rem", margin: "0 auto", textAlign: "center" }}>
           <h1 className="font-black uppercase leading-none tracking-wide text-white" style={{ fontSize: "clamp(3rem, 8vw, 7rem)", textAlign: "center" }}>
             WELCOME TO{" "}
-            <span style={{ backgroundImage: "linear-gradient(to right, #EF5D08, #F29C04)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <Link href="/about" style={{ backgroundImage: "linear-gradient(to right, #EF5D08, #F29C04)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", textDecoration: "none" }}>
               VEGAVATH
-            </span>
+            </Link>
           </h1>
 
           <p className="mt-6 font-light text-gray-300" style={{ fontSize: "clamp(1.2rem, 2.5vw, 2rem)" }}>
@@ -74,9 +74,6 @@ export default async function HomePage() {
           </p>
 
           <div style={{ marginTop: "3rem", display: "flex", justifyContent: "center", gap: "1.5rem", alignItems: "center", flexWrap: "wrap" }}>
-            <Link href="/about" className="font-semibold text-[#9a9a9a] transition-colors hover:text-[#EBEBEB]" style={{ fontSize: "1rem" }}>
-              Explore Vegavath →
-            </Link>
             <Link href="/join">
               <button style={{
                 width: "120px",
@@ -107,7 +104,7 @@ export default async function HomePage() {
 
       <section className="w-full bg-[#121212] px-6 py-24 md:py-28" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
         <div className="w-full max-w-6xl center-wrap" style={{ margin: "0 auto", paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
-          <h2 className="mb-12 text-center text-4xl font-black text-[#EBEBEB] text-mid" style={{ textAlign: "center" }}>Our Build</h2>
+          <h2 className="text-center text-4xl font-black text-[#EBEBEB] text-mid" style={{ textAlign: "center", marginBottom: "2rem" }}>Our Build</h2>
           <KartModelWrapper />
           <div className="flex-mid" style={{ marginTop: "3.5rem", display: "flex", justifyContent: "center", textAlign: "center" }}>
             <HeroDomains />
@@ -117,9 +114,14 @@ export default async function HomePage() {
 
       <section className="w-full bg-[#121212] px-6 pb-24 pt-28 md:pb-28 md:pt-32" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "4rem" }}>
         <div className="w-full max-w-7xl center-wrap" style={{ margin: "0 auto", paddingLeft: "1rem", paddingRight: "1rem" }}>
-          <h2 className="mb-10 text-center font-black text-[#EBEBEB] text-mid" style={{ fontSize: "2.5rem", textAlign: "center" }}>Upcoming Events</h2>
+          <h2 className="text-center font-black text-[#EBEBEB] text-mid" style={{ fontSize: "2.5rem", textAlign: "center", marginBottom: "2rem" }}>Upcoming Events</h2>
           {upcomingEvents.length === 0 ? (
-            <p className="text-center text-[#9a9a9a]" style={{ textAlign: "center" }}>No upcoming events. Check back soon.</p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem", marginTop: "1.5rem" }}>
+              <p style={{ textAlign: "center", color: "#9a9a9a" }}>No upcoming events. Check back soon.</p>
+              <Link href="/events" style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", background: "transparent", color: "#EF5D08", padding: "0.6rem 1.5rem", fontSize: "0.9rem", fontWeight: 600, textDecoration: "none" }}>
+                View All Events
+              </Link>
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3 center-wrap" style={{ paddingLeft: "0.75rem", paddingRight: "0.75rem" }}>
               {upcomingEvents.slice(0, 3).map((event) => (
@@ -161,30 +163,12 @@ export default async function HomePage() {
               ))}
             </div>
           )}
-          <div className="mt-10 text-center" style={{ textAlign: "center" }}>
-            <Link
-              href="/events"
-              className="inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
-              style={{
-                alignItems: "center",
-                borderRadius: "9999px",
-                border: "1.5px solid #EF5D08",
-                background: "transparent",
-                padding: "0.6rem 1.5rem",
-                fontSize: "0.9rem",
-                fontWeight: 600,
-                textDecoration: "none",
-              }}
-            >
-              View All Events
-            </Link>
           </div>
-        </div>
       </section>
 
       <section className="w-full bg-[#1a1a1a] px-6 py-24 md:py-28" style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "3rem" }}>
         <div className="w-full max-w-7xl center-wrap" style={{ margin: "0 auto" }}>
-          <h2 className="mb-10 text-center font-black text-[#EBEBEB] text-mid" style={{ fontSize: "2.5rem", textAlign: "center" }}>Past Events</h2>
+          <h2 className="text-center font-black text-[#EBEBEB] text-mid" style={{ fontSize: "2.5rem", textAlign: "center", marginBottom: "2.5rem" }}>Past Events</h2>
           {pastEvents.length === 0 ? (
             <p className="text-center text-[#9a9a9a]" style={{ textAlign: "center" }}>No past events available yet.</p>
           ) : (
@@ -204,7 +188,7 @@ export default async function HomePage() {
                       />
                     ) : null}
                   </div>
-                  <div className="p-5">
+                  <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                     <h3 className="font-bold text-[#EBEBEB]" style={{ fontSize: "1.25rem" }}>{event.title}</h3>
                     <p className="mt-1 text-[#9a9a9a]" style={{ fontSize: "1rem" }}>{formatEventDate(event.event_date)}</p>
                     <Link
@@ -228,7 +212,7 @@ export default async function HomePage() {
               ))}
             </div>
           )}
-          <div className="mt-10 text-center" style={{ textAlign: "center" }}>
+          <div style={{ marginTop: "3rem", textAlign: "center" }}>
             <Link
               href="/events"
               className="inline-flex border-[#EF5D08] text-[#EF5D08] transition-colors hover:border-[#d44f06] hover:text-[#d44f06]"
@@ -252,7 +236,7 @@ export default async function HomePage() {
       {sponsors.length > 0 ? (
         <section className="w-full bg-[#121212] px-6 py-24 md:py-28" style={{ overflow: "hidden", marginTop: "3rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div className="w-full max-w-6xl center-wrap" style={{ margin: "0 auto", paddingLeft: "1rem", paddingRight: "1rem" }}>
-            <h2 className="mb-12 text-center text-4xl font-black text-[#EBEBEB] text-mid" style={{ textAlign: "center" }}>Our Partners</h2>
+            <h2 className="text-center text-4xl font-black text-[#EBEBEB] text-mid" style={{ textAlign: "center", marginBottom: "2.5rem" }}>Our Partners</h2>
             <div style={{ overflow: "hidden", borderRadius: "1.5rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 0", margin: "0 auto" }}>
               <div style={{ display: "flex", width: "max-content", alignItems: "center", gap: "2.5rem", paddingLeft: "2.5rem", animation: "sponsor-marquee 24s linear infinite" }}>
                 {[...sponsors, ...sponsors].map((sponsor, index) => (
@@ -287,7 +271,7 @@ export default async function HomePage() {
               Be part of a community building the future of mobility and technology
             </p>
           </div>
-          <div className="mt-8">
+          <div style={{ marginTop: "2.5rem" }}>
             <Link
               href="/join"
               style={{ display: "inline-flex", alignItems: "center", background: "white", color: "#EF5D08", fontWeight: 700, fontSize: "1.1rem", borderRadius: "9999px", padding: "0.875rem 2.5rem", textDecoration: "none", transition: "background 0.2s" }}

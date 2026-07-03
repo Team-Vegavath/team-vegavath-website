@@ -151,14 +151,13 @@ export default async function AboutPage() {
 
         {sponsors.length > 0 ? (
           <section className="space-y-8 overflow-hidden">
-            <h2 className="text-2xl font-bold tracking-tight text-[#EBEBEB]" style={{ textAlign: "center" }}>
+            <h2 className="text-2xl font-bold tracking-tight text-[#EBEBEB]" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
               Our Sponsors
             </h2>
 
             <div className="overflow-hidden rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a] py-6">
               <div
-                className="flex w-max items-center gap-6 px-6"
-                style={{ animation: "sponsor-marquee 24s linear infinite" }}
+                style={{ display: "flex", width: "max-content", alignItems: "center", gap: "1.5rem", paddingLeft: "1.5rem", paddingRight: "1.5rem", animation: "sponsor-marquee 24s linear infinite" }}
               >
                 {marqueeSponsors.map((sponsor, index) => {
                   const content = (
@@ -210,17 +209,17 @@ export default async function AboutPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">10+</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Projects</p>
+              <div style={{ borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#222222", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                <p style={{ fontSize: "1.5rem", fontWeight: 900, color: "#EF5D08" }}>10+</p>
+                <p style={{ marginTop: "0.25rem", fontSize: "0.875rem", fontWeight: 500, color: "#9a9a9a" }}>Projects</p>
               </div>
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">3+</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Awards</p>
+              <div style={{ borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#222222", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                <p style={{ fontSize: "1.5rem", fontWeight: 900, color: "#EF5D08" }}>3+</p>
+                <p style={{ marginTop: "0.25rem", fontSize: "0.875rem", fontWeight: 500, color: "#9a9a9a" }}>Awards</p>
               </div>
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">85</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Active Members</p>
+              <div style={{ borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#222222", padding: "1.25rem", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                <p style={{ fontSize: "1.5rem", fontWeight: 900, color: "#EF5D08" }}>85</p>
+                <p style={{ marginTop: "0.25rem", fontSize: "0.875rem", fontWeight: 500, color: "#9a9a9a" }}>Active Members</p>
               </div>
             </div>
           </div>
@@ -231,7 +230,7 @@ export default async function AboutPage() {
               <p className="text-base leading-7 text-[#9a9a9a]">{missionText}</p>
             </div>
 
-            <div className="space-y-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {visionDomains.map((domain) => (
                 <div
                   key={domain}
@@ -304,10 +303,10 @@ export default async function AboutPage() {
                 <div className="text-3xl" aria-hidden="true">
                   {value.icon}
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-[#EBEBEB]">
+                <h3 style={{ marginTop: "1rem", fontSize: "1.1rem", fontWeight: 700, color: "#EBEBEB" }}>
                   {value.title}
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-[#9a9a9a]">
+                <p style={{ marginTop: "0.75rem", fontSize: "0.875rem", lineHeight: 1.7, color: "#9a9a9a" }}>
                   {value.description}
                 </p>
               </article>
