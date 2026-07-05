@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AuthError } from "next-auth";
 
 import { auth, signIn } from "@/lib/auth";
 
@@ -29,12 +30,9 @@ export default async function AdminLoginPage({
         redirectTo: "/admin/dashboard",
       });
     } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.message === "CredentialsSignin" ||
-          error.constructor.name === "CredentialsSignin" ||
-          String(error).includes("CredentialsSignin"))
-      ) {
+      // instanceof survives production minification; string/constructor-name
+      // checks do not — that mismatch was crashing prod on wrong passwords.
+      if (error instanceof AuthError) {
         redirect("/admin?error=invalid");
       }
       // Re-throw redirect errors so Next.js handles them correctly
@@ -43,24 +41,25 @@ export default async function AdminLoginPage({
   }
 
   return (
-    <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#09090b", padding: "2.5rem 1rem" }}>
-      <section style={{ width: "100%", maxWidth: "28rem", borderRadius: "1rem", border: "1px solid #27272a", background: "#18181b", padding: "2.5rem", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
-        <Link href="/" style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", marginBottom: "1.5rem", transition: "all 0.2s" }}>
+    <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--bg-base)", padding: "2.5rem 1rem" }}>
+      <section style={{ width: "100%", maxWidth: "28rem", border: "1px solid var(--border-strong)", background: "var(--bg-card)", padding: "2.5rem" }}>
+        <Link
+          href="/"
+          className="mono"
+          style={{ display: "inline-flex", alignItems: "center", fontSize: "0.75rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem" }}
+        >
           ← Back to site
         </Link>
-        <div style={{ marginBottom: "2rem", textAlign: "center" }}>
-          <div className="mb-3 text-3xl" aria-hidden="true">
-            ⚠️
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-wide text-zinc-100">
+        <div style={{ marginBottom: "2rem" }}>
+          <h1 className="heading" style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-primary)" }}>
             RESTRICTED ACCESS
           </h1>
-          <p className="mt-2 text-sm uppercase tracking-[0.2em] text-zinc-400">
-            Authorized Personnel Only
+          <p className="mono" style={{ marginTop: "0.5rem", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>
+            Authorized personnel only
           </p>
         </div>
 
-        <form action={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.5rem" }}>
+        <form action={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <label htmlFor="username" className="sr-only">
               Username
@@ -69,9 +68,9 @@ export default async function AdminLoginPage({
               id="username"
               name="username"
               type="text"
-              placeholder="Enter username"
+              placeholder="Username"
               required
-              style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.875rem 1rem", fontSize: "1rem", color: "#f4f4f5", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" }}
+              style={{ width: "100%", borderRadius: "4px", border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
             />
           </div>
 
@@ -83,30 +82,26 @@ export default async function AdminLoginPage({
               id="password"
               name="password"
               type="password"
-              placeholder="Enter password"
+              placeholder="Password"
               required
-              style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.875rem 1rem", fontSize: "1rem", color: "#f4f4f5", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" }}
+              style={{ width: "100%", borderRadius: "4px", border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
             />
           </div>
 
           {error ? (
-            <p className="rounded-lg border border-red-700/60 bg-red-950/50 px-3 py-2 text-sm font-medium text-red-300">
+            <p style={{ border: "1px solid rgba(239, 68, 68, 0.5)", background: "rgba(239, 68, 68, 0.08)", padding: "0.6rem 0.8rem", fontSize: "0.85rem", color: "var(--error)" }}>
               Invalid username or password
             </p>
           ) : null}
 
-          <button
-            type="submit"
-            style={{ width: "100%", borderRadius: "9999px", background: "linear-gradient(to right, #dc2626, #EF5D08)", padding: "0.875rem 1rem", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.05em", color: "white", border: "none", cursor: "pointer", transition: "opacity 0.2s" }}
-          >
-            ACCESS SYSTEM
+          <button type="submit" className="btn-primary" style={{ width: "100%", padding: "0.9rem 1rem" }}>
+            SIGN IN
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-zinc-500">
-          <p>🔒 ENCRYPTED CONNECTION</p>
-          <p className="mt-1">All activities are monitored and logged</p>
-        </div>
+        <p className="mono" style={{ marginTop: "1.75rem", fontSize: "0.65rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+          All activity is monitored and logged
+        </p>
       </section>
     </main>
   );

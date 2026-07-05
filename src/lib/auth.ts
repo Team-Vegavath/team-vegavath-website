@@ -21,7 +21,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const hash = process.env.ADMIN_PASSWORD_HASH;
         if (!hash) return null;
 
-        const valid = await bcrypt.compare(password, hash);
+        // bcrypt.compare throws on a malformed hash (e.g. bad env value);
+        // treat any comparison failure as invalid credentials, not a crash.
+        let valid = false;
+        try {
+          valid = await bcrypt.compare(password, hash);
+        } catch {
+          return null;
+        }
         if (!valid) return null;
 
         return {

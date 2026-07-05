@@ -57,17 +57,17 @@ export default async function GalleryPage() {
   ];
 
   return (
-    <main style={{ background: "#121212", color: "#EBEBEB", overflowX: "hidden" }}>
-      <section style={{ width: "100%", paddingTop: "6rem", paddingBottom: "6rem" }}>
+    <main style={{ background: "var(--bg-base)", color: "var(--text-primary)", overflowX: "hidden", minHeight: "100vh" }}>
+      <section style={{ width: "100%", padding: "9rem 0 6rem" }}>
         <Container>
           <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
-            <header style={{ width: "100%", textAlign: "center" }}>
-              <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, letterSpacing: "0.15em", color: "#EBEBEB", textAlign: "center" }}>
-                GALLERY
-              </h1>
-              <p style={{ margin: "1rem auto 0", maxWidth: "48rem", fontSize: "1rem", color: "#9a9a9a", textAlign: "center" }}>
-                A visual journey through our projects, events, workshops, and memorable moments
+            <header>
+              <p className="label-tech" style={{ color: "var(--accent)", marginBottom: "0.75rem" }}>
+                Builds, events & everything between
               </p>
+              <h1 className="heading" style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase" }}>
+                Gallery
+              </h1>
             </header>
             <GalleryClient items={galleryItems} filters={filters} />
           </div>
@@ -76,5 +76,3 @@ export default async function GalleryPage() {
     </main>
   );
 }
-
-

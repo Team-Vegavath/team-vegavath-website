@@ -92,26 +92,26 @@ export default async function AdminDashboardPage() {
         <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 14rem), 1fr))", gap: "1rem" }}>
           {(
             [
-              { href: "/admin/events", label: "Manage Events", emoji: "📅" },
-              { href: "/admin/team", label: "Manage Team", emoji: "👥" },
-              { href: "/admin/gallery", label: "Manage Gallery", emoji: "🖼️" },
-              { href: "/admin/sponsors", label: "Manage Sponsors", emoji: "🤝" },
-              { href: "/admin/settings", label: "Settings", emoji: "⚙️" },
+              { href: "/admin/events", label: "Manage Events" },
+              { href: "/admin/team", label: "Manage Team" },
+              { href: "/admin/gallery", label: "Manage Gallery" },
+              { href: "/admin/sponsors", label: "Manage Sponsors" },
+              { href: "/admin/settings", label: "Settings" },
             ] as const
-          ).map(({ href, label, emoji }) => (
+          ).map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.25rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, color: "#EBEBEB", textDecoration: "none", transition: "border-color 0.2s" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", border: "1px solid #27272a", borderLeft: "2px solid var(--accent)", background: "#18181b", padding: "1.25rem 1.5rem", fontSize: "0.95rem", fontWeight: 600, color: "#EBEBEB", textDecoration: "none", transition: "border-color 0.2s" }}
               className="hover:border-[#EF5D08]"
             >
-              <span style={{ fontSize: "1.25rem" }}>{emoji}</span>
               {label}
+              <span aria-hidden="true" style={{ color: "var(--accent)" }}>→</span>
             </Link>
           ))}
         </section>
 
-        <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+        <section className="overflow-hidden border border-zinc-800 bg-zinc-900">
           <div className="border-b border-zinc-800 px-5 py-4">
             <h2 className="text-lg font-bold text-zinc-100">Recent Applications</h2>
             <p className="mt-1 text-sm text-zinc-400">Latest 10 submissions from join form</p>
@@ -140,7 +140,7 @@ export default async function AdminDashboardPage() {
                       </td>
                       <td className="whitespace-nowrap px-5 py-3">{application.domain_interest}</td>
                       <td className="whitespace-nowrap px-5 py-3">
-                        <span className="inline-flex rounded-full border border-zinc-700 px-2 py-1 text-xs uppercase tracking-wide text-zinc-200">
+                        <span className="inline-flex text-xs uppercase tracking-wide text-zinc-200">
                           {application.status}
                         </span>
                       </td>

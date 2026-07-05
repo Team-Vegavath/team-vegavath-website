@@ -43,12 +43,12 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         <span className="text-sm font-medium text-zinc-200">Recruitment Open</span>
         <div
           onClick={() => setRecruitmentOpen((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
             recruitmentOpen ? "bg-orange-500" : "bg-zinc-600"
           }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
               recruitmentOpen ? "translate-x-6" : "translate-x-1"
             }`}
           />
@@ -64,12 +64,12 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         <span className="text-sm font-medium text-zinc-200">Maintenance Mode</span>
         <div
           onClick={() => setMaintenanceMode((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
             maintenanceMode ? "bg-orange-500" : "bg-zinc-600"
           }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
               maintenanceMode ? "translate-x-6" : "translate-x-1"
             }`}
           />
@@ -145,7 +145,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         disabled={saving}
         className="mt-6 w-full rounded-lg bg-orange-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {saving ? "Saving..." : saved ? "Saved ✓" : "Save Changes"}
+        {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
       </button>
     </form>
   );

@@ -17,7 +17,7 @@ export default function LegalPage() {
             style={{
               display: "inline-flex",
               alignItems: "center",
-              borderRadius: "9999px",
+              borderRadius: 0,
               border: "1px solid #3f3f46",
               padding: "0.4rem 1rem",
               fontSize: "0.8rem",
@@ -40,9 +40,8 @@ export default function LegalPage() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 28rem), 1fr))", gap: "2rem" }}>
-          <div style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
+          <div style={{ borderRadius: 0, border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
             <h2 className="mb-6 flex items-center gap-3 text-3xl font-bold text-[#EBEBEB]">
-              <span className="text-[#EF5D08]">🔒</span>
               Privacy Policy
             </h2>
 
@@ -119,9 +118,8 @@ export default function LegalPage() {
             </div>
           </div>
 
-          <div style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
+          <div style={{ borderRadius: 0, border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
             <h2 className="mb-6 flex items-center gap-3 text-3xl font-bold text-[#EBEBEB]">
-              <span className="text-[#EF5D08]">📜</span>
               Terms of Service
             </h2>
 
@@ -221,7 +219,7 @@ export default function LegalPage() {
         </div>
 
         <div className="mt-12 text-center">
-          <div className="inline-block rounded-lg border border-[#EF5D08]/30 bg-[#1a1a1a] p-6">
+          <div className="inline-block border border-[#EF5D08]/30 bg-[#1a1a1a] p-6">
             <p className="mb-2 text-sm text-[#9a9a9a]">
               <span className="font-semibold text-[#EF5D08]">Open Source Project</span>
             </p>

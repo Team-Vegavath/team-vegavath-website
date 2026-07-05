@@ -15,18 +15,16 @@ function LoadingBox() {
   return (
     <mesh>
       <boxGeometry args={[2.8, 0.6, 1.4]} />
-      <meshStandardMaterial color="#2a2a2a" />
+      <meshStandardMaterial color="#1d1d1d" />
     </mesh>
   );
 }
 
 export default function KartModelSection() {
   return (
-    <div style={{ width: "100%", borderRadius: "0.75rem", overflow: "hidden", background: "#1a1a1a", border: "1px solid #2a2a2a" }}>
+    <div style={{ width: "100%", overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
       <div style={{ height: "28rem", width: "100%" }}>
-        <Canvas
-          style={{ background: "#1a1a1a" }}
-        >
+        <Canvas style={{ background: "#161616" }}>
           <Suspense fallback={<LoadingBox />}>
             <Stage
               environment="city"
@@ -48,8 +46,8 @@ export default function KartModelSection() {
           </Suspense>
         </Canvas>
       </div>
-      <p style={{ padding: "0.75rem", textAlign: "center", fontSize: "0.8rem", color: "#666" }}>
-        🏎️ Drag to rotate · Scroll to zoom
+      <p className="mono" style={{ padding: "0.65rem 1rem", borderTop: "1px solid var(--border)", fontSize: "0.7rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+        Drag to rotate — scroll to zoom
       </p>
     </div>
   );

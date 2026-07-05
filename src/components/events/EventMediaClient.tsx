@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
@@ -19,15 +19,18 @@ function getYouTubeId(url: string) {
   return match ? match[1] : null;
 }
 
+function PlayIcon() {
+  return (
+    <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+      <rect x="1" y="1" width="42" height="42" fill="rgba(10,10,10,0.6)" stroke="var(--text-primary)" strokeWidth="1" />
+      <path d="M17 13 L31 22 L17 31 Z" fill="var(--text-primary)" />
+    </svg>
+  );
+}
+
 export default function EventMediaClient({ items, eventTitle }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [isCustomCursorEnabled, setIsCustomCursorEnabled] = useState(false);
-
-  useEffect(() => {
-    const isTouch = window.matchMedia("(pointer: coarse)").matches;
-    setIsCustomCursorEnabled(!isTouch && localStorage.getItem("racing-cursor") !== "false");
-  }, []);
 
   const imageItems = items.filter((item) => item.type === "image");
 
@@ -43,7 +46,7 @@ export default function EventMediaClient({ items, eventTitle }: Props) {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))", gap: "1rem", width: "100%" }}>
-        {items.map((item, index) => {
+        {items.map((item) => {
           const videoId = item.type === "video" ? getYouTubeId(item.url) : null;
           const thumbnail = videoId
             ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
@@ -60,8 +63,8 @@ export default function EventMediaClient({ items, eventTitle }: Props) {
                 if (item.type === "image") openLightbox(imageIndex);
                 else if (item.url) setActiveVideo(item.url);
               }}
-              style={{ overflow: "hidden", borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", cursor: "pointer", position: "relative" }}
-              className="group"
+              style={{ overflow: "hidden", border: "1px solid var(--border)", background: "var(--bg-card)", cursor: "pointer", position: "relative" }}
+              className="media-card"
             >
               {item.type === "image" ? (
                 <div style={{ position: "relative", aspectRatio: "16/9", width: "100%" }}>
@@ -71,14 +74,15 @@ export default function EventMediaClient({ items, eventTitle }: Props) {
                     fill
                     style={{ objectFit: "cover", transition: "transform 0.3s" }}
                     sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    className="group-hover:scale-105"
                   />
-                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0)", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.3s" }} className="group-hover:bg-black/30">
-                    <span style={{ opacity: 0, color: "white", fontSize: "2rem", transition: "opacity 0.3s" }} className="group-hover:opacity-100">⊕</span>
+                  <div className="media-card-overlay">
+                    <span className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", color: "var(--text-primary)" }}>
+                      VIEW
+                    </span>
                   </div>
                 </div>
               ) : (
-                <div style={{ position: "relative", aspectRatio: "16/9", width: "100%", background: "#1a1a1a" }}>
+                <div style={{ position: "relative", aspectRatio: "16/9", width: "100%", background: "var(--bg-card)" }}>
                   {thumbnail ? (
                     <Image
                       src={thumbnail}
@@ -88,13 +92,13 @@ export default function EventMediaClient({ items, eventTitle }: Props) {
                       sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                     />
                   ) : null}
-                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: "2.5rem", color: "white" }}>▶</span>
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(10,10,10,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <PlayIcon />
                   </div>
                 </div>
               )}
               {item.caption ? (
-                <p style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem", color: "#9a9a9a" }}>{item.caption}</p>
+                <p style={{ padding: "0.5rem 0.75rem", fontSize: "0.8rem", color: "var(--text-secondary)" }}>{item.caption}</p>
               ) : null}
             </article>
           );
@@ -117,9 +121,10 @@ export default function EventMediaClient({ items, eventTitle }: Props) {
         >
           <button
             onClick={() => setActiveVideo(null)}
-            style={{ position: "absolute", top: "1.25rem", right: "1.25rem", color: "white", fontSize: "1.5rem", background: "none", border: "none", cursor: "pointer" }}
+            aria-label="Close video"
+            style={{ position: "absolute", top: "1.25rem", right: "1.25rem", color: "var(--text-primary)", fontSize: "1.75rem", lineHeight: 1, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-space), sans-serif" }}
           >
-            ✕
+            ×
           </button>
           <div
             onClick={(e) => e.stopPropagation()}

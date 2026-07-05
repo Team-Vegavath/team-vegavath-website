@@ -36,85 +36,106 @@ export default async function EventDetailPage({ params }: EventPageProps) {
 
   const galleryItems = await getGalleryByEvent(event.id);
   const formattedDate = new Date(event.event_date).toLocaleDateString("en-IN", {
+    day: "2-digit",
     month: "long",
     year: "numeric",
   });
 
   return (
-    <main style={{ minHeight: "100vh", background: "#121212", color: "#EBEBEB" }}>
-      <section style={{ width: "100%", paddingTop: "6rem", paddingBottom: "6rem" }}>
+    <main style={{ minHeight: "100vh", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+      <section style={{ width: "100%", padding: "9rem 0 6rem" }}>
         <Container>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4rem" }}>
-
+          <div style={{ display: "flex", flexDirection: "column", gap: "3.5rem" }}>
             <Link
               href="/events"
-              className="inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border-[1.5px] border-[#EF5D08] bg-transparent px-6 py-3.5 text-[clamp(0.95rem,1.2vw,1rem)] font-semibold leading-[1.15] text-[#EF5D08] no-underline transition-all duration-200 hover:bg-[#EF5D08] hover:text-white"
+              className="heading"
+              style={{
+                display: "inline-flex",
+                width: "fit-content",
+                alignItems: "center",
+                gap: "0.5rem",
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--text-secondary)",
+                textDecoration: "none",
+              }}
             >
-              ← Back to Events
+              ← All events
             </Link>
 
-            <div style={{ borderRadius: "1.5rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem", textAlign: "center" }}>
+            <header>
+              <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap" }}>
                 {event.logo_url ? (
-                  <div style={{ position: "relative", height: "5rem", width: "5rem", overflow: "hidden", borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#1a1a1a" }}>
-                    <Image
-                      src={event.logo_url}
-                      alt={`${event.title} logo`}
-                      width={80}
-                      height={80}
-                      style={{ height: "80px", width: "80px", objectFit: "contain", padding: "0.5rem" }}
-                    />
-                  </div>
+                  <Image
+                    src={event.logo_url}
+                    alt={`${event.title} logo`}
+                    width={64}
+                    height={64}
+                    style={{ height: "64px", width: "64px", objectFit: "contain", border: "1px solid var(--border)", background: "var(--bg-card)", padding: "0.4rem" }}
+                  />
                 ) : null}
-
-                <div style={{ width: "100%", textAlign: "center" }}>
-                  <p style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.28em", color: "#EF5D08" }}>
-                    {formattedDate}
+                <div>
+                  <p className="mono" style={{ fontSize: "0.75rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--accent)" }}>
+                    {formattedDate} — {event.category}
                   </p>
-                  <h1 style={{ marginTop: "0.75rem", fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, letterSpacing: "-0.02em", color: "#EBEBEB", textAlign: "center" }}>
+                  <h1 className="heading" style={{ marginTop: "0.5rem", fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 700, letterSpacing: "0.01em", textTransform: "uppercase" }}>
                     {event.title}
                   </h1>
-                  {event.description ? (
-                    <div style={{ marginTop: "1rem", color: "#9a9a9a", lineHeight: 1.7, fontSize: "1rem", textAlign: "center" }}>
-                      <ReactMarkdown>{event.description}</ReactMarkdown>
-                    </div>
-                  ) : null}
                 </div>
-
-                {event.registration_open ? (
-                  <Link
-                    href={event.registration_form_url || "/join"}
-                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "9999px", background: "#EF5D08", padding: "0.75rem 2rem", fontSize: "0.875rem", fontWeight: 700, color: "white", textDecoration: "none" }}
-                  >
-                    Register Now
-                  </Link>
-                ) : null}
               </div>
-            </div>
+
+              {event.cover_image_url ? (
+                <div style={{ position: "relative", width: "100%", aspectRatio: "21/9", marginTop: "2.5rem", border: "1px solid var(--border)", overflow: "hidden" }}>
+                  <Image
+                    src={event.cover_image_url}
+                    alt={event.title}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    sizes="100vw"
+                  />
+                </div>
+              ) : null}
+
+              {event.description ? (
+                <div
+                  className="prose prose-invert"
+                  style={{ marginTop: "2rem", maxWidth: "48rem", color: "var(--text-secondary)", lineHeight: 1.75, fontSize: "1rem" }}
+                >
+                  <ReactMarkdown>{event.description}</ReactMarkdown>
+                </div>
+              ) : null}
+
+              <div style={{ marginTop: "2rem" }}>
+                {event.registration_open ? (
+                  <a
+                    href={event.registration_form_url || "/join"}
+                    target={event.registration_form_url ? "_blank" : undefined}
+                    rel={event.registration_form_url ? "noreferrer" : undefined}
+                    className="btn-primary"
+                  >
+                    REGISTER NOW
+                  </a>
+                ) : (
+                  <p className="mono" style={{ fontSize: "0.8rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+                    Registration is closed for this event.
+                  </p>
+                )}
+              </div>
+            </header>
 
             {galleryItems.length > 0 ? (
               <section>
-                <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center", marginBottom: "2rem" }}>
-                  Event Media
+                <h2 className="heading" style={{ fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 700, textTransform: "uppercase", marginBottom: "1.75rem" }}>
+                  Media
                 </h2>
                 <EventMediaClient items={galleryItems} eventTitle={event.title} />
               </section>
             ) : null}
-
           </div>
         </Container>
       </section>
     </main>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

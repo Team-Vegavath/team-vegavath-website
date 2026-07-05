@@ -30,7 +30,7 @@ export default async function AdminGalleryPage() {
       <div style={{ margin: "0 auto", width: "100%", maxWidth: "72rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
         <Link
           href="/admin/dashboard"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
+          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
         >
           ← Back to dashboard
         </Link>
@@ -39,7 +39,7 @@ export default async function AdminGalleryPage() {
 
         <GalleryUploadForm />
 
-        <section className="space-y-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
+        <section className="space-y-3 overflow-hidden border border-zinc-800 bg-zinc-900 p-4 sm:p-5">
           <h2 className="text-xl font-semibold text-zinc-100">Current Gallery Items</h2>
 
           <div className="overflow-x-auto">

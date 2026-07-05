@@ -63,7 +63,7 @@ export default async function AdminSettingsPage() {
       <div style={{ margin: "0 auto", width: "100%", maxWidth: "72rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
         <Link
           href="/admin/dashboard"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
+          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
         >
           ← Dashboard
         </Link>
@@ -72,7 +72,7 @@ export default async function AdminSettingsPage() {
 
         <SettingsForm settings={settings} />
 
-        <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+        <section className="overflow-hidden border border-zinc-800 bg-zinc-900">
           <div className="border-b border-zinc-800 px-5 py-4">
             <h2 className="text-lg font-bold text-zinc-100">Recent Applications</h2>
           </div>

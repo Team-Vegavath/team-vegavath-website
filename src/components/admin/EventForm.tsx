@@ -54,6 +54,9 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
     formData.append("path", path);
     const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Upload failed");
+    }
     return data.url;
   }
 
@@ -73,15 +76,18 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
     setSaving(true);
 
     try {
-      let logo_url = "";
-      let cover_image_url = "";
+      // Only include image fields when a new file was uploaded — sending "" on
+      // edit survives the service's COALESCE and wipes the stored URL.
+      const imageFields: { logo_url?: string; cover_image_url?: string } = {};
 
+      // R2 objects are served with immutable cache headers — replacements need
+      // a new filename, so key each upload by timestamp.
       if (logoFile) {
-        logo_url = await uploadFile(logoFile, `events/${slug}/logo.png`);
+        imageFields.logo_url = await uploadFile(logoFile, `events/${slug}/logo-${Date.now()}.png`);
       }
 
       if (coverFile) {
-        cover_image_url = await uploadFile(coverFile, `events/${slug}/cover.jpg`);
+        imageFields.cover_image_url = await uploadFile(coverFile, `events/${slug}/cover-${Date.now()}.jpg`);
       }
 
       const eventFields = {
@@ -93,8 +99,7 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
         event_date,
         registration_open,
         registration_form_url,
-        logo_url,
-        cover_image_url,
+        ...imageFields,
       };
 
       const isEdit = mode === "edit" && Boolean(initialData?.id);
@@ -127,7 +132,7 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
+      className="space-y-4 border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
     >
       <div>
         <label htmlFor="title" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
@@ -245,13 +250,13 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
         <button
           type="button"
           onClick={() => setRegistrationOpen((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
             registration_open ? "bg-[#EF5D08]" : "bg-[#3a3a3a]"
           }`}
           aria-label="Toggle registration open"
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
               registration_open ? "translate-x-6" : "translate-x-1"
             }`}
           />

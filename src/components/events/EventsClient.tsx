@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import type { Event } from "@/types/event";
 
 type Props = {
@@ -12,8 +13,17 @@ type Props = {
 const FILTER_LABELS = ["All", "Workshops", "Hackathons", "Competitions", "Talks"] as const;
 type FilterLabel = (typeof FILTER_LABELS)[number];
 
+function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function EventsClient({ events }: Props) {
   const [activeFilter, setActiveFilter] = useState<FilterLabel>("All");
+  const [gridRef] = useAutoAnimate<HTMLDivElement>();
 
   const filtered =
     activeFilter === "All"
@@ -24,108 +34,105 @@ export default function EventsClient({ events }: Props) {
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-        {FILTER_LABELS.map((label) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => setActiveFilter(label)}
-            style={{
-              borderRadius: "9999px",
-              border: "1.5px solid #EF5D08",
-              background: activeFilter === label ? "#EF5D08" : "transparent",
-              color: activeFilter === label ? "white" : "#EF5D08",
-              padding: "0.75rem 1.75rem",
-              fontSize: "clamp(0.95rem, 1.2vw, 1rem)",
-              fontWeight: 600,
-              lineHeight: 1,
-              whiteSpace: "nowrap",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#EF5D08";
-              (e.currentTarget as HTMLButtonElement).style.color = "white";
-            }}
-            onMouseLeave={e => {
-              if (activeFilter !== label) {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = "#EF5D08";
-              }
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      <div
+        role="tablist"
+        aria-label="Filter events by category"
+        style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginBottom: "2.5rem", borderBottom: "1px solid var(--border)" }}
+      >
+        {FILTER_LABELS.map((label) => {
+          const active = activeFilter === label;
+          return (
+            <button
+              key={label}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveFilter(label)}
+              className="heading events-filter-tab"
+              style={{
+                background: "transparent",
+                border: "none",
+                borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                marginBottom: "-1px",
+                borderRadius: 0,
+                padding: "0.65rem 1.1rem",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: active ? "var(--text-primary)" : "var(--text-muted)",
+                cursor: "pointer",
+                transition: "color 0.2s, border-color 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center text-base text-[#9a9a9a]">No events found.</p>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Nothing in this category yet. Follow{" "}
+          <a
+            href="https://www.instagram.com/teamvegavath_pesu/"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "var(--accent)", textDecoration: "none" }}
+          >
+            @teamvegavath_pesu
+          </a>{" "}
+          for announcements.
+        </p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 20rem), 1fr))", gap: "1.5rem", width: "100%" }}>
+        <div
+          ref={gridRef}
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 21rem), 1fr))", gap: "1rem", width: "100%" }}
+        >
           {filtered.map((event) => (
-            <article
+            <Link
               key={event.id}
-              className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] transition-colors hover:border-[#EF5D08]"
+              href={`/events/${event.slug}`}
+              className="event-card"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderLeft: "2px solid var(--accent)",
+                textDecoration: "none",
+                overflow: "hidden",
+                transition: "background 0.2s",
+              }}
             >
-              <div className="relative aspect-video w-full bg-[#2a2a2a]">
-                {event.cover_image_url ? (
+              {event.cover_image_url ? (
+                <div style={{ position: "relative", aspectRatio: "16/9", width: "100%", background: "var(--bg-elevated)" }}>
                   <Image
                     src={event.cover_image_url}
                     alt={event.title}
                     fill
-                    className="object-cover"
+                    style={{ objectFit: "cover" }}
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-[#2a2a2a]">
-                    <span className="text-4xl">🏁</span>
-                  </div>
-                )}
-              </div>
-              <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <span className="inline-block rounded-full bg-[#EF5D08]/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[#EF5D08]">
-                  {event.category}
-                </span>
-                <h2 className="text-lg font-bold text-[#EBEBEB]">{event.title}</h2>
-                {event.event_date && (
-                  <p className="text-sm text-[#9a9a9a]">
-                    {new Date(event.event_date).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                )}
-                <Link
-                  href={`/events/${event.slug}`}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    borderRadius: "9999px",
-                    border: "1.5px solid #EF5D08",
-                    background: "transparent",
-                    color: "#EF5D08",
-                    padding: "0.5rem 1.25rem",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    transition: "all 0.2s ease",
-                    whiteSpace: "nowrap",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "#d44f06";
-                    (e.currentTarget as HTMLAnchorElement).style.color = "#d44f06";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "#EF5D08";
-                    (e.currentTarget as HTMLAnchorElement).style.color = "#EF5D08";
-                  }}
+                </div>
+              ) : null}
+              <div style={{ padding: "1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1 }}>
+                <time className="mono" dateTime={event.event_date} style={{ fontSize: "0.75rem", letterSpacing: "0.14em", color: "var(--text-secondary)" }}>
+                  {formatDate(event.event_date)}
+                </time>
+                <h2 className="heading" style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                  {event.title}
+                </h2>
+                <span className="label-tech">{event.category}</span>
+                <span
+                  className="heading"
+                  style={{ marginTop: "auto", paddingTop: "0.75rem", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.14em", color: "var(--accent)" }}
                 >
-                  View Details →
-                </Link>
+                  VIEW DETAILS →
+                </span>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       )}

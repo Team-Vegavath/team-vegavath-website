@@ -1,16 +1,35 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Orbitron, Chakra_Petch, Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { CursorControls } from "@/components/layout/CursorControls";
+import { PageTransition } from "@/components/layout/PageTransition";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const orbitron = Orbitron({
   subsets: ["latin"],
+  weight: ["900"],
+  variable: "--font-orbitron",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const chakraPetch = Chakra_Petch({
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-chakra",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-space",
+  display: "swap",
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -39,10 +58,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${orbitron.variable} ${chakraPetch.variable} ${spaceGrotesk.variable} ${spaceMono.variable}`}>
       <body>
         <CursorControls />
-        {children}
+        <PageTransition>{children}</PageTransition>
       </body>
     </html>
   );

@@ -10,67 +10,67 @@ export const metadata: Metadata = {
 
 export const revalidate = 120;
 
-type MemberSectionProps = {
-  title: string;
-  subtitle: string;
-  members: TeamMember[];
-};
-
-function MemberSection({ title, subtitle, members }: MemberSectionProps) {
-  if (members.length === 0) return null;
-
+function PhotoOrInitial({ member }: { member: TeamMember }) {
+  if (member.photo_url) {
+    return (
+      <Image
+        src={member.photo_url}
+        alt={member.name}
+        fill
+        style={{ objectFit: "cover" }}
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+      />
+    );
+  }
   return (
-    <section style={{ width: "100%" }}>
-      <div style={{ marginBottom: "2.5rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "clamp(1.75rem, 4vw, 2.75rem)", fontWeight: 900, letterSpacing: "0.15em", color: "#EBEBEB", textTransform: "uppercase" }}>{title}</h2>
-        <p style={{ marginTop: "0.5rem", fontSize: "0.95rem", color: "#9a9a9a" }}>{subtitle}</p>
-        <div style={{ margin: "1rem auto 0", width: "3rem", height: "3px", background: "#EF5D08", borderRadius: "2px" }} />
-      </div>
+    <div style={{ height: "100%", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span className="heading" style={{ fontSize: "2.5rem", fontWeight: 700, color: "var(--border-strong)" }} aria-hidden="true">
+        {member.name.charAt(0)}
+      </span>
+    </div>
+  );
+}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))", gap: "1.5rem", width: "100%" }}>
-        {members.map((member) => (
-          <article
-            key={member.id}
-            style={{ overflow: "hidden", borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#1a1a1a", transition: "border-color 0.2s" }}
-            className="hover:border-[#EF5D08]"
+function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean }) {
+  return (
+    <div style={{ padding: compact ? "1rem" : "1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
+      <h3 className="heading" style={{ fontSize: compact ? "0.95rem" : "1.1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+        {member.name}
+      </h3>
+      <p style={{ fontSize: compact ? "0.78rem" : "0.85rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
+        {member.role}
+      </p>
+      {!compact && member.quote ? (
+        <p style={{ fontSize: "0.85rem", lineHeight: 1.6, color: "var(--text-secondary)", marginTop: "0.35rem", fontStyle: "italic" }}>
+          {member.quote}
+        </p>
+      ) : null}
+      <div style={{ marginTop: "auto", paddingTop: "0.6rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+        {member.domain ? <span className="label-tech">{member.domain}</span> : <span />}
+        {member.linkedin_url ? (
+          <a
+            href={member.linkedin_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono"
+            style={{ fontSize: "0.7rem", letterSpacing: "0.1em", color: "var(--text-secondary)", textDecoration: "none" }}
           >
-            <div style={{ position: "relative", aspectRatio: "1/1", width: "100%", background: "#2a2a2a" }}>
-              {member.photo_url ? (
-                <Image
-                  src={member.photo_url}
-                  alt={member.name}
-                  fill
-                  style={{ objectFit: "cover" }}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-              ) : (
-                <div style={{ height: "100%", width: "100%", background: "#2a2a2a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: "3rem", opacity: 0.3 }}>👤</span>
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#EBEBEB" }}>{member.name}</h3>
-              <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#EF5D08" }}>{member.role}</p>
-              {member.quote ? (
-                <p style={{ fontSize: "0.85rem", lineHeight: 1.6, color: "#9a9a9a", marginTop: "0.25rem" }}>{member.quote}</p>
-              ) : null}
-              {member.linkedin_url ? (
-                <a
-                  href={member.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "#07C5F0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
-                >
-                  LinkedIn →
-                </a>
-              ) : null}
-            </div>
-          </article>
-        ))}
+            LINKEDIN →
+          </a>
+        ) : null}
       </div>
-    </section>
+    </div>
+  );
+}
+
+function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ marginBottom: "2rem" }}>
+      <h2 className="heading" style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+        {title}
+      </h2>
+      <p style={{ marginTop: "0.4rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>{subtitle}</p>
+    </div>
   );
 }
 
@@ -83,54 +83,84 @@ export default async function CrewPage() {
     members = [];
   }
 
-  const coreMembers = members.filter((m) => m.tier === "core");
-  const crewMembers = members.filter((m) => m.tier === "crew");
-  const legacyMembers = members.filter((m) => m.tier === "legacy");
+  const active = members.filter((m) => m.is_active !== false);
+  const coreMembers = active.filter((m) => m.tier === "core");
+  const crewMembers = active.filter((m) => m.tier === "crew");
+  const legacyMembers = active.filter((m) => m.tier === "legacy");
 
   return (
-    <main style={{ background: "#121212", color: "#EBEBEB", minHeight: "100vh", overflowX: "hidden" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "80rem", padding: "6rem 1.5rem 4rem", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "6rem" }}>
-
-        <header style={{ textAlign: "center" }}>
-          <h1 style={{ fontSize: "clamp(2rem, 6vw, 4rem)", fontWeight: 900, letterSpacing: "0.2em", color: "#EBEBEB", textTransform: "uppercase", textAlign: "center" }}>
-            Meet The Crew
-          </h1>
-          <p style={{ marginTop: "1rem", fontSize: "1.1rem", color: "#9a9a9a", textAlign: "center" }}>
-            Our diverse team of passionate engineers, designers, and innovators
+    <main style={{ background: "var(--bg-base)", color: "var(--text-primary)", minHeight: "100vh", overflowX: "hidden" }}>
+      <div style={{ margin: "0 auto", width: "100%", maxWidth: "80rem", padding: "9rem 1.5rem 5rem", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "5rem" }}>
+        <header>
+          <p className="label-tech" style={{ color: "var(--accent)", marginBottom: "0.75rem" }}>
+            Core · Crew · Legacy
           </p>
+          <h1 className="heading" style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase" }}>
+            The Crew
+          </h1>
         </header>
 
-        <MemberSection
-          title="Core"
-          subtitle="The founding members leading Vegavath"
-          members={coreMembers}
-        />
+        {coreMembers.length > 0 ? (
+          <section>
+            <SectionHeading title="Core" subtitle="Leads running the club day to day" />
+            <div className="crew-core-grid">
+              {coreMembers.map((member) => (
+                <article key={member.id} className="crew-core-card">
+                  <div className="crew-photo">
+                    <PhotoOrInitial member={member} />
+                  </div>
+                  <MemberInfo member={member} />
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-        <MemberSection
-          title="Crew"
-          subtitle="The passionate builders across every domain"
-          members={crewMembers}
-        />
+        {crewMembers.length > 0 ? (
+          <section>
+            <SectionHeading title="Crew" subtitle="Builders across every domain" />
+            <div className="crew-grid">
+              {crewMembers.map((member) => (
+                <article key={member.id} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
+                  <div className="crew-photo" style={{ borderRight: "none", borderBottom: "1px solid var(--border)" }}>
+                    <PhotoOrInitial member={member} />
+                  </div>
+                  <MemberInfo member={member} compact />
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-        <MemberSection
-          title="Legacy Crew"
-          subtitle="Those who built the foundation we stand on"
-          members={legacyMembers}
-        />
+        {legacyMembers.length > 0 ? (
+          <section>
+            <SectionHeading title="Legacy" subtitle="The seniors who built the foundation" />
+            <div className="crew-grid">
+              {legacyMembers.map((member) => (
+                <article key={member.id} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
+                  <div className="crew-photo" style={{ borderRight: "none", borderBottom: "1px solid var(--border)" }}>
+                    <PhotoOrInitial member={member} />
+                  </div>
+                  <MemberInfo member={member} compact />
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem", borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "2rem 1.5rem", alignItems: "center", textAlign: "center" }}>
+        <section style={{ borderTop: "1px solid var(--border)", paddingTop: "3rem", display: "flex", flexDirection: "column", gap: "1.25rem", alignItems: "flex-start" }}>
           <div>
-            <h2 style={{ fontSize: "clamp(1.25rem, 3vw, 1.75rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center" }}>Want to Join Our Crew?</h2>
-            <p style={{ marginTop: "0.5rem", color: "#9a9a9a", textAlign: "center" }}>{"We're always looking for passionate individuals"}</p>
+            <h2 className="heading" style={{ fontSize: "clamp(1.25rem, 3vw, 1.6rem)", fontWeight: 700, textTransform: "uppercase" }}>
+              Want in?
+            </h2>
+            <p style={{ marginTop: "0.5rem", color: "var(--text-secondary)" }}>
+              Recruitment opens each semester across all six domains.
+            </p>
           </div>
-          <Link
-            href="/join"
-            style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", background: "transparent", color: "#EF5D08", padding: "0.75rem 2rem", fontSize: "0.95rem", fontWeight: 700, textDecoration: "none", transition: "all 0.2s" }}
-          >
-            Apply Now 🏁
+          <Link href="/join" className="btn-primary">
+            APPLY NOW
           </Link>
         </section>
-
       </div>
     </main>
   );

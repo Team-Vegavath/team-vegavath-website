@@ -20,21 +20,20 @@ export default async function EventsPage() {
   }
 
   return (
-    <main className="bg-[#121212] text-[#EBEBEB]">
-      <section className="w-full py-24">
+    <main style={{ background: "var(--bg-base)", color: "var(--text-primary)", minHeight: "100vh" }}>
+      <section style={{ width: "100%", padding: "9rem 0 6rem" }}>
         <Container>
-          <div className="space-y-8">
-            <header style={{ width: "100%", textAlign: "center", marginBottom: "1rem" }}>
-              <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 800, letterSpacing: "-0.02em", color: "#EBEBEB", textAlign: "center" }}>
-                Events
-              </h1>
-            </header>
-            <EventsClient events={events} />
-          </div>
+          <header style={{ marginBottom: "3rem" }}>
+            <p className="label-tech" style={{ color: "var(--accent)", marginBottom: "0.75rem" }}>
+              Workshops, hackathons & competitions
+            </p>
+            <h1 className="heading" style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 700, letterSpacing: "0.01em", textTransform: "uppercase" }}>
+              Events
+            </h1>
+          </header>
+          <EventsClient events={events} />
         </Container>
       </section>
     </main>
   );
 }
-
-

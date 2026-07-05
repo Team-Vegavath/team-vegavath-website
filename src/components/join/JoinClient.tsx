@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
+/* These five values are what /api/join and the DB CHECK constraint accept —
+   do not add domains here without a matching backend change. */
 const DOMAINS = ["Automotive", "Robotics", "Design", "Media", "Marketing"] as const;
 type Domain = typeof DOMAINS[number];
+
+const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
+const INSTAGRAM_URL = "https://www.instagram.com/teamvegavath_pesu/";
 
 type FormData = {
   name: string;
@@ -29,12 +35,17 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.domain_interest) {
+      setErrorMsg("Pick a domain to apply for.");
+      setStatus("error");
+      return;
+    }
     setStatus("submitting");
     setErrorMsg("");
 
@@ -59,15 +70,33 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
   if (!recruitmentOpen) {
     return (
-      <main style={{ minHeight: "100vh", background: "#121212", color: "#EBEBEB", display: "flex", alignItems: "center", justifyContent: "center", padding: "6rem 1.5rem", boxSizing: "border-box" }}>
-        <div style={{ width: "100%", maxWidth: "36rem", textAlign: "center" }}>
-          <div style={{ fontSize: "4rem", marginBottom: "1.5rem" }}>🚫</div>
-          <h1 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center", marginBottom: "1rem" }}>Recruitment Closed</h1>
-          <p style={{ color: "#9a9a9a", fontSize: "1rem", lineHeight: 1.7, marginBottom: "2rem", textAlign: "center" }}>
-            We are not accepting applications right now. Follow our social media for announcements on when recruitment opens.
+      <main
+        className="pattern-speed-lines"
+        style={{ minHeight: "100vh", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center", padding: "7rem 1.5rem 4rem", boxSizing: "border-box" }}
+      >
+        <div style={{ width: "100%", maxWidth: "36rem" }}>
+          <Image
+            src={LOGO_URL}
+            alt="Team Vegavath shield"
+            width={56}
+            height={56}
+            style={{ height: "56px", width: "56px", objectFit: "contain", marginBottom: "1.75rem" }}
+          />
+          <h1 className="heading" style={{ fontSize: "clamp(1.75rem, 4vw, 2.75rem)", fontWeight: 600, textTransform: "uppercase" }}>
+            Recruitment is currently closed.
+          </h1>
+          <p style={{ marginTop: "1.25rem", color: "var(--text-secondary)", fontSize: "1rem", lineHeight: 1.7 }}>
+            Follow us on Instagram to be notified when we open —{" "}
+            <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>
+              @teamvegavath_pesu
+            </a>
           </p>
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", background: "transparent", color: "#EF5D08", padding: "0.75rem 2rem", fontWeight: 700, textDecoration: "none" }}>
-            ← Back to Home
+          <Link
+            href="/"
+            className="heading"
+            style={{ display: "inline-flex", marginTop: "2.5rem", fontSize: "0.78rem", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-secondary)", textDecoration: "none" }}
+          >
+            ← Back to home
           </Link>
         </div>
       </main>
@@ -76,137 +105,147 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
   if (status === "success") {
     return (
-      <main style={{ minHeight: "100vh", background: "#121212", color: "#EBEBEB", display: "flex", alignItems: "center", justifyContent: "center", padding: "6rem 1.5rem", boxSizing: "border-box" }}>
-        <div style={{ width: "100%", maxWidth: "36rem", textAlign: "center" }}>
-          <div style={{ fontSize: "4rem", marginBottom: "1.5rem" }}>🏁</div>
-          <h1 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center", marginBottom: "1rem" }}>Application Submitted!</h1>
-          <p style={{ color: "#9a9a9a", fontSize: "1rem", lineHeight: 1.7, marginBottom: "2rem", textAlign: "center" }}>
-            Thanks for applying to Team Vegavath. We'll review your application and get back to you soon.
+      <main
+        className="pattern-speed-lines"
+        style={{ minHeight: "100vh", color: "var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center", padding: "7rem 1.5rem 4rem", boxSizing: "border-box" }}
+      >
+        <div style={{ width: "100%", maxWidth: "36rem" }}>
+          <p className="mono" style={{ fontSize: "0.8rem", letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--success)" }}>
+            Application received
           </p>
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", background: "#EF5D08", color: "white", padding: "0.75rem 2rem", fontWeight: 700, textDecoration: "none" }}>
-            Back to Home 🏎️
+          <h1 className="heading" style={{ marginTop: "1rem", fontSize: "clamp(1.75rem, 4vw, 2.75rem)", fontWeight: 700, textTransform: "uppercase" }}>
+            {"You're on the grid."}
+          </h1>
+          <p style={{ marginTop: "1.25rem", color: "var(--text-secondary)", fontSize: "1rem", lineHeight: 1.7 }}>
+            {"Thanks for applying to Team Vegavath. We review every application and we'll reach out over email."}
+          </p>
+          <Link href="/" className="btn-outline" style={{ marginTop: "2.5rem" }}>
+            BACK TO HOME
           </Link>
         </div>
       </main>
     );
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    background: "#1a1a1a",
-    border: "1px solid #2a2a2a",
-    borderRadius: "0.5rem",
-    padding: "0.875rem 1rem",
-    color: "#EBEBEB",
-    fontSize: "1rem",
-    outline: "none",
-    boxSizing: "border-box",
-    transition: "border-color 0.2s",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    color: "#9a9a9a",
-    marginBottom: "0.5rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-  };
-
   return (
-    <main style={{ minHeight: "100vh", background: "#121212", color: "#EBEBEB", padding: "6rem 1.5rem 4rem", boxSizing: "border-box" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "40rem" }}>
-
-        <header style={{ textAlign: "center", marginBottom: "3rem" }}>
-          <h1 style={{ fontSize: "clamp(2rem, 6vw, 3.5rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center", letterSpacing: "0.05em" }}>
-            Join The Race
-          </h1>
-          <p style={{ marginTop: "0.75rem", color: "#9a9a9a", fontSize: "1rem", textAlign: "center" }}>
-            Ready to accelerate? Apply to Team Vegavath below.
+    <main className="join-split" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
+      {/* Branding panel — orange, stacked type */}
+      <div className="join-brand pattern-speed-lines-strong">
+        <Image
+          src={LOGO_URL}
+          alt="Team Vegavath shield"
+          width={56}
+          height={56}
+          style={{ height: "56px", width: "56px", objectFit: "contain" }}
+        />
+        <h1 className="heading" style={{ fontWeight: 700, fontSize: "clamp(2.75rem, 7vw, 4.5rem)", lineHeight: 0.95, textTransform: "uppercase", color: "var(--bg-base)" }}>
+          Join
+          <br />
+          The
+          <br />
+          Team
+        </h1>
+        <div style={{ marginTop: "auto" }}>
+          <p className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(10,10,10,0.7)", marginBottom: "0.6rem" }}>
+            Six domains
           </p>
-        </header>
+          <p className="heading" style={{ fontWeight: 600, fontSize: "0.85rem", lineHeight: 1.9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--bg-base)" }}>
+            Coding · Automotives · Sponsorship &amp; Finance
+            <br />
+            Robotics · Operations · Social Media
+          </p>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: "1rem", padding: "2rem 1.5rem", boxSizing: "border-box" }}>
+      {/* Form panel */}
+      <div className="join-form-panel" style={{ padding: "4rem clamp(1.5rem, 5vw, 5rem) 5rem" }}>
+        <div style={{ maxWidth: "34rem" }}>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.7, marginBottom: "3rem" }}>
+            Applications are reviewed by the domain leads. Tell us who you are and where you want to build.
+          </p>
 
-          {/* Honeypot — hidden from humans */}
-          <input type="text" name="website" value={form.website} onChange={handleChange} style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "2.25rem" }}>
+            {/* Honeypot — hidden from humans */}
+            <input type="text" name="website" value={form.website} onChange={handleChange} style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
 
-          <div>
-            <label style={labelStyle}>Full Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              required
-              placeholder="Your full name"
-              style={inputStyle}
-              onFocus={e => (e.target.style.borderColor = "#EF5D08")}
-              onBlur={e => (e.target.style.borderColor = "#2a2a2a")}
-            />
-          </div>
+            <div>
+              <label htmlFor="join-name" className="label-tech" style={{ display: "block", marginBottom: "0.35rem" }}>
+                Full name *
+              </label>
+              <input
+                id="join-name"
+                type="text"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                required
+                placeholder="Your full name"
+                className="join-input"
+              />
+            </div>
 
-          <div>
-            <label style={labelStyle}>Email Address *</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              placeholder="your.email@example.com"
-              style={inputStyle}
-              onFocus={e => (e.target.style.borderColor = "#EF5D08")}
-              onBlur={e => (e.target.style.borderColor = "#2a2a2a")}
-            />
-          </div>
+            <div>
+              <label htmlFor="join-email" className="label-tech" style={{ display: "block", marginBottom: "0.35rem" }}>
+                Email address *
+              </label>
+              <input
+                id="join-email"
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                required
+                placeholder="you@pes.edu"
+                className="join-input"
+              />
+            </div>
 
-          <div>
-            <label style={labelStyle}>Domain of Interest *</label>
-            <select
-              name="domain_interest"
-              value={form.domain_interest}
-              onChange={handleChange}
-              required
-              style={{ ...inputStyle, cursor: "pointer" }}
-              onFocus={e => (e.target.style.borderColor = "#EF5D08")}
-              onBlur={e => (e.target.style.borderColor = "#2a2a2a")}
+            <div>
+              <p className="label-tech" style={{ marginBottom: "0.75rem" }}>Domain of interest *</p>
+              <div className="join-domain-tiles" role="group" aria-label="Domain of interest">
+                {DOMAINS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className="join-domain-tile"
+                    aria-pressed={form.domain_interest === d}
+                    onClick={() => setForm((prev) => ({ ...prev, domain_interest: d }))}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="join-portfolio" className="label-tech" style={{ display: "block", marginBottom: "0.35rem" }}>
+                Portfolio / GitHub URL (optional)
+              </label>
+              <input
+                id="join-portfolio"
+                type="url"
+                name="portfolio_url"
+                value={form.portfolio_url}
+                onChange={handleChange}
+                placeholder="https://github.com/yourusername"
+                className="join-input"
+              />
+            </div>
+
+            {status === "error" && (
+              <p style={{ color: "var(--error)", fontSize: "0.875rem" }}>{errorMsg}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={status === "submitting"}
+              className="btn-primary"
+              style={{ width: "100%", padding: "1rem", opacity: status === "submitting" ? 0.6 : 1, cursor: status === "submitting" ? "not-allowed" : "pointer" }}
             >
-              <option value="" disabled>Select your domain</option>
-              {DOMAINS.map((d) => (
-                <option key={d} value={d} style={{ background: "#1a1a1a" }}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Portfolio / GitHub URL <span style={{ color: "#666", fontWeight: 400 }}>(optional)</span></label>
-            <input
-              type="url"
-              name="portfolio_url"
-              value={form.portfolio_url}
-              onChange={handleChange}
-              placeholder="https://github.com/yourusername"
-              style={inputStyle}
-              onFocus={e => (e.target.style.borderColor = "#EF5D08")}
-              onBlur={e => (e.target.style.borderColor = "#2a2a2a")}
-            />
-          </div>
-
-          {status === "error" && (
-            <p style={{ color: "#ef4444", fontSize: "0.875rem", textAlign: "center" }}>{errorMsg}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={status === "submitting"}
-            style={{ width: "100%", borderRadius: "9999px", background: status === "submitting" ? "#666" : "#EF5D08", color: "white", padding: "1rem", fontSize: "1rem", fontWeight: 700, border: "none", cursor: status === "submitting" ? "not-allowed" : "pointer", transition: "background 0.2s", marginTop: "0.5rem" }}
-          >
-            {status === "submitting" ? "Submitting..." : "Submit Application 🏁"}
-          </button>
-
-        </form>
+              {status === "submitting" ? "SUBMITTING..." : "SUBMIT APPLICATION"}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );

@@ -30,10 +30,10 @@ export default async function AdminTeamPage({
   if (resolvedSearchParams.new === "true") {
     return (
       <main style={{ minHeight: "100vh", background: "#09090b", color: "#EBEBEB", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+        <div className="flex w-full max-w-4xl flex-col gap-6" style={{ margin: "0 auto" }}>
           <Link
             href="/admin/team"
-            style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
+            style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
           >
             ← Back to team list
           </Link>
@@ -59,7 +59,7 @@ export default async function AdminTeamPage({
           </Link>
         </div>
 
-        <section className="overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#1a1a1a]">
+        <section className="overflow-hidden border border-[#2a2a2a] bg-[#1a1a1a]">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#2a2a2a] text-sm">
               <thead className="bg-[#121212] text-left text-xs uppercase tracking-[0.12em] text-zinc-400">
@@ -131,7 +131,7 @@ export default async function AdminTeamPage({
 
         <Link
           href="/admin/dashboard"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: "9999px", border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
+          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
         >
           ← Back to dashboard
         </Link>

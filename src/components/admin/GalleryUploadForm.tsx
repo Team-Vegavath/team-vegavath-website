@@ -251,7 +251,7 @@ export default function GalleryUploadForm() {
               <progress
                 value={progress}
                 max={100}
-                className="h-2 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-[#2a2a2a] [&::-webkit-progress-value]:bg-[#EF5D08] [&::-moz-progress-bar]:bg-[#EF5D08]"
+                className="h-2 w-full overflow-hidden [&::-webkit-progress-bar]:bg-[#2a2a2a] [&::-webkit-progress-value]:bg-[#EF5D08] [&::-moz-progress-bar]:bg-[#EF5D08]"
               />
               <p className="text-sm text-[#B8B8B8]">{progress}%</p>
             </div>

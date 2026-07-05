@@ -1,8 +1,9 @@
-import Image from "next/image";
-import Link from "next/link";
 import type { Metadata } from "next";
 
 import AboutHeroImage from "@/components/about/AboutHeroImage";
+import { DomainGrid } from "@/components/home/DomainGrid";
+import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
+import { Reveal } from "@/components/ui/Reveal";
 import { getActiveSponsors } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
@@ -11,322 +12,213 @@ export const metadata: Metadata = {
 
 export const revalidate = 120;
 
-const missionText =
-  "To create a future-ready community where technology, innovation, and teamwork converge — shaping the next generation of leaders in mobility, robotics, and digital transformation.";
-
-const domains = [
-  { title: "Coding", emoji: "💻", description: "The backbone of everything we build. From embedded systems and automotive software to autonomous robotics code, internal tools, and full-stack websites — we code it all." },
-  { title: "Automotives", emoji: "🏎️", description: "Where ideas turn into machines. We design, build, and fabricate vehicles — from simulations to hands-on assembly." },
-  { title: "Sponsorship & Finance", emoji: "🤝", description: "Powering innovation through partnerships. This domain handles budgeting, sponsor relations, and industry collaborations." },
-  { title: "Robotics", emoji: "🤖", description: "Designing intelligence in motion. We build robots combining mechanics, electronics, and software." },
-  { title: "Operations", emoji: "⚙️", description: "The engine that keeps the club running — permissions, LORs, members, events, and internal workflows." },
-  { title: "Social Media", emoji: "📣", description: "Telling our story to the world. Marketing, content creation, outreach, and showcasing everything Vegavath builds." },
+const STATS = [
+  { number: "200+", label: "Footfall" },
+  { number: "2", label: "Major Events" },
+  { number: "85", label: "Active Members" },
+  { number: "6", label: "Domains" },
 ] as const;
 
-const visionDomains = [
-  "Coding",
-  "Automotives",
-  "Sponsorship & Finance",
-  "Robotics",
-  "Operations",
-  "Social Media",
-] as const;
-
-const timelineEntries = [
+const TIMELINE = [
   {
-    year: "2020",
-    title: "Team Vegavath Founded",
-    description: "Started with a vision to bridge academia and industry",
+    date: "SEP 2025",
+    title: "Freshers Day",
+    description: "First open event of the year — the newest batch meets the team.",
   },
   {
-    year: "2021",
-    title: "First Go-Kart Built",
-    description:
-      "Successfully designed and built our first high-performance go-kart",
+    date: "NOV 2025",
+    title: "Ignition 1.0",
+    description: "IoT hackathon with 200+ footfall — one of the largest campus hackathons at PESU ECC.",
   },
   {
-    year: "2022",
-    title: "Robotics Division Launch",
-    description:
-      "Expanded into autonomous systems and robotics development",
-  },
-  {
-    year: "2023",
-    title: "Multi-Domain Excellence",
-    description:
-      "Achieved recognition across all five technical domains",
+    date: "FEB 2026",
+    title: "EmbedX 2.0",
+    description: "Embedded systems event continuing the technical series.",
   },
 ] as const;
 
-const values = [
+const VALUES = [
   {
-    icon: "💡",
+    shape: "circle",
     title: "Innovation",
-    description:
-      "We challenge convention and build forward-looking solutions with curiosity at the center.",
+    description: "We challenge convention and build forward-looking solutions with curiosity at the center.",
   },
   {
-    icon: "🏆",
+    shape: "triangle",
     title: "Excellence",
-    description:
-      "We hold ourselves to high engineering and creative standards in every project we ship.",
+    description: "We hold ourselves to high engineering and creative standards in every project we ship.",
   },
   {
-    icon: "🤝",
+    shape: "square",
     title: "Collaboration",
-    description:
-      "Our best ideas come from working across disciplines, learning openly, and moving as one team.",
+    description: "Our best ideas come from working across disciplines, learning openly, and moving as one team.",
   },
   {
-    icon: "🚀",
+    shape: "hexagon",
     title: "Impact",
-    description:
-      "We build experiences that prepare students for real-world challenges in technology and mobility.",
+    description: "We build experiences that prepare students for real-world challenges in technology and mobility.",
   },
 ] as const;
 
-export default async function AboutPage() {
-  let sponsors = [] as Awaited<ReturnType<typeof getActiveSponsors>>;
-
-  try {
-    sponsors = await getActiveSponsors();
-  } catch {
-    sponsors = [];
-  }
-
-  const marqueeSponsors = sponsors.length > 0 ? [...sponsors, ...sponsors] : [];
+function ValueShape({ shape }: { shape: (typeof VALUES)[number]["shape"] }) {
+  const stroke = "var(--accent)";
+  const common = { fill: "none", stroke, strokeWidth: 1.5 };
 
   return (
-    <main className="bg-[#121212] text-[#EBEBEB]" style={{ overflowX: "hidden" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "80rem", display: "flex", flexDirection: "column", gap: "5rem", padding: "3rem 1.25rem", boxSizing: "border-box" }}>
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 28rem), 1fr))", gap: "2rem", alignItems: "center" }}>
-          <div className="space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[#EF5D08]">
-              Who We Are
+    <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
+      {shape === "circle" ? <circle cx="18" cy="18" r="13" {...common} /> : null}
+      {shape === "triangle" ? <path d="M18 5 L31 30 L5 30 Z" {...common} /> : null}
+      {shape === "square" ? <rect x="6" y="6" width="24" height="24" {...common} /> : null}
+      {shape === "hexagon" ? <path d="M18 4 L30 11 L30 25 L18 32 L6 25 L6 11 Z" {...common} /> : null}
+    </svg>
+  );
+}
+
+export default async function AboutPage() {
+  const sponsors = await getActiveSponsors().catch(() => []);
+
+  return (
+    <main style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
+      {/* Full-bleed hero — the photo + statement IS the header */}
+      <AboutHeroImage />
+
+      {/* Intro + mission pull-quote */}
+      <section style={{ padding: "5rem 1.5rem" }}>
+        <div style={{ margin: "0 auto", maxWidth: "56rem" }}>
+          <Reveal>
+            <p style={{ fontSize: "1.05rem", lineHeight: 1.8, color: "var(--text-secondary)" }}>
+              Team Vegavath is the official student innovation club of PES University, Electronic City
+              Campus. Founded by Mechanical Engineering seniors as a racing team, it has grown into a
+              multi-domain community of Computer Science and Electronics students with a shared obsession:
+              automotives and robotics.
             </p>
-            <h1 className="text-3xl font-black tracking-tight text-[#EBEBEB] sm:text-4xl">
-              About Team Vegavath
-            </h1>
-            <p className="text-base leading-7 text-[#9a9a9a] sm:text-lg">
-              Team Vegavath is the official student innovation club of PES
-              University, Electronic City Campus (PESU ECC). Founded by our
-              Mechanical Engineering seniors as a racing team, Vegavath has now
-              evolved into a multi-domain student community that brings together
-              passionate minds from Computer Science and Electronics backgrounds
-              with a passion for automotives and robotics.
-            </p>
-          </div>
+          </Reveal>
 
-          <AboutHeroImage />
-        </section>
+          <Reveal delay={0.1}>
+            <blockquote
+              style={{
+                marginTop: "3.5rem",
+                borderLeft: "2px solid var(--accent)",
+                paddingLeft: "1.75rem",
+                fontSize: "clamp(1.3rem, 3vw, 1.75rem)",
+                fontStyle: "italic",
+                lineHeight: 1.5,
+                color: "var(--text-primary)",
+              }}
+            >
+              A <span style={{ color: "var(--gold)", fontStyle: "normal", fontWeight: 600 }}>future-ready community</span> where
+              technology, innovation, and teamwork converge — shaping the next generation of leaders in
+              mobility, robotics, and digital transformation.
+            </blockquote>
+          </Reveal>
+        </div>
+      </section>
 
-        <section className="rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a] text-center shadow-sm" style={{ padding: "2.5rem 1.5rem" }}>
-          <h2 className="text-2xl font-bold text-[#EBEBEB] sm:text-3xl">
-            Our Mission
-          </h2>
-          <p style={{ margin: "1rem auto 0", maxWidth: "48rem", fontSize: "1rem", lineHeight: 1.75, color: "#9a9a9a" }}>
-            {missionText}
-          </p>
-        </section>
+      {/* Domains — shared grid, identical to home */}
+      <section style={{ padding: "0 1.5rem 5rem" }}>
+        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+          <Reveal>
+            <h2 style={{ marginBottom: "2rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
+              What we do
+            </h2>
+            <DomainGrid />
+          </Reveal>
+        </div>
+      </section>
 
-        <section className="space-y-8">
-          <h2 className="text-2xl font-bold tracking-tight text-[#EBEBEB]" style={{ textAlign: "center" }}>
-            What We Do
-          </h2>
+      {/* Stats — dramatic, dot pattern */}
+      <section className="pattern-dots" style={{ padding: "5.5rem 1.5rem" }}>
+        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+          <Reveal>
+            <div className="stats-grid">
+              {STATS.map(({ number, label }) => (
+                <div key={label}>
+                  <p className="stat-number">{number}</p>
+                  <p className="stat-label">{label}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </div>
+      </section>
 
-          <div className="domains-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
-            {domains.map((domain) => (
-              <article
-                key={domain.title}
-                className="rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] shadow-sm transition-colors hover:border-[#EF5D08]"
-                style={{ padding: "1.5rem" }}
-              >
-                <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>{domain.emoji}</div>
-                <h3 className="text-lg font-bold text-[#EBEBEB]">{domain.title}</h3>
-                <p style={{ marginTop: "0.75rem", fontSize: "0.9rem", lineHeight: 1.6, color: "#9a9a9a" }}>{domain.description}</p>
-              </article>
+      {/* Timeline — real events only */}
+      <section style={{ padding: "5rem 1.5rem" }}>
+        <div style={{ margin: "0 auto", maxWidth: "56rem" }}>
+          <Reveal>
+            <h2 style={{ marginBottom: "3rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
+              The road so far
+            </h2>
+          </Reveal>
+
+          <div style={{ borderLeft: "1px solid var(--border-strong)", paddingLeft: "2rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            {TIMELINE.map((entry, index) => (
+              <Reveal key={entry.title} delay={index * 0.08}>
+                <div style={{ position: "relative" }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: "calc(-2rem - 5px)",
+                      top: "0.4rem",
+                      width: "9px",
+                      height: "9px",
+                      background: "var(--accent)",
+                    }}
+                  />
+                  <time className="mono" dateTime={entry.date} style={{ fontSize: "0.75rem", letterSpacing: "0.18em", color: "var(--accent)" }}>
+                    {entry.date}
+                  </time>
+                  <h3 style={{ marginTop: "0.4rem", fontSize: "1.25rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                    {entry.title}
+                  </h3>
+                  <p style={{ marginTop: "0.5rem", fontSize: "0.95rem", lineHeight: 1.65, color: "var(--text-secondary)" }}>
+                    {entry.description}
+                  </p>
+                </div>
+              </Reveal>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {sponsors.length > 0 ? (
-          <section className="space-y-8 overflow-hidden">
-            <h2 className="text-2xl font-bold tracking-tight text-[#EBEBEB]" style={{ textAlign: "center" }}>
-              Our Sponsors
+      {/* Values — geometric outlines, no emoji */}
+      <section style={{ padding: "0 1.5rem 5rem" }}>
+        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+          <Reveal>
+            <h2 style={{ marginBottom: "2rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
+              How we operate
             </h2>
-
-            <div className="overflow-hidden rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a] py-6">
-              <div
-                className="flex w-max items-center gap-6 px-6"
-                style={{ animation: "sponsor-marquee 24s linear infinite" }}
-              >
-                {marqueeSponsors.map((sponsor, index) => {
-                  const content = (
-                    <div className="flex min-w-[200px] items-center gap-4 rounded-2xl border border-[#2a2a2a] bg-[#222222] px-5 py-4 shadow-sm transition-colors hover:border-[#EF5D08]">
-                      <Image
-                        src={sponsor.logo_url}
-                        alt={sponsor.name}
-                        width={120}
-                        height={60}
-                        className="h-[60px] w-[120px] object-contain"
-                      />
-                      <p className="text-sm font-semibold text-[#EBEBEB]">
-                        {sponsor.name}
-                      </p>
-                    </div>
-                  );
-
-                  return sponsor.website_url ? (
-                    <a
-                      key={`${sponsor.id}-${index}`}
-                      href={sponsor.website_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
-                    >
-                      {content}
-                    </a>
-                  ) : (
-                    <div key={`${sponsor.id}-${index}`}>{content}</div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 28rem), 1fr))", gap: "2rem" }}>
-          <div className="space-y-6 rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a]" style={{ padding: "1.75rem" }}>
-            <div className="space-y-3">
-              <h2 className="text-2xl font-bold text-[#EBEBEB]">
-                OUR JOURNEY &amp; WHAT WE DO
-              </h2>
-              <p className="text-base leading-7 text-[#9a9a9a]">
-                Rooted in our racing heritage, Team Vegavath has grown into a
-                collaborative student club building across mobility, robotics,
-                software, design, and outreach. We turn ambitious ideas into
-                prototypes, hackathons, and hands-on learning experiences.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">10+</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Projects</p>
-              </div>
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">3+</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Awards</p>
-              </div>
-              <div className="rounded-2xl border border-[#2a2a2a] bg-[#222222] p-5 shadow-sm">
-                <p className="text-2xl font-black text-[#EF5D08]">85</p>
-                <p className="mt-1 text-sm font-medium text-[#9a9a9a]">Active Members</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6 rounded-3xl border border-[#2a2a2a] bg-[#1a1a1a] shadow-sm" style={{ padding: "1.75rem" }}>
-            <div className="space-y-3">
-              <h2 className="text-2xl font-bold text-[#EBEBEB]">OUR VISION</h2>
-              <p className="text-base leading-7 text-[#9a9a9a]">{missionText}</p>
-            </div>
-
-            <div className="space-y-3">
-              {visionDomains.map((domain) => (
-                <div
-                  key={domain}
-                  className="flex items-center gap-4 rounded-2xl border border-[#2a2a2a] bg-[#222222] px-4 py-3 transition-colors hover:border-[#EF5D08]"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EF5D08]/10 text-sm font-bold text-[#EF5D08]">
-                    {domain.charAt(0)}
-                  </div>
-                  <p className="text-sm font-semibold text-[#EBEBEB] sm:text-base">
-                    {domain}
+          </Reveal>
+          <Reveal delay={0.08}>
+            <div className="values-grid">
+              {VALUES.map(({ shape, title, description }) => (
+                <div key={title} style={{ background: "var(--bg-card)", padding: "1.75rem 1.5rem" }}>
+                  <ValueShape shape={shape} />
+                  <h3 style={{ marginTop: "1.1rem", fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                    {title}
+                  </h3>
+                  <p style={{ marginTop: "0.6rem", fontSize: "0.9rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                    {description}
                   </p>
                 </div>
               ))}
             </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Sponsors marquee — same treatment as home */}
+      {sponsors.length > 0 ? (
+        <section style={{ padding: "0 0 5rem" }}>
+          <div style={{ margin: "0 auto", maxWidth: "80rem" }}>
+            <p className="label-tech" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+              Backed by
+            </p>
+            <SponsorMarquee sponsors={sponsors} />
           </div>
         </section>
-
-        <section className="space-y-10">
-          <h2 className="text-center text-2xl font-bold tracking-tight text-[#EBEBEB] sm:text-3xl">
-            OUR JOURNEY
-          </h2>
-
-          <div className="relative">
-            <div style={{ position: "absolute", left: "50%", top: 0, height: "100%", width: "2px", background: "#2a2a2a", transform: "translateX(-50%)" }} />
-
-            <div className="space-y-8">
-              {timelineEntries.map((entry, index) => (
-                <div
-                  key={entry.year}
-                  style={{ position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", alignItems: "start" }}
-                >
-                  {index % 2 === 0 ? (
-                    <>
-                      <article style={{ borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "1.5rem", transition: "border-color 0.2s" }} className="hover:border-[#EF5D08]">
-                        <p style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.24em", color: "#EF5D08" }}>{entry.year}</p>
-                        <h3 style={{ marginTop: "0.5rem", fontSize: "1.25rem", fontWeight: 700, color: "#EBEBEB" }}>{entry.title}</h3>
-                        <p style={{ marginTop: "0.75rem", fontSize: "0.9rem", lineHeight: 1.6, color: "#9a9a9a" }}>{entry.description}</p>
-                      </article>
-                      <div />
-                    </>
-                  ) : (
-                    <>
-                      <div />
-                      <article style={{ borderRadius: "1rem", border: "1px solid #2a2a2a", background: "#1a1a1a", padding: "1.5rem", transition: "border-color 0.2s" }} className="hover:border-[#EF5D08]">
-                        <p style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.24em", color: "#EF5D08" }}>{entry.year}</p>
-                        <h3 style={{ marginTop: "0.5rem", fontSize: "1.25rem", fontWeight: 700, color: "#EBEBEB" }}>{entry.title}</h3>
-                        <p style={{ marginTop: "0.75rem", fontSize: "0.9rem", lineHeight: 1.6, color: "#9a9a9a" }}>{entry.description}</p>
-                      </article>
-                    </>
-                  )}
-                  <div style={{ position: "absolute", left: "50%", top: "1.75rem", height: "0.75rem", width: "0.75rem", borderRadius: "50%", background: "#EF5D08", transform: "translateX(-50%)" }} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-8">
-          <h2 className="text-center text-2xl font-bold tracking-tight text-[#EBEBEB] sm:text-3xl">
-            OUR VALUES
-          </h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.25rem" }}>
-            {values.map((value) => (
-              <article
-                key={value.title}
-                className="rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] text-center shadow-sm transition-colors hover:border-[#EF5D08]"
-                style={{ padding: "1.5rem" }}
-              >
-                <div className="text-3xl" aria-hidden="true">
-                  {value.icon}
-                </div>
-                <h3 className="mt-4 text-lg font-bold text-[#EBEBEB]">
-                  {value.title}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-[#9a9a9a]">
-                  {value.description}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: "56rem", border: "2px dashed #EF5D08", borderRadius: "1.5rem", padding: "4rem 2rem", textAlign: "center", boxSizing: "border-box" }}>
-            <h2 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, color: "#EBEBEB", textAlign: "center" }}>Join Team Vegavath</h2>
-            <p style={{ marginTop: "1rem", color: "#9a9a9a", fontSize: "1.1rem", textAlign: "center" }}>Be part of a community building the future of mobility and technology</p>
-            <div style={{ marginTop: "2rem", textAlign: "center" }}>
-              <Link href="/join" style={{ display: "inline-flex", alignItems: "center", background: "white", color: "#EF5D08", fontWeight: 700, fontSize: "1.1rem", borderRadius: "9999px", padding: "0.875rem 2.5rem", textDecoration: "none" }}>
-                Apply Now 🏁
-              </Link>
-            </div>
-          </div>
-        </section>
-      </div>
+      ) : null}
     </main>
   );
 }

@@ -15,7 +15,7 @@ export default function NotFound() {
           <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
             <h1 className="text-8xl font-bold text-[#EBEBEB]">404</h1>
             <h2 className="text-2xl font-semibold text-[#9a9a9a]">Page not found</h2>
-            <p className="mx-auto max-w-md text-[#9a9a9a]">
+            <p className="max-w-md text-[#9a9a9a]" style={{ margin: "0 auto" }}>
               The page you are looking for does not exist or has been moved.
             </p>
             <Link

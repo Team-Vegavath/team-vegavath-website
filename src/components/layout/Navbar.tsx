@@ -3,47 +3,84 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useScroll, useMotionValueEvent } from "framer-motion";
 
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/about", label: "About" },
-  { href: "/events", label: "Events" },
-  { href: "/gallery", label: "Gallery" },
-  { href: "/crew", label: "Team" },
-  { href: "/sponsors", label: "Sponsors" },
-  { href: "/join", label: "Join Us" },
+  { href: "/", label: "HOME" },
+  { href: "/about", label: "ABOUT" },
+  { href: "/events", label: "EVENTS" },
+  { href: "/gallery", label: "GALLERY" },
+  { href: "/crew", label: "CREW" },
+  { href: "/sponsors", label: "SPONSORS" },
 ] as const;
+
+const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 
 export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { scrollY } = useScroll();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setScrolled(latest > 80);
+  });
+
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#EF5D08]/20 bg-[#121212]/80 backdrop-blur-md">
-      <nav className="flex w-full items-center justify-between" style={{ height: "80px", paddingLeft: "clamp(1.25rem, 5vw, 6rem)", paddingRight: "clamp(1.25rem, 5vw, 6rem)" }}>
-        <Link href="/" className="flex items-center gap-3 flex-shrink-0">
+    <header
+      className="site-nav"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        background: scrolled || menuOpen ? "var(--bg-base)" : "transparent",
+        borderBottom: scrolled && !menuOpen ? "1px solid var(--border)" : "1px solid transparent",
+        transition: "background 0.25s ease, border-color 0.25s ease",
+      }}
+    >
+      <nav
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: "72px",
+          paddingLeft: "clamp(1.25rem, 4vw, 4rem)",
+          paddingRight: "clamp(1.25rem, 4vw, 4rem)",
+        }}
+      >
+        <Link href="/" aria-label="Team Vegavath home" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <Image
-            src="https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png"
-            alt="Vegavath"
+            src={LOGO_URL}
+            alt="Team Vegavath shield"
             width={48}
             height={48}
-            className="object-contain" style={{ height: "72px", width: "72px" }}
+            style={{ height: "48px", width: "48px", objectFit: "contain" }}
           />
-          <span className="font-black uppercase tracking-wider text-[#EF5D08]" style={{ fontSize: "2rem" }}>
-            VEGAVATH
-          </span>
         </Link>
 
-        <ul className="hidden md:flex items-center" style={{ gap: "2.5rem" }}>
+        <ul className="nav-links-desktop">
           {NAV_LINKS.map(({ href, label }) => (
             <li key={href}>
               <Link
                 href={href}
-                style={{ fontSize: "1.1rem" }}
-                className={`font-semibold tracking-wide transition-colors duration-200 hover:text-[#EF5D08] ${
-                  pathname === href ? "text-[#EF5D08]" : "text-[#9a9a9a]"
-                }`}
+                className="nav-link"
+                style={{
+                  color: pathname === href ? "var(--accent)" : "var(--text-secondary)",
+                }}
               >
                 {label}
               </Link>
@@ -51,37 +88,33 @@ export function Navbar() {
           ))}
         </ul>
 
+        <Link href="/join" className="btn-primary nav-join-desktop" style={{ padding: "0.55rem 1.4rem" }}>
+          JOIN US
+        </Link>
+
         <button
           onClick={() => setMenuOpen((prev) => !prev)}
           aria-label="Toggle menu"
           aria-expanded={menuOpen}
-          style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "0.6rem 0.75rem", background: "rgba(239,93,8,0.1)", border: "1px solid rgba(239,93,8,0.3)", borderRadius: "0.5rem", cursor: "pointer" }}
-          className="md:hidden"
+          className="nav-hamburger"
         >
-          <span style={{ display: "block", height: "2px", width: "22px", background: "#EF5D08", borderRadius: "2px" }} />
-          <span style={{ display: "block", height: "2px", width: "22px", background: "#EF5D08", borderRadius: "2px" }} />
-          <span style={{ display: "block", height: "2px", width: "22px", background: "#EF5D08", borderRadius: "2px" }} />
+          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", transition: "transform 0.2s", transform: menuOpen ? "translateY(7px) rotate(45deg)" : "none" }} />
+          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", opacity: menuOpen ? 0 : 1, transition: "opacity 0.2s" }} />
+          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", transition: "transform 0.2s", transform: menuOpen ? "translateY(-7px) rotate(-45deg)" : "none" }} />
         </button>
       </nav>
 
       {menuOpen && (
-        <div className="md:hidden" style={{ borderTop: "1px solid rgba(239,93,8,0.2)", background: "rgba(18,18,18,0.98)", backdropFilter: "blur(12px)" }}>
-          <ul style={{ display: "flex", flexDirection: "column", padding: "0.5rem 0 1rem 0" }}>
+        <div className="nav-overlay">
+          <ul style={{ display: "flex", flexDirection: "column", gap: "0.25rem", listStyle: "none" }}>
             {NAV_LINKS.map(({ href, label }) => (
               <li key={href}>
                 <Link
                   href={href}
                   onClick={() => setMenuOpen(false)}
+                  className="nav-overlay-link"
                   style={{
-                    display: "block",
-                    padding: "0.875rem 1.5rem",
-                    fontSize: "1.1rem",
-                    fontWeight: 600,
-                    letterSpacing: "0.02em",
-                    color: pathname === href ? "#EF5D08" : "#EBEBEB",
-                    borderLeft: pathname === href ? "3px solid #EF5D08" : "3px solid transparent",
-                    transition: "all 0.15s",
-                    textDecoration: "none",
+                    color: pathname === href ? "var(--accent)" : "var(--text-primary)",
                   }}
                 >
                   {label}
@@ -89,6 +122,14 @@ export function Navbar() {
               </li>
             ))}
           </ul>
+          <Link
+            href="/join"
+            onClick={() => setMenuOpen(false)}
+            className="btn-primary"
+            style={{ width: "100%", padding: "1rem" }}
+          >
+            JOIN US
+          </Link>
         </div>
       )}
     </header>

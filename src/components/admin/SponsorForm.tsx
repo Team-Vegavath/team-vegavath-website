@@ -95,7 +95,7 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
+      className="space-y-4 border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
     >
       <div>
         <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
@@ -190,13 +190,13 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
         <button
           type="button"
           onClick={() => setIsActive((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
             is_active ? "bg-[#EF5D08]" : "bg-[#3a3a3a]"
           }`}
           aria-label="Toggle sponsor active"
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
               is_active ? "translate-x-6" : "translate-x-1"
             }`}
           />
