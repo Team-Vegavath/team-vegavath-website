@@ -25,15 +25,16 @@ export default function AboutHeroImage() {
           priority
           style={{ objectFit: "cover", objectPosition: "center" }}
         />
+        {/* Darkens only the bottom ~40% so faces in the photo stay clear */}
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.45) 45%, rgba(10,10,10,0.25) 100%)",
+            background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 40%, transparent 70%)",
           }}
         />
-        <div style={{ position: "relative", width: "100%", maxWidth: "80rem", margin: "0 auto", padding: "0 clamp(1.25rem, 4vw, 4rem) 4rem" }}>
-          <h1 className="heading" style={{ fontWeight: 700, fontSize: "clamp(2.5rem, 7vw, 5rem)", lineHeight: 1.05, color: "var(--text-primary)", textTransform: "uppercase" }}>
+        <div style={{ position: "absolute", bottom: "2rem", left: "2.5rem", right: "1.5rem" }}>
+          <h1 className="heading" style={{ fontWeight: 700, fontSize: "clamp(2rem, 6vw, 4.5rem)", lineHeight: 1.05, color: "var(--text-primary)", textTransform: "uppercase" }}>
             Built by students.
             <br />
             For students.

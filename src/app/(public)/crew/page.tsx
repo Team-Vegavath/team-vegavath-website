@@ -31,33 +31,54 @@ function PhotoOrInitial({ member }: { member: TeamMember }) {
   );
 }
 
+/* Club LinkedIn (same URL as Footer). Every card links here; a member's own
+   linkedin_url (settable via admin MemberForm) overrides it when present. */
+const CLUB_LINKEDIN_URL = "https://www.linkedin.com/company/team-vegavath-pesu";
+
+function LinkedInLink({ member }: { member: TeamMember }) {
+  return (
+    <a
+      href={member.linkedin_url || CLUB_LINKEDIN_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${member.name} on LinkedIn`}
+      style={{ color: "var(--text-muted)", display: "inline-flex" }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+      </svg>
+    </a>
+  );
+}
+
 function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean }) {
   return (
     <div style={{ padding: compact ? "1rem" : "1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
-      <h3 className="heading" style={{ fontSize: compact ? "0.95rem" : "1.1rem", fontWeight: 600, color: "var(--text-primary)" }}>
+      <h3 className="heading" style={{ fontSize: compact ? "0.95rem" : "1.35rem", fontWeight: 600, color: "var(--text-primary)" }}>
         {member.name}
       </h3>
       <p style={{ fontSize: compact ? "0.78rem" : "0.85rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
         {member.role}
       </p>
-      {!compact && member.quote ? (
-        <p style={{ fontSize: "0.85rem", lineHeight: 1.6, color: "var(--text-secondary)", marginTop: "0.35rem", fontStyle: "italic" }}>
+      {member.quote ? (
+        <p
+          style={{
+            fontSize: compact ? "0.78rem" : "0.85rem",
+            lineHeight: 1.6,
+            color: "var(--text-secondary)",
+            marginTop: "0.35rem",
+            fontStyle: "italic",
+            ...(compact
+              ? { overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }
+              : {}),
+          }}
+        >
           {member.quote}
         </p>
       ) : null}
       <div style={{ marginTop: "auto", paddingTop: "0.6rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
         {member.domain ? <span className="label-tech">{member.domain}</span> : <span />}
-        {member.linkedin_url ? (
-          <a
-            href={member.linkedin_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mono"
-            style={{ fontSize: "0.7rem", letterSpacing: "0.1em", color: "var(--text-secondary)", textDecoration: "none" }}
-          >
-            LINKEDIN →
-          </a>
-        ) : null}
+        <LinkedInLink member={member} />
       </div>
     </div>
   );
@@ -154,7 +175,7 @@ export default async function CrewPage() {
               Want in?
             </h2>
             <p style={{ marginTop: "0.5rem", color: "var(--text-secondary)" }}>
-              Recruitment opens each semester across all six domains.
+              Recruitment opens each year across all six domains.
             </p>
           </div>
           <Link href="/join" className="btn-primary">

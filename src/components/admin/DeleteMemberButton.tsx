@@ -8,6 +8,7 @@ interface DeleteMemberButtonProps {
   name: string;
 }
 
+/** Danger-zone delete for the member EDIT page; list rows use <InlineDelete />. */
 export default function DeleteMemberButton({ id, name }: DeleteMemberButtonProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -33,13 +34,8 @@ export default function DeleteMemberButton({ id, name }: DeleteMemberButtonProps
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDelete}
-      disabled={deleting}
-      className="mt-4 w-full rounded-lg border border-red-800 bg-red-900/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-900/50 disabled:opacity-50"
-    >
-      {deleting ? "Deleting..." : "Delete Member"}
+    <button type="button" onClick={handleDelete} disabled={deleting} className="admin-btn-danger">
+      {deleting ? "DELETING…" : "DELETE MEMBER"}
     </button>
   );
 }

@@ -8,6 +8,7 @@ type DeleteSponsorButtonProps = {
   name: string;
 };
 
+/** Danger-zone delete for the sponsor EDIT page; list rows use <InlineDelete />. */
 export default function DeleteSponsorButton({ id, name }: DeleteSponsorButtonProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -39,13 +40,8 @@ export default function DeleteSponsorButton({ id, name }: DeleteSponsorButtonPro
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleDelete}
-      disabled={deleting}
-      className="mt-4 w-full rounded-lg border border-red-800 bg-red-900/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-900/50 disabled:opacity-50"
-    >
-      {deleting ? "Deleting..." : "Delete Sponsor"}
+    <button type="button" onClick={handleDelete} disabled={deleting} className="admin-btn-danger">
+      {deleting ? "DELETING…" : "DELETE SPONSOR"}
     </button>
   );
 }

@@ -32,6 +32,53 @@ export async function createMember(input: CreateMemberInput): Promise<TeamMember
   return rows[0] as TeamMember;
 }
 
+export async function createMembersBulk(
+  inputs: CreateMemberInput[]
+): Promise<{ inserted: number; skipped: number }> {
+  if (inputs.length === 0) return { inserted: 0, skipped: 0 };
+
+  // team_members has no unique constraint on name (001_initial_schema.sql),
+  // so ON CONFLICT (name) would throw — dedupe by pre-checking existing names.
+  const existing = await sql`SELECT name FROM team_members`;
+  const existingNames = new Set(existing.map((row) => (row as { name: string }).name));
+
+  const fresh = inputs.filter((m) => !existingNames.has(m.name));
+  if (fresh.length === 0) return { inserted: 0, skipped: inputs.length };
+
+  const values = fresh
+    .map((_, i) => {
+      const base = i * 9;
+      return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9})`;
+    })
+    .join(",");
+
+  const params = fresh.flatMap((m) => [
+    m.name,
+    m.role,
+    m.tier,
+    m.domain ?? null,
+    m.quote ?? null,
+    m.linkedin_url ?? null,
+    m.photo_url ?? null,
+    m.display_order ?? 0,
+    m.is_active ?? true,
+  ]);
+
+  // Neon driver v1 only allows parameterized (non-template) calls via .query()
+  const result = await sql.query(
+    `INSERT INTO team_members
+       (name, role, tier, domain, quote, linkedin_url, photo_url, display_order, is_active)
+     VALUES ${values}
+     RETURNING id`,
+    params
+  );
+
+  return {
+    inserted: result.length,
+    skipped: inputs.length - result.length,
+  };
+}
+
 export async function updateMember(
   id: string,
   input: UpdateMemberInput

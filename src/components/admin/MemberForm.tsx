@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import FileUploadField from "@/components/admin/FileUploadField";
+import ToggleSwitch from "@/components/admin/ToggleSwitch";
+
 interface MemberFormProps {
   mode: "create" | "edit";
   initialData?: {
@@ -15,6 +18,7 @@ interface MemberFormProps {
     linkedin_url?: string;
     display_order?: number;
     is_active?: boolean;
+    photo_url?: string | null;
   };
 }
 
@@ -29,7 +33,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
   const [linkedin_url, setLinkedinUrl] = useState(initialData?.linkedin_url ?? "");
   const [display_order, setDisplayOrder] = useState(initialData?.display_order ?? 0);
   const [is_active, setIsActive] = useState(initialData?.is_active ?? true);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -39,6 +43,9 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
     formData.append("path", path);
     const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Upload failed");
+    }
     return data.url;
   }
 
@@ -48,11 +55,18 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
     setSaving(true);
 
     try {
-      let photo_url = "";
       const safeName = name.toLowerCase().replace(/\s+/g, "-");
 
-      if (photoFile) {
-        photo_url = await uploadFile(photoFile, `team/${tier}/${safeName}.jpg`);
+      // Only include photo_url when a new file was uploaded; sending "" on
+      // edit would wipe the stored URL (same COALESCE trap EventForm had).
+      // Timestamped key: R2 serves immutable cache headers, never reuse a key.
+      const imageFields: { photo_url?: string } = {};
+
+      if (photoFiles[0]) {
+        imageFields.photo_url = await uploadFile(
+          photoFiles[0],
+          `team/${tier}/${safeName}-${Date.now()}.jpg`,
+        );
       }
 
       const payload = {
@@ -65,7 +79,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
         linkedin_url,
         display_order,
         is_active,
-        photo_url,
+        ...imageFields,
       };
 
       const method = mode === "edit" && initialData?.id ? "PATCH" : "POST";
@@ -94,16 +108,12 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
     }
   }
 
-  const inputClassName =
-    "bg-[#121212] border border-[#2a2a2a] text-[#EBEBEB] rounded-lg px-4 py-2 w-full focus:outline-none focus:border-[#EF5D08]";
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
-    >
+    <form onSubmit={handleSubmit} className="admin-form" style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+      <span className="admin-section-label">Basic Info</span>
+
       <div>
-        <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="name" className="admin-label">
           Name
         </label>
         <input
@@ -112,12 +122,12 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           required
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="role" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="role" className="admin-label">
           Role
         </label>
         <input
@@ -127,19 +137,19 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           value={role}
           onChange={(event) => setRole(event.target.value)}
           placeholder="e.g. Club Head, Design Lead, Member"
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="tier" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="tier" className="admin-label">
           Tier
         </label>
         <select
           id="tier"
           value={tier}
           onChange={(event) => setTier(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         >
           <option value="core">core</option>
           <option value="crew">crew</option>
@@ -148,14 +158,14 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
       </div>
 
       <div>
-        <label htmlFor="domain" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="domain" className="admin-label">
           Domain
         </label>
         <select
           id="domain"
           value={domain}
           onChange={(event) => setDomain(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         >
           <option value="Automotive">Automotive</option>
           <option value="Robotics">Robotics</option>
@@ -167,8 +177,10 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
         </select>
       </div>
 
+      <span className="admin-section-label">Profile</span>
+
       <div>
-        <label htmlFor="quote" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="quote" className="admin-label">
           Quote
         </label>
         <textarea
@@ -176,13 +188,13 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           rows={4}
           value={quote}
           onChange={(event) => setQuote(event.target.value)}
-          placeholder="Their personal quote — optional"
-          className={inputClassName}
+          placeholder="Their personal quote · optional"
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="linkedin_url" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="linkedin_url" className="admin-label">
           LinkedIn URL
         </label>
         <input
@@ -190,13 +202,30 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           type="url"
           value={linkedin_url}
           onChange={(event) => setLinkedinUrl(event.target.value)}
-          placeholder="https://linkedin.com/in/username — optional"
-          className={inputClassName}
+          placeholder="https://linkedin.com/in/username · optional"
+          className="admin-input"
+        />
+        <p className="admin-hint">Shows the LinkedIn icon on /crew when set</p>
+      </div>
+
+      <span className="admin-section-label">Media</span>
+
+      <div>
+        <span className="admin-label">Photo</span>
+        <FileUploadField
+          id="photo"
+          accept="image/*"
+          files={photoFiles}
+          onFilesChange={setPhotoFiles}
+          currentUrl={initialData?.photo_url}
+          hint="Square crop preferred · optional, can be added later"
         />
       </div>
 
+      <span className="admin-section-label">Status &amp; Visibility</span>
+
       <div>
-        <label htmlFor="display_order" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="display_order" className="admin-label">
           Display Order
         </label>
         <input
@@ -204,49 +233,22 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           type="number"
           value={display_order}
           onChange={(event) => setDisplayOrder(Number(event.target.value))}
-          className={inputClassName}
+          className="admin-input"
         />
-        <p className="mt-2 text-xs text-zinc-400">Lower number = appears first within tier</p>
+        <p className="admin-hint">Lower number = appears first within tier</p>
       </div>
 
-      <div>
-        <label htmlFor="photo" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Photo
-        </label>
-        <input
-          id="photo"
-          type="file"
-          accept="image/*"
-          onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-          className={inputClassName}
-        />
-        <p className="mt-2 text-xs text-zinc-400">Optional — can be added later</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          Active
+        </span>
+        <ToggleSwitch value={is_active} onChange={setIsActive} ariaLabel="Member active" />
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-[#121212] p-4">
-        <span className="text-sm font-medium text-[#EBEBEB]">Active</span>
-        <div
-          onClick={() => setIsActive((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
-            is_active ? "bg-[#EF5D08]" : "bg-[#3a3a3a]"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
-              is_active ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
-      </div>
+      {error ? <p className="admin-error">{error}</p> : null}
 
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-lg bg-[#EF5D08] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#d84f00] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? "Saving..." : mode === "create" ? "Add Member" : "Update Member"}
+      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "SAVING…" : "SAVE MEMBER"}
       </button>
     </form>
   );

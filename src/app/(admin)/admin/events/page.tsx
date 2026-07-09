@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import DeleteEventButton from "@/components/admin/DeleteEventButton";
 import EventForm from "@/components/admin/EventForm";
-import ToggleEventStatusButton from "@/components/admin/ToggleEventStatusButton";
+import InlineDelete from "@/components/admin/InlineDelete";
 import { auth } from "@/lib/auth";
 import { getEvents } from "@/lib/services/events";
 import type { Event } from "@/types/event";
@@ -44,108 +43,93 @@ export default async function AdminEventsPage({
 
   if (showNewForm) {
     return (
-      <main style={{ minHeight: "100vh", background: "#09090b", color: "white", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
-        <div className="flex w-full max-w-3xl flex-col gap-6" style={{ margin: "0 auto" }}>
-          <Link
-            href="/admin/events"
-            style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
-          >
-            ← Back to events list
-          </Link>
+      <div style={{ maxWidth: "52rem" }}>
+        <Link href="/admin/events" className="admin-back-link">
+          ← Back to events
+        </Link>
 
-          <h1 className="text-3xl font-extrabold tracking-tight">Create New Event</h1>
+        <header className="admin-page-header" style={{ marginTop: "1rem" }}>
+          <h1 className="admin-page-title">New Event</h1>
+        </header>
 
-          <EventForm mode="create" />
-        </div>
-      </main>
+        <EventForm mode="create" />
+      </div>
     );
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#09090b", color: "white", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "72rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-3xl font-extrabold tracking-tight">Manage Events</h1>
-          <Link
-            href="/admin/events?new=true"
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-          >
-            Add New Event
-          </Link>
-        </div>
-
-        <section className="overflow-hidden border border-zinc-800 bg-zinc-900">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-800 text-sm">
-              <thead className="bg-zinc-950/60 text-left text-xs uppercase tracking-[0.12em] text-zinc-400">
-                <tr>
-                  <th className="px-5 py-3">Title</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Date</th>
-                  <th className="px-5 py-3">Registration Open</th>
-                  <th className="px-5 py-3">Slug</th>
-                  <th className="px-5 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {events.length > 0 ? (
-                  events.map((event) => (
-                    <tr key={event.id} className="text-zinc-200">
-                      <td className="whitespace-nowrap px-5 py-3 font-medium text-zinc-100">
-                        <Link
-                          href={`/events/${event.slug}`}
-                          target="_blank"
-                          className="text-[#EF5D08] hover:text-[#F29C04] underline"
-                        >
-                          {event.title}
-                        </Link>
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3 uppercase text-zinc-300">
-                        {event.status}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3 text-zinc-300">
-                        {formatDate(event.event_date)}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3 text-zinc-300">
-                        {event.registration_open ? "Yes" : "No"}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-3 text-zinc-300">{event.slug}</td>
-                      <td className="whitespace-nowrap px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/admin/events/${event.id}/edit`}
-                            className="text-sm text-[#9a9a9a] hover:text-[#EBEBEB]"
-                          >
-                            Edit
-                          </Link>
-                          <ToggleEventStatusButton
-                            id={event.id}
-                            currentStatus={event.status}
-                          />
-                          <DeleteEventButton id={event.id} title={event.title} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-zinc-400">
-                      No events yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <Link
-          href="/admin/dashboard"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1px solid #3f3f46", padding: "0.4rem 1rem", fontSize: "0.8rem", color: "#a1a1aa", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
-        >
-          ← Back to dashboard
+    <>
+      <header className="admin-page-header">
+        <h1 className="admin-page-title">Events</h1>
+        <Link href="/admin/events?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+          ADD EVENT
         </Link>
-      </div>
-    </main>
+      </header>
+
+      <section className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Registration</th>
+              <th>Slug</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.length > 0 ? (
+              events.map((event) => (
+                <tr key={event.id}>
+                  <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
+                    <Link
+                      href={`/events/${event.slug}`}
+                      target="_blank"
+                      style={{ color: "var(--text-primary)", textDecoration: "none", borderBottom: "1px solid var(--border-strong)" }}
+                    >
+                      {event.title}
+                    </Link>
+                  </td>
+                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
+                    <span
+                      className="admin-dot"
+                      style={{ background: event.status === "upcoming" ? "var(--accent)" : "var(--text-muted)" }}
+                      aria-hidden="true"
+                    />
+                    {event.status}
+                  </td>
+                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{formatDate(event.event_date)}</td>
+                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
+                    {event.registration_open ? "OPEN" : "CLOSED"}
+                  </td>
+                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{event.slug}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <Link href={`/admin/events/${event.id}/edit`} className="admin-row-action">
+                        EDIT
+                      </Link>
+                      {/* Plain DELETE here soft-deletes (archives): the API's non-permanent
+                          path. Permanent delete lives in the edit page's danger zone. */}
+                      <InlineDelete
+                        endpoint={`/api/admin/events?id=${event.id}`}
+                        confirmMessage={`Archive "${event.title}"? It will be hidden from the public site but can be restored.`}
+                        label="ARCHIVE"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="admin-empty">
+                  No events yet
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+    </>
   );
 }

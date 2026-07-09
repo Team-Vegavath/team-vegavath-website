@@ -1,6 +1,6 @@
 # Team Vegavath Website - Junior Dev Team Handoff
 
-Last updated: 2026-04-20
+Last updated: 2026-07-07
 Owner: Team Vegavath
 Repository: team-vegavath-website
 Primary branch: master
@@ -187,6 +187,24 @@ Local commands:
 - npm run lint
 - npx tsc --noEmit
 - npm run build
+
+### Git rules for juniors
+
+Branching and commits:
+- Never commit directly to master. Always work on a feature branch:
+  `git checkout master && git pull`, then `git checkout -b feat/<short-name>` (or `fix/<short-name>`).
+- Commit messages follow the existing history style: `feat: <what shipped>`, `fix: <what was broken>`, `chore: <housekeeping>`. Write what the commit does, not "updates".
+- Keep each branch to one focused change. If you touched two unrelated things, split them into two branches/PRs.
+
+Hard rules (no exceptions):
+- Never `git push --force` to master.
+- Never commit binary assets (images, videos, models) — they go to R2.
+- Never commit `.env.local` or any secret. If a secret lands in a commit, tell the lead immediately — it must be rotated, not just deleted.
+- Never merge with red CI, and never "fix" CI by disabling lint or type checks.
+
+AI assistants (Claude, Copilot, etc.):
+- AI tools must NOT run git commands that change state (commit, push, branch, merge, rebase). A human runs all git operations after reviewing the AI's changes with `git diff`.
+- Review every AI-generated diff line by line before staging it. You own what you commit.
 
 ## 12) Seed and content bootstrap
 

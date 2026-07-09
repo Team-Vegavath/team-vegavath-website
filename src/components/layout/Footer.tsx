@@ -15,11 +15,11 @@ const NAV_LINKS = [
 
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 
-/* Real club socials — used when site_settings has no override */
+/* Real club socials, used when site_settings has no override */
 const DEFAULT_SOCIALS = {
   instagram: "https://www.instagram.com/teamvegavath_pesu/",
   linkedin: "https://www.linkedin.com/company/team-vegavath-pesu",
-  github: "https://github.com/Team-Vegavath",
+  github: "https://github.com/Team-Vegavath/team-vegavath-website",
 } as const;
 
 interface FooterProps {
@@ -72,7 +72,7 @@ export function Footer({ settings }: FooterProps) {
               style={{ height: "40px", width: "40px", objectFit: "contain" }}
             />
             <p className="heading" style={{ fontWeight: 700, fontSize: "0.95rem", letterSpacing: "0.14em", color: "var(--text-primary)" }}>
-              TEAM VEGAVATH — PESU ECC
+              TEAM VEGAVATH · PESU ECC
             </p>
           </div>
 
@@ -106,12 +106,8 @@ export function Footer({ settings }: FooterProps) {
             </ul>
           </nav>
 
-          <p className="mono" style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          <p className="mono" style={{ fontSize: "0.75rem", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>
             © 2026 Team Vegavath
-          </p>
-
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            Built by the Vegavath Coding Domain
           </p>
         </div>
       </div>

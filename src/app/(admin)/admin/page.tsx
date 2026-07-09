@@ -31,7 +31,7 @@ export default async function AdminLoginPage({
       });
     } catch (error) {
       // instanceof survives production minification; string/constructor-name
-      // checks do not — that mismatch was crashing prod on wrong passwords.
+      // checks do not; that mismatch was crashing prod on wrong passwords.
       if (error instanceof AuthError) {
         redirect("/admin?error=invalid");
       }
@@ -70,7 +70,7 @@ export default async function AdminLoginPage({
               type="text"
               placeholder="Username"
               required
-              style={{ width: "100%", borderRadius: "4px", border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
+              style={{ width: "100%", borderRadius: 0, border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
             />
           </div>
 
@@ -84,7 +84,7 @@ export default async function AdminLoginPage({
               type="password"
               placeholder="Password"
               required
-              style={{ width: "100%", borderRadius: "4px", border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
+              style={{ width: "100%", borderRadius: 0, border: "1px solid var(--border-strong)", background: "var(--bg-base)", padding: "0.875rem 1rem", fontSize: "1rem", color: "var(--text-primary)", boxSizing: "border-box", outline: "none" }}
             />
           </div>
 

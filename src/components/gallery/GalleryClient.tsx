@@ -57,7 +57,7 @@ export default function GalleryClient({ items, filters }: Props) {
 
   return (
     <>
-      {/* Filter tabs — sharp underline treatment */}
+      {/* Filter tabs: sharp underline treatment */}
       <div
         role="tablist"
         aria-label="Filter gallery by event"

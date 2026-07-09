@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import FileUploadField from "@/components/admin/FileUploadField";
+import ToggleSwitch from "@/components/admin/ToggleSwitch";
+
 interface SponsorFormProps {
   mode: "create" | "edit";
   initialData?: {
@@ -13,6 +16,7 @@ interface SponsorFormProps {
     description?: string;
     display_order?: number;
     is_active?: boolean;
+    logo_url?: string | null;
   };
 }
 
@@ -25,12 +29,9 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [display_order, setDisplayOrder] = useState(initialData?.display_order ?? 0);
   const [is_active, setIsActive] = useState(initialData?.is_active ?? true);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoFiles, setLogoFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const inputClassName =
-    "bg-[#121212] border border-[#2a2a2a] text-[#EBEBEB] rounded-lg px-4 py-2 w-full focus:outline-none focus:border-[#EF5D08]";
 
   async function uploadFile(file: File, path: string): Promise<string> {
     const formData = new FormData();
@@ -38,6 +39,9 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
     formData.append("path", path);
     const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Upload failed");
+    }
     return data.url;
   }
 
@@ -54,8 +58,9 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
 
       let logo_url: string | undefined;
 
-      if (logoFile) {
-        logo_url = await uploadFile(logoFile, `sponsors/${safeName}.png`);
+      // Timestamped key: R2 serves immutable cache headers, never reuse a key.
+      if (logoFiles[0]) {
+        logo_url = await uploadFile(logoFiles[0], `sponsors/${safeName}-${Date.now()}.png`);
       }
 
       const sponsorFields = {
@@ -93,12 +98,11 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
-    >
+    <form onSubmit={handleSubmit} className="admin-form" style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+      <span className="admin-section-label">Basic Info</span>
+
       <div>
-        <label htmlFor="name" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="name" className="admin-label">
           Name
         </label>
         <input
@@ -107,19 +111,19 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
           required
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="tier" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="tier" className="admin-label">
           Tier
         </label>
         <select
           id="tier"
           value={tier}
           onChange={(event) => setTier(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         >
           <option value="premium">Premium</option>
           <option value="community">Community</option>
@@ -127,7 +131,7 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
       </div>
 
       <div>
-        <label htmlFor="website_url" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="website_url" className="admin-label">
           Website URL
         </label>
         <input
@@ -135,13 +139,13 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
           type="url"
           value={website_url}
           onChange={(event) => setWebsiteUrl(event.target.value)}
-          placeholder="https://sponsor-website.com — optional"
-          className={inputClassName}
+          placeholder="https://sponsor-website.com · optional"
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="description" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="description" className="admin-label">
           Description
         </label>
         <textarea
@@ -149,16 +153,29 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={4}
-          placeholder="Brief description shown in sponsor carousel — optional"
-          className={inputClassName}
+          placeholder="Brief description shown in sponsor carousel · optional"
+          className="admin-input"
         />
       </div>
 
+      <span className="admin-section-label">Media</span>
+
       <div>
-        <label
-          htmlFor="display_order"
-          className="mb-2 block text-sm font-medium text-[#EBEBEB]"
-        >
+        <span className="admin-label">Logo</span>
+        <FileUploadField
+          id="logo"
+          accept="image/*,image/svg+xml"
+          files={logoFiles}
+          onFilesChange={setLogoFiles}
+          currentUrl={initialData?.logo_url}
+          hint="PNG or SVG recommended"
+        />
+      </div>
+
+      <span className="admin-section-label">Status &amp; Visibility</span>
+
+      <div>
+        <label htmlFor="display_order" className="admin-label">
           Display Order
         </label>
         <input
@@ -166,51 +183,22 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
           type="number"
           value={display_order}
           onChange={(event) => setDisplayOrder(Number(event.target.value) || 0)}
-          className={inputClassName}
+          className="admin-input"
         />
-        <p className="mt-2 text-xs text-zinc-400">Lower number = appears first</p>
+        <p className="admin-hint">Lower number = appears first</p>
       </div>
 
-      <div>
-        <label htmlFor="logo" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Logo
-        </label>
-        <input
-          id="logo"
-          type="file"
-          accept="image/*,image/svg+xml"
-          onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)}
-          className={inputClassName}
-        />
-        <p className="mt-2 text-xs text-zinc-400">PNG or SVG recommended</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          Active
+        </span>
+        <ToggleSwitch value={is_active} onChange={setIsActive} ariaLabel="Sponsor active" />
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-[#121212] p-4">
-        <span className="text-sm font-medium text-[#EBEBEB]">Active</span>
-        <button
-          type="button"
-          onClick={() => setIsActive((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
-            is_active ? "bg-[#EF5D08]" : "bg-[#3a3a3a]"
-          }`}
-          aria-label="Toggle sponsor active"
-        >
-          <span
-            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
-              is_active ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </button>
-      </div>
+      {error ? <p className="admin-error">{error}</p> : null}
 
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
-
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-lg bg-[#EF5D08] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#d84f00] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? "Saving..." : mode === "create" ? "Add Sponsor" : "Update Sponsor"}
+      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "SAVING…" : "SAVE SPONSOR"}
       </button>
     </form>
   );

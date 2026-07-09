@@ -2,10 +2,12 @@
 
 This file is read by AI coding assistants (GitHub Copilot, etc).
 Follow these rules exactly. Do not improvise structure.
+CLAUDE.md at the repo root is the source of truth — on any conflict
+with this file, CLAUDE.md wins. (Last synced: 2026-07-07.)
 
 ## Stack
 
-- Next.js 1 App Router + TypeScript (strict mode)
+- Next.js 16 App Router + TypeScript (strict mode)
 - Tailwind CSS v4
 - Framer Motion (UI transitions only)
 - React Three Fiber + Drei (3D kart model)
@@ -63,6 +65,10 @@ src/
 - Error boundaries on every async server component.
 - Skeleton loading states for all DB-fetched sections.
 - Mobile-first CSS — 375px first, scale up.
+- Colors/fonts from the design tokens in src/app/globals.css only.
+- Tailwind classes first; inline style={{}} where Tailwind v4 utilities
+  don't generate in this setup (mx-auto, some responsive prefixes —
+  centering is always inline `margin: "0 auto"`).
 - ISR (revalidate: 60) for public pages except /join and /events/[slug].
 - SSR only for /join, /events/[slug], and all /admin/* routes.
 
@@ -77,7 +83,11 @@ src/
 - Unbounded SELECT queries without LIMIT
 - Duplicate business logic between public and admin routes
 - `<img>` tags — always next/image
-- Inline styles — always Tailwind classes
+- Emoji in UI text
+- Rounded corners (rounded-full/xl/2xl, 9999px radii) — the design
+  is sharp-cornered; sole exception is RacingCursor.tsx
+- Hardcoded hex colors — use globals.css tokens
+- Gradient text or glow effects
 
 ## Build Order (do not skip steps)
 

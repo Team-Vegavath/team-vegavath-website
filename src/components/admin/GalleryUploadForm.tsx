@@ -3,39 +3,49 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import FileUploadField from "@/components/admin/FileUploadField";
+
+type UploadStatus = "queued" | "uploading" | "done" | "error";
+
+const STATUS_COLOR: Record<UploadStatus, string> = {
+  queued: "var(--text-muted)",
+  uploading: "var(--accent)",
+  done: "var(--gold)",
+  error: "var(--error)",
+};
+
 export default function GalleryUploadForm() {
   const router = useRouter();
 
   const [eventLabel, setEventLabel] = useState("");
   const [eventId, setEventId] = useState("");
-  const [files, setFiles] = useState<FileList | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [captions, setCaptions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+
+  // Batch snapshot + per-file statuses: rendered instead of the picker while
+  // an upload runs, so mid-upload file removals can't desync the status list.
+  const [batch, setBatch] = useState<{ name: string }[] | null>(null);
+  const [statuses, setStatuses] = useState<UploadStatus[]>([]);
+  const [summary, setSummary] = useState<{ done: number; failed: number } | null>(null);
 
   const [videoUrl, setVideoUrl] = useState("");
   const [videoCaption, setVideoCaption] = useState("");
   const [videoEventLabel, setVideoEventLabel] = useState("");
 
-  const inputClassName =
-    "bg-[#121212] border border-[#2a2a2a] text-[#EBEBEB] rounded-lg px-4 py-2 w-full focus:outline-none focus:border-[#EF5D08]";
-
   const resetImageForm = () => {
     setEventLabel("");
     setEventId("");
-    setFiles(null);
+    setFiles([]);
     setCaptions([]);
-    setProgress(0);
+    setBatch(null);
+    setStatuses([]);
+    setSummary(null);
   };
 
-  const handleFilesChange = (selectedFiles: FileList | null) => {
+  const handleFilesChange = (selectedFiles: File[]) => {
     setFiles(selectedFiles);
-    if (!selectedFiles) {
-      setCaptions([]);
-      return;
-    }
-
     setCaptions((previous) =>
       Array.from({ length: selectedFiles.length }, (_, index) => previous[index] ?? ""),
     );
@@ -49,33 +59,73 @@ export default function GalleryUploadForm() {
     });
   };
 
+  const setStatusAtIndex = (index: number, status: UploadStatus) => {
+    setStatuses((previous) => {
+      const next = [...previous];
+      next[index] = status;
+      return next;
+    });
+  };
+
   const handleImageUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
-    if (!files || files.length === 0 || !eventLabel.trim()) {
-      setError("Please provide an event label and select at least one image.");
+    if (files.length === 0) {
+      setError("Please select at least one image.");
       return;
     }
 
+    // Event label is optional: unlabelled uploads go into a "General" bucket
+    // (event_id stays null unless pasted — no lookup from the label).
+    const trimmedEventLabel = eventLabel.trim() || "General";
+    const eventSlug = trimmedEventLabel
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+
+    const batchFiles = [...files];
+    const batchCaptions = [...captions];
+
     setUploading(true);
-    setProgress(0);
+    setSummary(null);
+    setBatch(batchFiles.map((file) => ({ name: file.name })));
+    setStatuses(batchFiles.map(() => "queued"));
 
+    // New items sort after existing ones: the gallery lists display_order ASC,
+    // so start the batch at current max + 1 (best effort — falls back to 0).
+    let baseOrder = 0;
     try {
-      const trimmedEventLabel = eventLabel.trim();
-      const eventSlug = trimmedEventLabel
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "");
+      const listResponse = await fetch("/api/admin/gallery");
+      if (listResponse.ok) {
+        const items = (await listResponse.json()) as { display_order?: number }[];
+        baseOrder = items.reduce(
+          (max, item) => Math.max(max, (item.display_order ?? 0) + 1),
+          0,
+        );
+      }
+    } catch {
+      // keep baseOrder = 0
+    }
 
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
-        if (!file) {
-          continue;
-        }
+    let done = 0;
+    let failed = 0;
 
+    for (let index = 0; index < batchFiles.length; index += 1) {
+      const file = batchFiles[index];
+      if (!file) {
+        continue;
+      }
+
+      setStatusAtIndex(index, "uploading");
+
+      // Per-file try/catch: one bad file logs and moves on — partial success
+      // is expected behaviour for a bulk upload.
+      try {
         const filename = file.name.toLowerCase().replace(/\s+/g, "-");
-        const uploadPath = `gallery/${eventSlug}/${filename}`;
+        // Timestamp prefix: R2 serves immutable cache headers; re-uploading a
+        // same-named file must never reuse the old object key.
+        const uploadPath = `gallery/${eventSlug}/${Date.now()}-${filename}`;
 
         const uploadFormData = new FormData();
         uploadFormData.append("file", file);
@@ -111,8 +161,8 @@ export default function GalleryUploadForm() {
             type: "image",
             url: r2Url,
             thumbnail_url: r2Url,
-            caption: captions[index] || "",
-            display_order: index,
+            caption: batchCaptions[index] || "",
+            display_order: baseOrder + index,
           }),
         });
 
@@ -123,18 +173,18 @@ export default function GalleryUploadForm() {
           throw new Error(createError?.error ?? "Failed to create gallery item.");
         }
 
-        setProgress(Math.round(((index + 1) / files.length) * 100));
+        done += 1;
+        setStatusAtIndex(index, "done");
+      } catch (caughtError) {
+        failed += 1;
+        setStatusAtIndex(index, "error");
+        console.error(`[gallery upload] ${file.name}:`, caughtError);
       }
-
-      resetImageForm();
-      router.refresh();
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error ? caughtError.message : "Failed to upload images.";
-      setError(message);
-    } finally {
-      setUploading(false);
     }
+
+    setSummary({ done, failed });
+    setUploading(false);
+    router.refresh();
   };
 
   const handleVideoSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -180,145 +230,177 @@ export default function GalleryUploadForm() {
     }
   };
 
+  const showBatchList = batch !== null;
+
   return (
-    <section style={{ borderRadius: "0.75rem", border: "1px solid #2a2a2a", background: "#18181b", padding: "1.5rem", color: "#EBEBEB", boxSizing: "border-box" }}>
-      <div className="space-y-8">
-        <form onSubmit={handleImageUpload} className="space-y-4">
-          <h2 className="text-xl font-semibold text-[#EBEBEB]">Upload Images</h2>
+    <section className="admin-form">
+      <form onSubmit={handleImageUpload} style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+        <span className="admin-section-label">Upload Images</span>
 
-          <div className="space-y-2">
-            <label htmlFor="eventLabel" className="text-sm text-[#B8B8B8]">
-              Event Label (e.g. &quot;Ignition 1.0&quot;)
-            </label>
-            <input
-              id="eventLabel"
-              type="text"
-              value={eventLabel}
-              onChange={(event) => setEventLabel(event.target.value)}
-              className={inputClassName}
-              placeholder="Ignition 1.0"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="eventId" className="text-sm text-[#B8B8B8]">
-              Event ID (optional)
-            </label>
-            <input
-              id="eventId"
-              type="text"
-              value={eventId}
-              onChange={(event) => setEventId(event.target.value)}
-              className={inputClassName}
-              placeholder="Paste event ID"
-            />
-            <p className="text-xs text-[#8B8B8B]">Paste event ID from events table for filtering</p>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="galleryFiles" className="text-sm text-[#B8B8B8]">
-              Images
-            </label>
-            <input
-              id="galleryFiles"
-              type="file"
-              multiple
-              accept="image/*"
-              className={inputClassName}
-              onChange={(event) => handleFilesChange(event.target.files)}
-            />
-          </div>
-
-          {files && files.length > 0 && (
-            <div className="space-y-3">
-              {Array.from(files).map((file, index) => (
-                <div key={`${file.name}-${index}`} className="space-y-1">
-                  <p className="text-xs text-[#9E9E9E]">{file.name}</p>
-                  <input
-                    type="text"
-                    value={captions[index] ?? ""}
-                    onChange={(event) => updateCaptionAtIndex(index, event.target.value)}
-                    className={inputClassName}
-                    placeholder="Caption (optional)"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {uploading && (
-            <div className="space-y-2">
-              <progress
-                value={progress}
-                max={100}
-                className="h-2 w-full overflow-hidden [&::-webkit-progress-bar]:bg-[#2a2a2a] [&::-webkit-progress-value]:bg-[#EF5D08] [&::-moz-progress-bar]:bg-[#EF5D08]"
-              />
-              <p className="text-sm text-[#B8B8B8]">{progress}%</p>
-            </div>
-          )}
-
-          <button
-            type="submit"
+        <div>
+          <label htmlFor="eventLabel" className="admin-label">
+            Link to Event (optional)
+          </label>
+          <input
+            id="eventLabel"
+            type="text"
+            value={eventLabel}
+            onChange={(event) => setEventLabel(event.target.value)}
+            className="admin-input"
+            placeholder="Ignition 1.0"
             disabled={uploading}
-            className="rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {uploading ? "Uploading..." : "Upload"}
+          />
+          <p className="admin-hint">Leave empty to file the batch under &quot;General&quot;</p>
+        </div>
+
+        <div>
+          <label htmlFor="eventId" className="admin-label">
+            Event ID (optional)
+          </label>
+          <input
+            id="eventId"
+            type="text"
+            value={eventId}
+            onChange={(event) => setEventId(event.target.value)}
+            className="admin-input"
+            placeholder="Paste event ID"
+            disabled={uploading}
+          />
+          <p className="admin-hint">Paste event ID from events table for filtering</p>
+        </div>
+
+        {!showBatchList && (
+          <div>
+            <span className="admin-label">Images</span>
+            <FileUploadField
+              id="galleryFiles"
+              accept="image/*"
+              multiple
+              files={files}
+              onFilesChange={handleFilesChange}
+              hint="JPG or PNG · multiple files supported"
+            />
+            {files.length > 0 && (
+              <p className="mono" style={{ marginTop: "0.5rem", fontSize: "0.65rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+                {files.length} {files.length === 1 ? "FILE" : "FILES"} SELECTED
+              </p>
+            )}
+          </div>
+        )}
+
+        {!showBatchList && files.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+            {files.map((file, index) => (
+              <div key={`${file.name}-${index}`}>
+                <label htmlFor={`caption-${index}`} className="admin-label">
+                  Caption · {file.name}
+                </label>
+                <input
+                  id={`caption-${index}`}
+                  type="text"
+                  value={captions[index] ?? ""}
+                  onChange={(event) => updateCaptionAtIndex(index, event.target.value)}
+                  className="admin-input"
+                  placeholder="Caption (optional)"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showBatchList && (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            {batch.map((file, index) => {
+              const status = statuses[index] ?? "queued";
+              return (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="mono"
+                  style={{ display: "flex", justifyContent: "space-between", gap: "1rem", fontSize: "0.7rem", letterSpacing: "0.08em", borderBottom: "1px solid var(--border)", paddingBottom: "0.35rem" }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
+                    {file.name}
+                  </span>
+                  <span style={{ flexShrink: 0, textTransform: "uppercase", color: STATUS_COLOR[status] }}>
+                    {status}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {summary && (
+          <p className="mono" style={{ fontSize: "0.75rem", letterSpacing: "0.16em", textTransform: "uppercase", color: summary.failed > 0 ? "var(--error)" : "var(--gold)" }}>
+            {summary.done} UPLOADED · {summary.failed} FAILED
+          </p>
+        )}
+
+        {summary ? (
+          <button type="button" onClick={resetImageForm} className="btn-outline" style={{ width: "fit-content" }}>
+            DONE
           </button>
-        </form>
-
-        <form onSubmit={handleVideoSubmit} className="space-y-4 border-t border-[#2a2a2a] pt-6">
-          <h2 className="text-xl font-semibold text-[#EBEBEB]">Add YouTube Video</h2>
-
-          <div className="space-y-2">
-            <label htmlFor="videoEventLabel" className="text-sm text-[#B8B8B8]">
-              Event Label
-            </label>
-            <input
-              id="videoEventLabel"
-              type="text"
-              value={videoEventLabel}
-              onChange={(event) => setVideoEventLabel(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="videoUrl" className="text-sm text-[#B8B8B8]">
-              YouTube embed URL (format: https://www.youtube.com/embed/VIDEO_ID)
-            </label>
-            <input
-              id="videoUrl"
-              type="url"
-              value={videoUrl}
-              onChange={(event) => setVideoUrl(event.target.value)}
-              className={inputClassName}
-              placeholder="https://www.youtube.com/embed/VIDEO_ID"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="videoCaption" className="text-sm text-[#B8B8B8]">
-              Caption
-            </label>
-            <input
-              id="videoCaption"
-              type="text"
-              value={videoCaption}
-              onChange={(event) => setVideoCaption(event.target.value)}
-              className={inputClassName}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="rounded-lg bg-[#EF5D08] px-4 py-2 text-sm font-semibold text-white"
-          >
-            Add Video
+        ) : (
+          <button type="submit" disabled={uploading} className="btn-primary" style={{ width: "fit-content", opacity: uploading ? 0.6 : 1 }}>
+            {uploading ? "UPLOADING…" : "UPLOAD"}
           </button>
-        </form>
+        )}
+      </form>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
-      </div>
+      <form onSubmit={handleVideoSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.4rem", marginTop: "1.4rem" }}>
+        <span className="admin-section-label">Add YouTube Video</span>
+
+        <div>
+          <label htmlFor="videoEventLabel" className="admin-label">
+            Event Label
+          </label>
+          <input
+            id="videoEventLabel"
+            type="text"
+            value={videoEventLabel}
+            onChange={(event) => setVideoEventLabel(event.target.value)}
+            className="admin-input"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="videoUrl" className="admin-label">
+            YouTube Embed URL
+          </label>
+          <input
+            id="videoUrl"
+            type="url"
+            value={videoUrl}
+            onChange={(event) => setVideoUrl(event.target.value)}
+            className="admin-input"
+            placeholder="https://www.youtube.com/embed/VIDEO_ID"
+          />
+          <p className="admin-hint">Format: https://www.youtube.com/embed/VIDEO_ID</p>
+        </div>
+
+        <div>
+          <label htmlFor="videoCaption" className="admin-label">
+            Caption
+          </label>
+          <input
+            id="videoCaption"
+            type="text"
+            value={videoCaption}
+            onChange={(event) => setVideoCaption(event.target.value)}
+            className="admin-input"
+          />
+        </div>
+
+        <button type="submit" className="btn-primary" style={{ width: "fit-content" }}>
+          ADD VIDEO
+        </button>
+      </form>
+
+      {error && (
+        <p className="admin-error" style={{ marginTop: "1.4rem" }}>
+          {error}
+        </p>
+      )}
     </section>
   );
 }

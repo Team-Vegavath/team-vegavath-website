@@ -10,15 +10,6 @@ interface CursorToggleProps {
 }
 
 export default function CursorToggle({ enabled, onToggle }: CursorToggleProps) {
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-
-  useEffect(() => {
-    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-    setIsTouchDevice(hasTouch);
-  }, []);
-
-  if (isTouchDevice) return null;
-
   const handleToggle = () => {
     const newState = !enabled;
     onToggle(newState);
@@ -28,7 +19,7 @@ export default function CursorToggle({ enabled, onToggle }: CursorToggleProps) {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[99999]">
+    <div className="cursor-toggle-wrapper fixed bottom-5 right-5 z-[99999]">
       <button
         type="button"
         onClick={handleToggle}

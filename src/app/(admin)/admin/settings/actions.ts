@@ -16,7 +16,9 @@ export async function updateSettings(formData: FormData) {
   const fields = [
     "recruitment_open",
     "maintenance_mode",
+    "maintenance_message",
     "contact_email",
+    "contact_phone",
     "contact_address",
     "instagram_url",
     "linkedin_url",

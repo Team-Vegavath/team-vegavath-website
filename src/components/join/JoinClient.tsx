@@ -4,9 +4,10 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-/* These five values are what /api/join and the DB CHECK constraint accept —
+/* These six values are what /api/join and the DB CHECK constraint accept
+   (Coding requires migrations/002_add_coding_domain.sql applied to Neon);
    do not add domains here without a matching backend change. */
-const DOMAINS = ["Automotive", "Robotics", "Design", "Media", "Marketing"] as const;
+const DOMAINS = ["Automotive", "Robotics", "Design", "Media", "Marketing", "Coding"] as const;
 type Domain = typeof DOMAINS[number];
 
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
@@ -86,7 +87,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
             Recruitment is currently closed.
           </h1>
           <p style={{ marginTop: "1.25rem", color: "var(--text-secondary)", fontSize: "1rem", lineHeight: 1.7 }}>
-            Follow us on Instagram to be notified when we open —{" "}
+            Follow us on Instagram to be notified when we open:{" "}
             <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>
               @teamvegavath_pesu
             </a>
@@ -129,15 +130,8 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
   return (
     <main className="join-split" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
-      {/* Branding panel — orange, stacked type */}
+      {/* Branding panel: orange, stacked type (no logo; the navbar already has it) */}
       <div className="join-brand pattern-speed-lines-strong">
-        <Image
-          src={LOGO_URL}
-          alt="Team Vegavath shield"
-          width={56}
-          height={56}
-          style={{ height: "56px", width: "56px", objectFit: "contain" }}
-        />
         <h1 className="heading" style={{ fontWeight: 700, fontSize: "clamp(2.75rem, 7vw, 4.5rem)", lineHeight: 0.95, textTransform: "uppercase", color: "var(--bg-base)" }}>
           Join
           <br />
@@ -165,7 +159,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "2.25rem" }}>
-            {/* Honeypot — hidden from humans */}
+            {/* Honeypot: hidden from humans */}
             <input type="text" name="website" value={form.website} onChange={handleChange} style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
 
             <div>
@@ -195,7 +189,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                 value={form.email}
                 onChange={handleChange}
                 required
-                placeholder="you@pes.edu"
+                placeholder="you@example.com"
                 className="join-input"
               />
             </div>

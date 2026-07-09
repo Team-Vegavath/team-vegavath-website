@@ -8,6 +8,8 @@ export function CursorControls() {
   const [enabled, setEnabled] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Touch devices are handled in CSS (@media (pointer: coarse) in globals.css)
+  // to avoid the one-frame hydration flash JS detection had.
   useEffect(() => {
     setMounted(true);
     try {

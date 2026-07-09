@@ -38,38 +38,41 @@ export default async function EditEventPage({
     : "";
 
   return (
-    <main style={{ minHeight: "100vh", background: "#09090b", color: "#EBEBEB", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "52rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
-        <Link
-          href="/admin/events"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
-        >
-          ← Back to events list
-        </Link>
+    <div style={{ maxWidth: "52rem" }}>
+      <Link href="/admin/events" className="admin-back-link">
+        ← Back to events
+      </Link>
 
-        <h1 className="text-3xl font-extrabold tracking-tight text-[#EBEBEB]">Edit Event</h1>
+      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
+        <h1 className="admin-page-title">Edit Event</h1>
+        <ToggleEventStatusButton id={event.id as string} currentStatus={event.status as string} />
+      </header>
 
-        <EventForm
-          mode="edit"
-          initialData={{
-            id: event.id,
-            title: event.title,
-            slug: event.slug,
-            category: event.category,
-            status: event.status,
-            description: event.description,
-            event_date: formattedDate,
-            registration_open: event.registration_open,
-            registration_form_url: event.registration_form_url,
-          }}
-        />
+      <EventForm
+        mode="edit"
+        initialData={{
+          id: event.id,
+          title: event.title,
+          slug: event.slug,
+          category: event.category,
+          status: event.status,
+          description: event.description,
+          event_date: formattedDate,
+          registration_open: event.registration_open,
+          registration_form_url: event.registration_form_url,
+          logo_url: event.logo_url,
+          cover_image_url: event.cover_image_url,
+        }}
+      />
 
+      <section className="admin-danger-zone">
+        <p className="admin-danger-title">Danger Zone</p>
+        <p className="admin-danger-text">
+          Archiving hides the event from the public site but keeps its data. Permanent
+          deletion removes it forever and cannot be undone.
+        </p>
         <DeleteEventButton id={event.id as string} title={event.title as string} />
-        <ToggleEventStatusButton
-          id={event.id as string}
-          currentStatus={event.status as string}
-        />
-      </div>
-    </main>
+      </section>
+    </div>
   );
 }

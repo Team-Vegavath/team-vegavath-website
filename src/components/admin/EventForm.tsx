@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import FileUploadField from "@/components/admin/FileUploadField";
+import ToggleSwitch from "@/components/admin/ToggleSwitch";
+
 interface EventFormProps {
   mode: "create" | "edit";
   initialData?: {
@@ -15,6 +18,8 @@ interface EventFormProps {
     event_date?: string;
     registration_open?: boolean;
     registration_form_url?: string;
+    logo_url?: string | null;
+    cover_image_url?: string | null;
   };
 }
 
@@ -43,8 +48,8 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
     initialData?.registration_open ?? false,
   );
 
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [logoFiles, setLogoFiles] = useState<File[]>([]);
+  const [coverFiles, setCoverFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -76,18 +81,18 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
     setSaving(true);
 
     try {
-      // Only include image fields when a new file was uploaded — sending "" on
+      // Only include image fields when a new file was uploaded; sending "" on
       // edit survives the service's COALESCE and wipes the stored URL.
       const imageFields: { logo_url?: string; cover_image_url?: string } = {};
 
-      // R2 objects are served with immutable cache headers — replacements need
+      // R2 objects are served with immutable cache headers; replacements need
       // a new filename, so key each upload by timestamp.
-      if (logoFile) {
-        imageFields.logo_url = await uploadFile(logoFile, `events/${slug}/logo-${Date.now()}.png`);
+      if (logoFiles[0]) {
+        imageFields.logo_url = await uploadFile(logoFiles[0], `events/${slug}/logo-${Date.now()}.png`);
       }
 
-      if (coverFile) {
-        imageFields.cover_image_url = await uploadFile(coverFile, `events/${slug}/cover-${Date.now()}.jpg`);
+      if (coverFiles[0]) {
+        imageFields.cover_image_url = await uploadFile(coverFiles[0], `events/${slug}/cover-${Date.now()}.jpg`);
       }
 
       const eventFields = {
@@ -126,16 +131,12 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
     }
   }
 
-  const inputClassName =
-    "bg-[#121212] border border-[#2a2a2a] text-[#EBEBEB] rounded-lg px-4 py-2 w-full focus:outline-none focus:border-[#EF5D08]";
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 border border-[#2a2a2a] bg-[#1a1a1a] p-5 text-[#EBEBEB]"
-    >
+    <form onSubmit={handleSubmit} className="admin-form" style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+      <span className="admin-section-label">Basic Info</span>
+
       <div>
-        <label htmlFor="title" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="title" className="admin-label">
           Title
         </label>
         <input
@@ -150,12 +151,12 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
               setSlug(slugify(nextTitle));
             }
           }}
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="slug" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="slug" className="admin-label">
           Slug
         </label>
         <input
@@ -163,19 +164,19 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           type="text"
           value={slug}
           onChange={(event) => setSlug(slugify(event.target.value))}
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
       <div>
-        <label htmlFor="category" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="category" className="admin-label">
           Category
         </label>
         <select
           id="category"
           value={category}
           onChange={(event) => setCategory(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         >
           <option value="workshops">workshops</option>
           <option value="hackathons">hackathons</option>
@@ -186,36 +187,7 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
       </div>
 
       <div>
-        <label htmlFor="status" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Status
-        </label>
-        <select
-          id="status"
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          className={inputClassName}
-        >
-          <option value="upcoming">upcoming</option>
-          <option value="past">past</option>
-          <option value="archived">archived</option>
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor="event_date" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Event Date
-        </label>
-        <input
-          id="event_date"
-          type="date"
-          value={event_date}
-          onChange={(event) => setEventDate(event.target.value)}
-          className={inputClassName}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="description" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
+        <label htmlFor="description" className="admin-label">
           Description
         </label>
         <textarea
@@ -224,15 +196,45 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           onChange={(event) => setDescription(event.target.value)}
           placeholder="Supports markdown"
           rows={6}
-          className={inputClassName}
+          className="admin-input"
         />
       </div>
 
+      <span className="admin-section-label">Schedule &amp; Status</span>
+
       <div>
-        <label
-          htmlFor="registration_form_url"
-          className="mb-2 block text-sm font-medium text-[#EBEBEB]"
+        <label htmlFor="status" className="admin-label">
+          Status
+        </label>
+        <select
+          id="status"
+          value={status}
+          onChange={(event) => setStatus(event.target.value)}
+          className="admin-input"
         >
+          <option value="upcoming">upcoming</option>
+          <option value="past">past</option>
+          <option value="archived">archived</option>
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="event_date" className="admin-label">
+          Event Date
+        </label>
+        <input
+          id="event_date"
+          type="date"
+          value={event_date}
+          onChange={(event) => setEventDate(event.target.value)}
+          className="admin-input"
+        />
+      </div>
+
+      <span className="admin-section-label">Registration</span>
+
+      <div>
+        <label htmlFor="registration_form_url" className="admin-label">
           Registration Form URL
         </label>
         <input
@@ -240,65 +242,48 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           type="url"
           value={registration_form_url}
           onChange={(event) => setRegistrationFormUrl(event.target.value)}
-          className={inputClassName}
+          className="admin-input"
         />
-        <p className="mt-2 text-xs text-zinc-400">Google Form URL — paste your Google Form link here. Leave blank if not applicable.</p>
+        <p className="admin-hint">Google Form link. Leave blank if not applicable.</p>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-[#121212] p-4">
-        <span className="text-sm font-medium text-[#EBEBEB]">Registration Open</span>
-        <button
-          type="button"
-          onClick={() => setRegistrationOpen((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
-            registration_open ? "bg-[#EF5D08]" : "bg-[#3a3a3a]"
-          }`}
-          aria-label="Toggle registration open"
-        >
-          <span
-            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
-              registration_open ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          Registration Open
+        </span>
+        <ToggleSwitch value={registration_open} onChange={setRegistrationOpen} ariaLabel="Registration open" />
       </div>
+
+      <span className="admin-section-label">Media</span>
 
       <div>
-        <label htmlFor="logo" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Logo
-        </label>
-        <input
+        <span className="admin-label">Logo</span>
+        <FileUploadField
           id="logo"
-          type="file"
           accept="image/*"
-          onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)}
-          className={inputClassName}
+          files={logoFiles}
+          onFilesChange={setLogoFiles}
+          currentUrl={initialData?.logo_url}
+          hint="PNG preferred · optional, can be added later"
         />
-        <p className="mt-2 text-xs text-zinc-400">Optional — can be added later</p>
       </div>
 
       <div>
-        <label htmlFor="cover" className="mb-2 block text-sm font-medium text-[#EBEBEB]">
-          Cover Image
-        </label>
-        <input
+        <span className="admin-label">Cover Image</span>
+        <FileUploadField
           id="cover"
-          type="file"
           accept="image/*"
-          onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
-          className={inputClassName}
+          files={coverFiles}
+          onFilesChange={setCoverFiles}
+          currentUrl={initialData?.cover_image_url}
+          hint="JPG preferred · optional, can be added later"
         />
-        <p className="mt-2 text-xs text-zinc-400">Optional — can be added later</p>
       </div>
 
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
+      {error ? <p className="admin-error">{error}</p> : null}
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-lg bg-[#EF5D08] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#d84f00] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? "Saving..." : mode === "create" ? "Create Event" : "Update Event"}
+      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "SAVING…" : "SAVE EVENT"}
       </button>
     </form>
   );

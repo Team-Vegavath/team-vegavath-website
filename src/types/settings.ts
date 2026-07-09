@@ -20,7 +20,7 @@ export interface Application {
   id: string;
   name: string;
   email: string;
-  domain_interest: "Automotive" | "Robotics" | "Design" | "Media" | "Marketing";
+  domain_interest: "Automotive" | "Robotics" | "Design" | "Media" | "Marketing" | "Coding";
   portfolio_url: string | null;
   status: "pending" | "reviewed" | "accepted" | "rejected";
   submitted_at: string;
@@ -29,6 +29,6 @@ export interface Application {
 export interface CreateApplicationInput {
   name: string;
   email: string;
-  domain_interest: "Automotive" | "Robotics" | "Design" | "Media" | "Marketing";
+  domain_interest: "Automotive" | "Robotics" | "Design" | "Media" | "Marketing" | "Coding";
   portfolio_url: string | null;
 }

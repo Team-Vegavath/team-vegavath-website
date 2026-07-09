@@ -13,7 +13,6 @@ export const metadata: Metadata = {
 export const revalidate = 120;
 
 const STATS = [
-  { number: "200+", label: "Footfall" },
   { number: "2", label: "Major Events" },
   { number: "85", label: "Active Members" },
   { number: "6", label: "Domains" },
@@ -23,12 +22,12 @@ const TIMELINE = [
   {
     date: "SEP 2025",
     title: "Freshers Day",
-    description: "First open event of the year — the newest batch meets the team.",
+    description: "First open event of the year, where the newest batch meets the team.",
   },
   {
     date: "NOV 2025",
     title: "Ignition 1.0",
-    description: "IoT hackathon with 200+ footfall — one of the largest campus hackathons at PESU ECC.",
+    description: "IoT hackathon, one of the largest campus hackathons at PESU ECC.",
   },
   {
     date: "FEB 2026",
@@ -79,7 +78,7 @@ export default async function AboutPage() {
 
   return (
     <main style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
-      {/* Full-bleed hero — the photo + statement IS the header */}
+      {/* Full-bleed hero: the photo + statement IS the header */}
       <AboutHeroImage />
 
       {/* Intro + mission pull-quote */}
@@ -107,14 +106,14 @@ export default async function AboutPage() {
               }}
             >
               A <span style={{ color: "var(--gold)", fontStyle: "normal", fontWeight: 600 }}>future-ready community</span> where
-              technology, innovation, and teamwork converge — shaping the next generation of leaders in
+              technology, innovation, and teamwork converge, shaping the next generation of leaders in
               mobility, robotics, and digital transformation.
             </blockquote>
           </Reveal>
         </div>
       </section>
 
-      {/* Domains — shared grid, identical to home */}
+      {/* Domains: shared grid, identical to home */}
       <section style={{ padding: "0 1.5rem 5rem" }}>
         <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
           <Reveal>
@@ -126,7 +125,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Stats — dramatic, dot pattern */}
+      {/* Stats: dramatic, dot pattern */}
       <section className="pattern-dots" style={{ padding: "5.5rem 1.5rem" }}>
         <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
           <Reveal>
@@ -142,7 +141,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Timeline — real events only */}
+      {/* Timeline: real events only */}
       <section style={{ padding: "5rem 1.5rem" }}>
         <div style={{ margin: "0 auto", maxWidth: "56rem" }}>
           <Reveal>
@@ -182,7 +181,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Values — geometric outlines, no emoji */}
+      {/* Values: geometric outlines, no emoji */}
       <section style={{ padding: "0 1.5rem 5rem" }}>
         <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
           <Reveal>
@@ -208,13 +207,16 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      {/* Sponsors marquee — same treatment as home */}
+      {/* Sponsors marquee: same treatment as home */}
       {sponsors.length > 0 ? (
         <section style={{ padding: "0 0 5rem" }}>
           <div style={{ margin: "0 auto", maxWidth: "80rem" }}>
-            <p className="label-tech" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-              Backed by
-            </p>
+            <h2
+              className="heading"
+              style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
+            >
+              PARTNERS
+            </h2>
             <SponsorMarquee sponsors={sponsors} />
           </div>
         </section>

@@ -8,10 +8,7 @@ export default function SignOutButton() {
         await signOut({ redirectTo: "/admin" });
       }}
     >
-      <button
-        type="submit"
-        className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-      >
+      <button type="submit" className="admin-signout">
         Sign Out
       </button>
     </form>

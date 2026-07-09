@@ -7,6 +7,10 @@ interface DeleteEventButtonProps {
   title: string;
 }
 
+/**
+ * Danger-zone actions for the event EDIT page only; list rows use the
+ * lightweight <InlineDelete /> instead.
+ */
 export default function DeleteEventButton({ id, title }: DeleteEventButtonProps) {
   const router = useRouter();
   const [archiving, setArchiving] = useState(false);
@@ -44,22 +48,22 @@ export default function DeleteEventButton({ id, title }: DeleteEventButtonProps)
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-2">
+    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
       <button
         type="button"
         onClick={handleArchive}
         disabled={archiving || deleting}
-        className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-[#9a9a9a] transition-colors hover:border-[#EF5D08] hover:text-[#EBEBEB] disabled:opacity-50"
+        className="admin-btn-danger-outline"
       >
-        {archiving ? "Archiving..." : "Archive Event (hide from site)"}
+        {archiving ? "ARCHIVING…" : "ARCHIVE EVENT"}
       </button>
       <button
         type="button"
         onClick={handlePermanentDelete}
         disabled={archiving || deleting}
-        className="w-full rounded-lg border border-red-800 bg-red-900/30 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-900/50 disabled:opacity-50"
+        className="admin-btn-danger"
       >
-        {deleting ? "Deleting..." : "Permanently Delete Event"}
+        {deleting ? "DELETING…" : "PERMANENTLY DELETE"}
       </button>
     </div>
   );

@@ -23,7 +23,9 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div style={{ width: "100%", background: "var(--bg-base)", color: "var(--text-primary)" }}>
+    // pattern-speed-lines sets background-color: var(--bg-base) itself; an inline
+    // background shorthand here would override the pattern image, so none is set.
+    <div className="pattern-speed-lines" style={{ width: "100%", color: "var(--text-primary)" }}>
       {/* Hero */}
       <section
         className="pattern-speed-lines"
@@ -34,15 +36,17 @@ export default async function HomePage() {
           alignItems: "center",
           justifyContent: "center",
           padding: "6rem 1.5rem 4rem",
+          overflow: "hidden",
         }}
       >
         <div style={{ maxWidth: "72rem", margin: "0 auto", textAlign: "center" }}>
           <h1
             style={{
-              fontSize: "clamp(72px, 16vw, 160px)",
+              fontSize: "clamp(48px, 12vw, 140px)",
               letterSpacing: "-0.02em",
               lineHeight: 1,
               color: "var(--text-primary)",
+              wordBreak: "keep-all",
             }}
           >
             VEGAVATH
@@ -59,7 +63,7 @@ export default async function HomePage() {
               color: "var(--accent)",
             }}
           >
-            PESU ECC — Racing Toward Innovation
+            Life At Full Throttle · PESU ECC
           </p>
 
           <p style={{ marginTop: "0.9rem", fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "var(--text-secondary)" }}>
@@ -108,8 +112,8 @@ export default async function HomePage() {
       <section style={{ padding: "5rem 1.5rem", background: "var(--bg-surface)" }}>
         <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
           <EventsPreview
-            upcoming={upcomingEvents.map(({ id, slug, title, category, event_date }) => ({ id, slug, title, category, event_date }))}
-            past={pastEvents.map(({ id, slug, title, category, event_date }) => ({ id, slug, title, category, event_date }))}
+            upcoming={upcomingEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
+            past={pastEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
           />
         </div>
       </section>
@@ -118,9 +122,12 @@ export default async function HomePage() {
       {sponsors.length > 0 ? (
         <section style={{ padding: "4rem 0" }}>
           <div style={{ margin: "0 auto", maxWidth: "80rem" }}>
-            <p className="label-tech" style={{ textAlign: "center", marginBottom: "1.5rem" }}>
-              Backed by
-            </p>
+            <h2
+              className="heading"
+              style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
+            >
+              PARTNERS
+            </h2>
             <SponsorMarquee sponsors={sponsors} />
           </div>
         </section>
@@ -141,7 +148,7 @@ export default async function HomePage() {
             JOIN THE TEAM
           </h2>
           <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
-            Build karts, ship code, and run the biggest events on campus — with 85 students who take it seriously.
+            Build karts, ship code, and run the biggest events on campus, with 85 students who take it seriously.
           </p>
           <div style={{ marginTop: "2.25rem" }}>
             <Link

@@ -54,7 +54,8 @@ export default function ToggleEventStatusButton({
       type="button"
       onClick={toggleStatus}
       disabled={loading}
-      className="rounded-lg border border-[#2a2a2a] px-4 py-2 text-sm text-[#9a9a9a] transition-colors hover:border-[#EF5D08] hover:text-[#EBEBEB] disabled:opacity-50"
+      className="btn-outline"
+      style={{ padding: "0.5rem 1.1rem", fontSize: "0.72rem" }}
     >
       {loading
         ? "Updating..."

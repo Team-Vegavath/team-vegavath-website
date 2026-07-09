@@ -34,32 +34,36 @@ export default async function EditSponsorPage({
   const sponsor = rows[0]!;
 
   return (
-    <main style={{ minHeight: "100vh", background: "#09090b", color: "#EBEBEB", padding: "6rem 2rem 4rem", boxSizing: "border-box" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "52rem", display: "flex", flexDirection: "column", gap: "1.5rem", boxSizing: "border-box" }}>
-        <Link
-          href="/admin/sponsors"
-          style={{ display: "inline-flex", alignItems: "center", borderRadius: 0, border: "1.5px solid #EF5D08", padding: "0.5rem 1.25rem", fontSize: "0.85rem", fontWeight: 600, color: "#EF5D08", textDecoration: "none", transition: "all 0.2s", width: "fit-content" }}
-        >
-          ← Back to sponsors
-        </Link>
+    <div style={{ maxWidth: "52rem" }}>
+      <Link href="/admin/sponsors" className="admin-back-link">
+        ← Back to sponsors
+      </Link>
 
-        <h1 className="text-3xl font-extrabold tracking-tight text-[#EBEBEB]">Edit Sponsor</h1>
+      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
+        <h1 className="admin-page-title">Edit Sponsor</h1>
+      </header>
 
-        <SponsorForm
-          mode="edit"
-          initialData={{
-            id: sponsor.id,
-            name: sponsor.name,
-            tier: sponsor.tier,
-            website_url: sponsor.website_url,
-            description: sponsor.description,
-            display_order: sponsor.display_order,
-            is_active: sponsor.is_active,
-          }}
-        />
+      <SponsorForm
+        mode="edit"
+        initialData={{
+          id: sponsor.id,
+          name: sponsor.name,
+          tier: sponsor.tier,
+          website_url: sponsor.website_url,
+          description: sponsor.description,
+          display_order: sponsor.display_order,
+          is_active: sponsor.is_active,
+          logo_url: sponsor.logo_url,
+        }}
+      />
 
+      <section className="admin-danger-zone">
+        <p className="admin-danger-title">Danger Zone</p>
+        <p className="admin-danger-text">
+          Deleting a sponsor removes it permanently. This cannot be undone.
+        </p>
         <DeleteSponsorButton id={sponsor.id as string} name={sponsor.name as string} />
-      </div>
-    </main>
+      </section>
+    </div>
   );
 }

@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: "%s | Team Vegavath",
   },
   description:
-    "Team Vegavath is the official student innovation club of PES University, Electronic City Campus — racing toward innovation in automotive, robotics, design, media, and marketing.",
+    "Team Vegavath is the official student innovation club of PES University, Electronic City Campus, racing toward innovation in automotive, robotics, design, media, and marketing.",
   keywords: ["Vegavath", "PESU ECC", "student club", "robotics", "automotive", "kart"],
   openGraph: {
     title: "Team Vegavath",

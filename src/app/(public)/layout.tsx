@@ -25,7 +25,7 @@ export default async function PublicLayout({
           <p style={{ margin: "1rem auto 0", maxWidth: "36rem", fontSize: "1rem", color: "var(--text-secondary)" }}>
             {settings.maintenance_message || "We are updating the site. Check back soon."}
           </p>
-          <p className="mono" style={{ marginTop: "1.5rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>— Team Vegavath</p>
+          <p className="mono" style={{ marginTop: "1.5rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>Team Vegavath</p>
         </div>
       </div>
     );

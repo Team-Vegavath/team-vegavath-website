@@ -56,6 +56,7 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
     <>
       <div
         ref={cursorRef}
+        data-racing-cursor=""
         className="fixed top-0 left-0 pointer-events-none z-[2147483647] -translate-x-1/2 -translate-y-1/2"
         style={{ display: enabled ? "block" : "none" }}
       >
@@ -64,6 +65,7 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
 
       <div
         ref={trailRef}
+        data-racing-cursor=""
         className="fixed top-0 left-0 pointer-events-none z-[2147483647] -translate-x-1/2 -translate-y-1/2"
         style={{ display: enabled ? "block" : "none" }}
       >

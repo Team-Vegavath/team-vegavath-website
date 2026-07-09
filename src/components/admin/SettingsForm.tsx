@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { updateSettings } from "@/app/(admin)/admin/settings/actions";
+import ToggleSwitch from "@/components/admin/ToggleSwitch";
 import type { SiteSettings } from "@/types/settings";
 
 interface SettingsFormProps {
@@ -12,7 +13,9 @@ interface SettingsFormProps {
 export default function SettingsForm({ settings }: SettingsFormProps) {
   const [recruitmentOpen, setRecruitmentOpen] = useState(settings.recruitment_open);
   const [maintenanceMode, setMaintenanceMode] = useState(settings.maintenance_mode);
+  const [maintenanceMessage, setMaintenanceMessage] = useState(settings.maintenance_message);
   const [contactEmail, setContactEmail] = useState(settings.contact_email);
+  const [contactPhone, setContactPhone] = useState(settings.contact_phone);
   const [contactAddress, setContactAddress] = useState(settings.contact_address);
   const [instagramUrl, setInstagramUrl] = useState(settings.instagram_url);
   const [linkedinUrl, setLinkedinUrl] = useState(settings.linkedin_url);
@@ -30,122 +33,132 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }}
-      style={{ borderRadius: "0.75rem", border: "1px solid #27272a", background: "#18181b", padding: "1.5rem", boxSizing: "border-box" }}
+      className="admin-form"
+      style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}
     >
-      <h2 className="mb-4 text-lg font-bold text-zinc-100">Recruitment &amp; Maintenance</h2>
+      <span className="admin-section-label">Site Status</span>
 
-      <input
-        type="hidden"
-        name="recruitment_open"
-        value={recruitmentOpen ? "true" : "false"}
-      />
-      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "0.5rem", background: "#27272a", padding: "1rem" }}>
-        <span className="text-sm font-medium text-zinc-200">Recruitment Open</span>
-        <div
-          onClick={() => setRecruitmentOpen((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
-            recruitmentOpen ? "bg-orange-500" : "bg-zinc-600"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
-              recruitmentOpen ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
+      <input type="hidden" name="recruitment_open" value={recruitmentOpen ? "true" : "false"} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          Recruitment Open
+        </span>
+        <ToggleSwitch value={recruitmentOpen} onChange={setRecruitmentOpen} ariaLabel="Recruitment open" />
       </div>
 
-      <input
-        type="hidden"
-        name="maintenance_mode"
-        value={maintenanceMode ? "true" : "false"}
-      />
-      <div style={{ marginBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "0.5rem", background: "#27272a", padding: "1rem" }}>
-        <span className="text-sm font-medium text-zinc-200">Maintenance Mode</span>
-        <div
-          onClick={() => setMaintenanceMode((prev) => !prev)}
-          className={`relative inline-flex h-6 w-11 items-center transition-colors ${
-            maintenanceMode ? "bg-orange-500" : "bg-zinc-600"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform bg-white transition-transform ${
-              maintenanceMode ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
+      <input type="hidden" name="maintenance_mode" value={maintenanceMode ? "true" : "false"} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          Maintenance Mode
+        </span>
+        <ToggleSwitch value={maintenanceMode} onChange={setMaintenanceMode} ariaLabel="Maintenance mode" />
       </div>
 
-      <h2 className="mt-6 mb-4 text-lg font-bold text-zinc-100">Contact Information</h2>
+      <div>
+        <label htmlFor="maintenance_message" className="admin-label">
+          Maintenance Message
+        </label>
+        <textarea
+          id="maintenance_message"
+          name="maintenance_message"
+          rows={3}
+          value={maintenanceMessage}
+          onChange={(event) => setMaintenanceMessage(event.target.value)}
+          placeholder="Shown on the public site while maintenance mode is on"
+          className="admin-input"
+        />
+      </div>
 
-      <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="contact_email">
-        Contact Email
-      </label>
-      <input
-        id="contact_email"
-        name="contact_email"
-        type="email"
-        value={contactEmail}
-        onChange={(event) => setContactEmail(event.target.value)}
-        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
-      />
+      <span className="admin-section-label">Contact</span>
 
-      <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="contact_address">
-        Contact Address
-      </label>
-      <input
-        id="contact_address"
-        name="contact_address"
-        type="text"
-        value={contactAddress}
-        onChange={(event) => setContactAddress(event.target.value)}
-        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
-      />
+      <div>
+        <label htmlFor="contact_email" className="admin-label">
+          Contact Email
+        </label>
+        <input
+          id="contact_email"
+          name="contact_email"
+          type="email"
+          value={contactEmail}
+          onChange={(event) => setContactEmail(event.target.value)}
+          className="admin-input"
+        />
+      </div>
 
-      <h2 className="mt-6 mb-4 text-lg font-bold text-zinc-100">Social Media Links</h2>
+      <div>
+        <label htmlFor="contact_phone" className="admin-label">
+          Contact Phone
+        </label>
+        <input
+          id="contact_phone"
+          name="contact_phone"
+          type="text"
+          value={contactPhone}
+          onChange={(event) => setContactPhone(event.target.value)}
+          className="admin-input"
+        />
+      </div>
 
-      <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="instagram_url">
-        Instagram URL
-      </label>
-      <input
-        id="instagram_url"
-        name="instagram_url"
-        type="url"
-        value={instagramUrl}
-        onChange={(event) => setInstagramUrl(event.target.value)}
-        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
-      />
+      <div>
+        <label htmlFor="contact_address" className="admin-label">
+          Contact Address
+        </label>
+        <input
+          id="contact_address"
+          name="contact_address"
+          type="text"
+          value={contactAddress}
+          onChange={(event) => setContactAddress(event.target.value)}
+          className="admin-input"
+        />
+      </div>
 
-      <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="linkedin_url">
-        LinkedIn URL
-      </label>
-      <input
-        id="linkedin_url"
-        name="linkedin_url"
-        type="url"
-        value={linkedinUrl}
-        onChange={(event) => setLinkedinUrl(event.target.value)}
-        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
-      />
+      <span className="admin-section-label">Social Media</span>
 
-      <label className="mb-2 block text-sm font-medium text-zinc-300" htmlFor="github_url">
-        GitHub URL
-      </label>
-      <input
-        id="github_url"
-        name="github_url"
-        type="url"
-        value={githubUrl}
-        onChange={(event) => setGithubUrl(event.target.value)}
-        style={{ width: "100%", borderRadius: "0.5rem", border: "1px solid #3f3f46", background: "#09090b", padding: "0.75rem 1rem", color: "#f4f4f5", marginBottom: "1rem", boxSizing: "border-box", outline: "none" }}
-      />
+      <div>
+        <label htmlFor="instagram_url" className="admin-label">
+          Instagram URL
+        </label>
+        <input
+          id="instagram_url"
+          name="instagram_url"
+          type="url"
+          value={instagramUrl}
+          onChange={(event) => setInstagramUrl(event.target.value)}
+          className="admin-input"
+        />
+      </div>
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="mt-6 w-full rounded-lg bg-orange-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? "Saving..." : saved ? "Saved" : "Save Changes"}
+      <div>
+        <label htmlFor="linkedin_url" className="admin-label">
+          LinkedIn URL
+        </label>
+        <input
+          id="linkedin_url"
+          name="linkedin_url"
+          type="url"
+          value={linkedinUrl}
+          onChange={(event) => setLinkedinUrl(event.target.value)}
+          className="admin-input"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="github_url" className="admin-label">
+          GitHub URL
+        </label>
+        <input
+          id="github_url"
+          name="github_url"
+          type="url"
+          value={githubUrl}
+          onChange={(event) => setGithubUrl(event.target.value)}
+          className="admin-input"
+        />
+      </div>
+
+      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
+        {saving ? "SAVING…" : saved ? "SAVED" : "SAVE CHANGES"}
       </button>
     </form>
   );

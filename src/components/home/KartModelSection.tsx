@@ -24,12 +24,12 @@ export default function KartModelSection() {
   return (
     <div style={{ width: "100%", overflow: "hidden", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
       <div style={{ height: "28rem", width: "100%" }}>
-        <Canvas style={{ background: "#161616" }}>
+        <Canvas frameloop="demand" style={{ background: "var(--bg-card)" }}>
           <Suspense fallback={<LoadingBox />}>
             <Stage
               environment="city"
               intensity={0.6}
-              adjustCamera={4}
+              adjustCamera={2}
               preset="rembrandt"
             >
               <KartModel />
@@ -47,7 +47,7 @@ export default function KartModelSection() {
         </Canvas>
       </div>
       <p className="mono" style={{ padding: "0.65rem 1rem", borderTop: "1px solid var(--border)", fontSize: "0.7rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-        Drag to rotate — scroll to zoom
+        Drag to rotate · scroll to zoom
       </p>
     </div>
   );

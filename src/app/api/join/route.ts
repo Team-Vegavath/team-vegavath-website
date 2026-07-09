@@ -3,7 +3,9 @@ import { createApplication } from "@/lib/services/applications";
 import { getSetting } from "@/lib/services/settings";
 import { isValidEmail, isValidUrl } from "@/lib/utils";
 
-const VALID_DOMAINS = ["Automotive", "Robotics", "Design", "Media", "Marketing"] as const;
+// Must stay in sync with JoinClient DOMAINS and the applications_domain_interest_check
+// DB constraint (Coding added in migrations/002_add_coding_domain.sql).
+const VALID_DOMAINS = ["Automotive", "Robotics", "Design", "Media", "Marketing", "Coding"] as const;
 type Domain = typeof VALID_DOMAINS[number];
 
 export async function POST(req: NextRequest) {
