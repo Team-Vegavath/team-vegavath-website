@@ -23,6 +23,7 @@ export default function AboutHeroImage() {
           alt="Team Vegavath at PES University, Electronic City Campus"
           fill
           priority
+          sizes="100vw"
           style={{ objectFit: "cover", objectPosition: "center" }}
         />
         {/* Darkens only the bottom ~40% so faces in the photo stay clear */}

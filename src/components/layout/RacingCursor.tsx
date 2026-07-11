@@ -10,7 +10,13 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
 
   useEffect(() => {
     setMounted(true);
-    setIsTouch(window.matchMedia("(pointer: coarse)").matches);
+    // Any touch capability counts: Samsung/One UI devices with S Pen or DeX
+    // support can report a fine primary pointer, and hiding the cursor there
+    // suppresses taps — so require a genuinely mouse-only environment.
+    setIsTouch(
+      window.matchMedia("(pointer: coarse), (hover: none)").matches ||
+        navigator.maxTouchPoints > 0
+    );
   }, []);
 
   useEffect(() => {
@@ -54,11 +60,14 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
 
   return (
     <>
+      {/* pointerEvents is inline, not a Tailwind class: this setup is known to
+          drop some utilities, and a click-eating div at max z-index that tracks
+          the pointer would swallow every tap/click on the page. */}
       <div
         ref={cursorRef}
         data-racing-cursor=""
         className="fixed top-0 left-0 pointer-events-none z-[2147483647] -translate-x-1/2 -translate-y-1/2"
-        style={{ display: enabled ? "block" : "none" }}
+        style={{ display: enabled ? "block" : "none", pointerEvents: "none" }}
       >
         <div className="h-3 w-3 rounded-full bg-orange-500" />
       </div>
@@ -67,7 +76,7 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
         ref={trailRef}
         data-racing-cursor=""
         className="fixed top-0 left-0 pointer-events-none z-[2147483647] -translate-x-1/2 -translate-y-1/2"
-        style={{ display: enabled ? "block" : "none" }}
+        style={{ display: enabled ? "block" : "none", pointerEvents: "none" }}
       >
         <div className="h-6 w-6 rounded-full border border-orange-500 opacity-50" />
       </div>

@@ -16,7 +16,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const username = credentials.username as string;
         const password = credentials.password as string;
 
-        if (username !== process.env.ADMIN_USERNAME) return null;
+        const enteredUsername = username.toLowerCase();
+        const storedUsername = (process.env.ADMIN_USERNAME ?? "").toLowerCase();
+        if (enteredUsername !== storedUsername) return null;
 
         const hash = process.env.ADMIN_PASSWORD_HASH;
         if (!hash) return null;

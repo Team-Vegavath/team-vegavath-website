@@ -575,3 +575,330 @@ keys, die, restart, check hiscore persists; resize the window mid-game.
 `/admin/gallery` — multi-select several images, optional event label,
 watch per-file statuses, confirm partial-failure summary (uploads hit the
 LIVE R2 bucket + database — use throwaway images and delete after).
+
+## Session 17 — Bug fixes · mobile nav · multi-domain applications (2026-07-09)
+
+**Item 1 — Oil slick (KartGame.tsx):** was drawn as a vertical ellipse
+radiusX ≈ 31px / radiusY = HEIGHT*0.46 (≈156px → ~92% of the 340px canvas),
+and collision killed on any X overlap in every lane. Now a 20px-tall stripe
+on the centre line (`fillRect(o.x, HEIGHT/2-10, W-o.x, 20)`) keeping the
+iridescent gradient + red hazard edge; hitbox = car Y-centre within 60px of
+HEIGHT/2 AND stripe X overlapping the car (constants OIL_H/OIL_Y/OIL_KILL,
+OIL_W removed). Middle lane dies, top/bottom lanes (95px off-centre) are safe.
+
+**Item 2 — Favicon:** R2 `icons/shield.png` etc. all 404; `icons/logo.png`
+(the navbar panther shield, 1197×1050 RGBA, 74KB) exists → downloaded as
+`src/app/icon.png` (App Router file convention, `/icon.png` confirmed in the
+build route manifest). `metadata.icons` added in layout.tsx (icon + apple).
+No SVG extraction needed — Navbar renders the logo from R2, not inline paths.
+
+**Item 3 — Android join-button taps: spec hypotheses 3a–3d all N/A as
+written.** No `cursor: none` exists in CSS (it's JS-set on body in
+RacingCursor.tsx, already gated by pointer detection); the mobile nav overlay
+is conditionally rendered (not in DOM when closed); every join CTA was
+already `<Link href>`; zero `whileTap`/`onTap` in the codebase. Applied
+intent-level hardening instead: (1) RacingCursor touch detection widened to
+`(pointer: coarse), (hover: none)` OR `navigator.maxTouchPoints > 0` — One UI
+devices with S Pen/DeX can report a fine primary pointer, which let the
+cursor mount and hide the native cursor on a touch device (trade-off:
+touch-screen laptops also lose the decorative cursor); (2) matching CSS
+media query widened to `(pointer: coarse), (hover: none)`; (3)
+`pointerEvents: "none"` made inline on both cursor divs instead of relying
+on the Tailwind utility (this setup is known to drop some utilities — a
+click-eating max-z-index div tracking the pointer would swallow every tap).
+NEEDS DEVICE RETEST on the One UI 8.5 phone; if taps still die, next suspect
+is PageTransition/AnimatePresence.
+
+**Item 4 — auth.ts (narrow authorized exception):** username comparison in
+`authorize` now lowercases both sides (`ADMIN_USERNAME ?? ""`). Nothing else
+touched.
+
+**Item 5 — Multi-domain applications (up to 3):**
+- `migrations/003_multi_domain_applications.sql` written verbatim from the
+  session spec — ⚠ NOT APPLIED to Neon; user runs it manually. ⚠ Deploy
+  order: `createApplication` now always INSERTs `domain_interest_2/3`, so
+  the migration MUST be applied before this code deploys or every /join
+  submit 500s. Note: the new columns' CHECK lists 8 values including
+  'Operations'/'Programming' which the app never sends (API validates
+  against the 6 VALID_DOMAINS) — harmless slack, kept as specced.
+- types/settings.ts: optional `domain_interest_2/3?: string | null` on
+  Application + CreateApplicationInput.
+- api/join/route.ts: reads both extras, each validated against
+  VALID_DOMAINS when present (null allowed), passed to createApplication.
+- JoinClient.tsx: `selectedDomains: Domain[]` state; tile toggle ignores
+  taps past 3; unselected tiles drop to opacity 0.5 at the limit; selected
+  styling reuses the existing `[aria-pressed="true"]` accent rule; "X / 3
+  DOMAINS" mono counter below tiles; ≥1 domain still required; POST sends
+  domain_interest = first pick, _2/_3 = rest or null.
+
+**Item 6 — Save confirmation:** only SettingsForm has a `saved` state
+(EventForm/MemberForm/SponsorForm navigate away on save — left alone).
+Button no longer flips its label; a green check + SAVED mono span
+(var(--success)) renders under it, auto-cleared by the existing 3s timeout.
+
+**Item 7 — Image loading:** both /about and /gallery already use next/image
+(lazy by default). Added `sizes` to the gallery photo thumbnails (same
+string as the adjacent video thumbs: 33vw/50vw/100vw) and `sizes="100vw"`
+to the about hero. next.config.ts (narrow authorized exception): R2 host
+was only present via `R2_PUBLIC_HOSTNAME` env; added the literal
+`pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev` remotePattern as a hardcoded
+fallback so optimization never silently breaks when the env var is absent.
+
+**Item 8 — Admin gallery mobile:** page structure already collapses (form
+wrapper is max-width only; admin-table has the ≤767px card layout). One real
+bug fixed: the upload batch-list filename span had ellipsis styles but no
+`minWidth: 0`, so long filenames forced the flex row (and page) wider than
+375px — added minWidth: 0.
+
+**Verified:** `npm run build` 0 errors (route manifest includes /icon.png);
+`npx tsc --noEmit` exit 0. Design gate on touched files: no emoji, no
+rounded-*, no mx-auto added.
+
+**Needs user eyeball (dev server):** /nope → play until an oil slick spawns
+(gear 3+, ~35s) — thin centre stripe, dodgeable top/bottom; browser tab —
+shield favicon; /join — multi-select tiles, counter, limit dimming, submit
+(⚠ hits LIVE /api/join and will 500 until migration 003 is applied — check
+validation states only, or apply 003 first); /admin/settings — save, green
+SAVED check appears then clears; /gallery + /about on a phone width;
+/admin/gallery at 375px. On the Android phone: retest all join buttons.
+
+## Session 18 — Kart mobile overlay · stats size · join form 4-step rebuild (2026-07-11)
+
+**Item 1 — Kart 3D viewer mobile scroll trap (KartModelSection.tsx):** there
+was NO prior touch handling — OrbitControls captured every touch, so mobile
+users couldn't scroll past the canvas. Added a tap-to-interact gate: touch
+devices (`"ontouchstart" in window || navigator.maxTouchPoints > 0`, detected
+in useEffect to avoid hydration mismatch) start with a semi-transparent
+overlay (tap icon SVG + "TAP TO INTERACT" mono label) over the canvas; the
+canvas has `pointerEvents: "none"` so scroll passes through. Tapping the
+overlay activates 3D controls; each subsequent touch on the canvas wrapper
+extends a 4 s inactivity timer, after which the overlay returns. Desktop
+unchanged (no overlay, pointerEvents auto). Timer cleared on unmount. The
+spec's hardcoded `#EF5D08`/`#F0F0F0` in the overlay snippet were swapped for
+`var(--accent)`/`var(--text-primary)` (identical values; tokens-only rule).
+
+**Item 2 — StatsTicker.tsx sized up:** container 2.75rem → 4rem, value font
+clamp(0.9,2vw,1.1) → clamp(1.6rem,4vw,2.2rem), label clamp → (0.7,1.5vw,0.85),
+value/label gap 0.5 → 0.75rem, label color --text-muted → --text-secondary,
+progress dots 4px → 5px. Carousel logic untouched.
+
+**Item 3 — Join page rebuilt as a 4-step form (JoinClient.tsx):**
+- Left brand panel de-oranged: `.join-brand` in globals.css now
+  `--bg-surface` with a 4px `--accent` left border; JOIN/THE/TEAM stacked
+  type is now accent-on-dark; domain list `--text-secondary`, "SIX DOMAINS"
+  micro-label `--text-muted`. Pattern class swapped
+  `pattern-speed-lines-strong` → `pattern-speed-lines` (the -strong variant
+  draws dark rgba(10,10,10) lines sized for the orange bg — invisible on a
+  dark surface).
+- Steps: 1 WHO ARE YOU (name, email, 10-digit mobile `pattern=[0-9]{10}`,
+  SRN/PRN, semester as three 1st/3rd/5th tap tiles reusing
+  `.join-domain-tile`); 2 WHERE YOU WANT TO BUILD (existing ≤3 multi-select,
+  "X / 3 DOMAINS SELECTED"); 3 WHY VEGAVATH (why_join + value_addition
+  textareas, rows 4, mono hints); 4 YOUR EXPERIENCE (domain_experience
+  textarea rows 5 + portfolio link input shown/required only when Social
+  Media is selected). Step indicator: "STEP N OF 4" + four 18×4px bars
+  (accent = active, border-strong = done, border = upcoming) + step title.
+  One `<form>` drives all steps: NEXT is type=submit so browser-native
+  validation (required/type/pattern) covers text fields of the visible step;
+  JS validates only the tile selectors (semester, ≥1 domain). Enter
+  advances. ← BACK plain mono button from step 2. Honeypot rendered on
+  every step. Textareas use `.join-input` + inline resize/min-height 120px/
+  Space Grotesk. Labels: mono uppercase 0.72rem/0.12em `--text-primary`,
+  accent asterisk, 0.5rem gap. No new CSS classes — all step UI inline-styled.
+- **DOMAINS switched to the FY26 set:** Coding · Automotives · Sponsorship &
+  Finance · Robotics · Operations · Social Media (in JoinClient,
+  /api/join VALID_DOMAINS, and new `ApplicationDomain` type in
+  types/settings.ts; old values kept as `LegacyApplicationDomain` for rows
+  already in the DB).
+
+**Item 4 — migrations/004_application_new_fields.sql:** adds nullable
+mobile_number, srn_prn, semester (CHECK 1/3/5), why_join, value_addition,
+domain_experience, design_portfolio_url. **Extended beyond the session spec:**
+the spec's FY26 domain names are NOT in the existing CHECK constraints
+(001/002/003 accept the FY25 names) — without a constraint change every FY26
+submission violates `applications_domain_interest_check` and 500s. 004
+therefore also drops and recreates the three domain CHECKs with the union of
+FY26 + FY25 values (existing rows hold FY25 values, so a FY26-only CHECK
+would fail validation on ADD). 004 subsumes 002 (recreates the same
+constraint, wider), so 002's "was it ever applied?" question is moot once
+004 runs.
+
+⚠ **DEPLOY ORDER: (1) apply 003 in Neon (004's `domain_interest_2/3` CHECKs
+need those columns), (2) apply 004, (3) deploy this code. Skipping 004 500s
+every join submission twice over (missing columns AND rejected domain
+values).** Neither 003 nor 004 has been applied — live-DB rule, user runs them.
+
+**Item 5 — services + API (applications.ts = narrow authorized exception):**
+`createApplication` INSERTs all 7 new columns (`?? null` so old call shapes
+still work). `/api/join`: VALID_DOMAINS → FY26 set; validates mobile_number
+(exactly 10 digits when present), semester ∈ 1/3/5 when present,
+design_portfolio_url via isValidUrl when present; `portfolio_url` (the old
+generic field, no longer on the form) is passed as null.
+
+**Verified:** `npm run build` 0 errors; `npx tsc --noEmit` exit 0. Design
+gate on JoinClient/KartModelSection/StatsTicker: no rounded-*, no emoji, no
+mx-auto.
+
+**Needs user eyeball (dev server):** `/` — stats carousel size, kart overlay
+on a real phone (tap to interact, controls die after 4 s idle, page scrolls
+over the inactive canvas); `/join` — dark brand panel with orange edge, all
+4 steps, back/next, semester tiles, Social Media conditional portfolio
+field, native validation messages. Submit hits LIVE /api/join — 500s until
+003 + 004 are applied; test validation states only, or apply migrations first.
+
+---
+
+## 2026-07-11 — Session 19: join panel verification, Sponsorship rename, apply-once cookie, admin applications, DomainGrid hover fix, Bootstrap spec resolved
+
+**Item 1 — join left-panel orange background: NO-OP, already fixed.** The
+session spec described the panel as "still solid orange", but the working
+tree already has the Session-18 fix: `.join-brand` in globals.css carries
+`background: var(--bg-surface)` + `border-left: 4px solid var(--accent)`,
+the JOIN/THE/TEAM stack is `var(--accent)`, and the domain list is
+`var(--text-secondary)` (see the S18 entry above). Verified, changed nothing.
+If the user still sees orange in the browser it's a stale-CSS cache, not code.
+
+**Item 2 — SRN/PRN placeholder:** `"e.g. PES2UG24CS019"` → `"Your SRN or PRN"`.
+
+**Item 3 — "Sponsorship & Finance" → "Sponsorship" (full rename, not
+display-only).** The submit value and /api/join VALID_DOMAINS both used the
+long name, so per the spec's conditional the *value* changed everywhere:
+JoinClient DOMAINS + brand-panel text, VALID_DOMAINS, `ApplicationDomain` in
+types/settings.ts. Because **migration 004 is still unapplied in Neon**, its
+three domain CHECKs were edited in place to list `'Sponsorship'` as the FY26
+value; `'Sponsorship & Finance'` moved to the legacy union (and to
+`LegacyApplicationDomain`) as a belt-and-braces guard in case any row was
+ever written with it. All six join tiles now render single-line. NOT
+renamed: the home-page DomainGrid card still says "Sponsorship & Finance"
+(display-only copy, S&F ghost abbreviation; out of the spec's scope — flag
+if it should match).
+
+**Item 4 — apply-once cookie:** JoinClient sets
+`vg_applied=1; max-age=30d; path=/; SameSite=Lax` after a successful POST,
+and on mount renders a "YOU'VE ALREADY APPLIED THIS CYCLE." panel (in the
+form column, brand panel kept) when the cookie is present. Success screen
+wins over the cookie check so a fresh submitter sees the confirmation.
+Deterrent only — clearing cookies bypasses it. ⚠ Must be declared in /legal
+as a functional cookie (not done this session — legal copy is a known open
+item anyway).
+
+**Item 5 — admin applications management:**
+- **migrations/005_application_status_pipeline.sql** (new): status CHECK
+  widened to pending / shortlisted / interview / selected / rejected +
+  legacy reviewed / accepted. ⚠ **NOT applied in Neon** — apply before
+  deploying this code or every status change 500s.
+- **types/settings.ts:** `APPLICATION_STATUSES` const + `ApplicationStatus`
+  union; `Application.status` retyped to it.
+- **services/applications.ts (authorized exception):** `getApplications`
+  re-signatured to `({ status?, limit = 50 })` — spec's snippet had no
+  LIMIT, kept one per the architecture contract; status filter is a separate
+  tagged-template branch (Neon driver, no dynamic SQL). Three existing
+  callers updated to the options object (dashboard, settings page, settings
+  route). Added `deleteApplication`. `updateApplicationStatus` now takes
+  `ApplicationStatus`.
+- **Routes:** `/api/admin/applications` GET (?status= filter, validated
+  against APPLICATION_STATUSES, limit 200) + DELETE (?id=, hard delete);
+  `/api/admin/applications/[id]/status` PATCH (validates status). Both
+  re-check `auth()` + isAdmin per the two-layer contract. No email anywhere.
+- **Page `(admin)/admin/applications`:** force-dynamic, server-filtered via
+  `?status=` searchParam; header count in mono; underline filter tabs
+  (ALL/PENDING/SHORTLISTED/INTERVIEW/SELECTED/REJECTED) reusing the public
+  gallery's tab treatment as Links. Legacy reviewed/accepted rows appear
+  under ALL only.
+- **ApplicationsTable (new client component):** row click expands a detail
+  panel (applicant line, domains, why-join, value-add, experience, portfolio
+  link target=_blank); actions cell stopPropagation-guarded; status `<select>`
+  PATCHes and shows "..." while in flight, dot recolors from local state
+  (pending muted / shortlisted gold / interview accent / selected success /
+  rejected error); delete via existing InlineDelete. Empty state
+  "NO APPLICATIONS".
+- **AdminShell:** "Applications" nav item (document icon) after Team.
+- The settings page's "Recent Applications" read-only table still exists —
+  left alone; the new page supersedes it functionally. Candidate for removal
+  in a later session.
+
+**Item 6 — DomainGrid hover jump fixed (CSS-only, no component change).**
+Hover was `:hover` CSS with a `max-height: 0 → 12rem` expansion, so tiles
+grew on hover. Now `.domain-desc` is always in layout and only
+`opacity`/`color` transition (transparent → `--bg-base`); tile `min-height`
+130px → 160px. Ghost letters were already absolutely positioned with fixed
+size — unaffected. **Deliberate deviation from the spec's "always occupy
+space":** on touch devices (`@media (hover: none)`) the description is
+`display: none` — no hover exists there, so reserved space would be
+permanent blank padding; the S11 behaviour of hiding on touch is preserved.
+
+**Item 7 — docs/bootstrap-spec.md rewritten to v4, conflict decision
+RESOLVED: Option B (explicit session token, no timeout).** Heartbeats fail
+exactly when volunteers are working (phone locked 8–15 min mid-presentation
+→ JS paused → false "gone" → account unlocks under an active user); iOS
+denies WakeLock; visibilitychange is unreliable on locked screens; the
+captive portal makes missed pings meaningless. Token = deterministic lock,
+zero background network, and the recovery path (admin one-tap UNLOCK) was
+already in the spec. Spec changes made while resolving: `volunteer_accounts`
+→ `bootstrap_volunteers` (prefix consistency; no conflicts with 001 either
+way), login claim specified as one atomic conditional UPDATE (retry-safe on
+flaky network), idempotent logout, FK indexes added (Postgres doesn't index
+FKs), `claimed_by TEXT[]` confirmed fine with the neon() driver if mutated
+via array_append/array_remove in SQL (TEXT fallback documented), bcryptjs
+usage matches auth.ts, `/api/bootstrap/*` + `/api/admin/bootstrap/*` collide
+with nothing, and noted 4s polling is a *new* pattern for this codebase
+(nothing polls today) with a pause-on-`document.hidden` courtesy rule.
+Documentation only — no Bootstrap code built.
+
+**Verified:** `npm run build` ✓ 0 errors (routes `/admin/applications`,
+`/api/admin/applications`, `/api/admin/applications/[id]/status` all
+registered); `npx tsc --noEmit` exit 0; design grep (rounded-*/9999px) clean
+on JoinClient, applications page, ApplicationsTable, AdminShell, DomainGrid.
+
+⚠ **Deploy order now: apply 003 → 004 (re-apply if an older 004 was ever
+run — it drops/recreates its constraints, safe) → 005 in Neon, then deploy.**
+User runs all migrations (live-DB rule).
+
+**Needs user eyeball (dev server):** `/join` — six single-line tiles incl.
+SPONSORSHIP, new SRN placeholder, submit → success → reload shows the
+already-applied panel (clear the vg_applied cookie to reset); `/` — domain
+tiles no longer resize on hover, desc invisible-but-reserved on desktop,
+absent on touch; `/admin/applications` — tabs, row expansion, status
+dropdown (⚠ PATCH 500s against live DB until 005 is applied), delete.
+
+---
+
+## 2026-07-11 — Session 20: DomainGrid hover description → click modal
+
+**DomainGrid.tsx (shared by `/` and `/about`) converted from server component
+to `"use client"`.** The S19 hover-reveal description (CSS-only, hidden on
+touch) is replaced by a click-to-open modal, identical on desktop and mobile.
+
+- Tile now renders only ghost abbreviation + name; the `.domain-desc` span is
+  gone. Descriptions stay in the same inline DOMAINS array — they just render
+  in the modal instead. Tiles get `onClick`, `cursor: pointer`, plus
+  `role="button"` / `tabIndex={0}` / Enter+Space keydown for keyboard access.
+- Modal (inline in the same file, framer-motion AnimatePresence): dimmed
+  fixed backdrop (click closes), centered card `min(480px, 90vw)` on
+  `--bg-elevated` / `--border-strong` with ghost abbr at 0.1 opacity, ×
+  close button, Chakra uppercase name, Space description. Escape-key
+  listener + body scroll lock (Navbar-overlay pattern), both keyed on
+  `activeDomain`. `role="dialog"` + `aria-modal` on the card.
+- DEVIATION from the session spec's markup: the card centers via motion
+  `x: "-50%", y: "-50%"` style props, NOT `style.transform` — framer-motion
+  owns the transform while animating `scale` and drops a raw
+  `translate(-50%, -50%)` (card would jump to the top-left corner).
+- globals.css: removed the whole S19 `.domain-desc` block (base rule,
+  `:hover` reveal, `@media (hover: none)` hide) and reverted `.domain-tile`
+  `min-height` 160px → 130px (the 30px was S19's description reservation).
+  `.domain-tile:hover` color invert kept unchanged.
+
+**Verified:** `npm run build` ✓ 0 errors; `npx tsc --noEmit` exit 0; design
+grep (rounded-*/mx-auto) clean on DomainGrid; `domain-desc` grep across src
+returns nothing.
+
+**Needs user eyeball (dev server):** `/` and `/about` domain sections —
+compact uniform tiles, hover invert intact, click any tile → modal (X /
+backdrop / Escape all close, page scroll locked while open); at 375px the
+card should sit centered at 90vw.
+
+**Docs follow-up (same day):** planning-agent-briefing.md refreshed through
+S20; README.md corrected to verified reality (R2_* env names +
+ADMIN_PASSWORD_HASH, current globals.css tokens/fonts, kart on all viewports,
+4-step join, /admin/applications, migrations note); new root `push.md` = the
+user's 4-step stage/review/commit/push checklist.

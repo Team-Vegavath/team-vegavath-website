@@ -318,7 +318,9 @@ export default function GalleryUploadForm() {
                   className="mono"
                   style={{ display: "flex", justifyContent: "space-between", gap: "1rem", fontSize: "0.7rem", letterSpacing: "0.08em", borderBottom: "1px solid var(--border)", paddingBottom: "0.35rem" }}
                 >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
+                  {/* minWidth 0: flex children refuse to shrink below content width,
+                      so long filenames would force the page wide on phones */}
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
                     {file.name}
                   </span>
                   <span style={{ flexShrink: 0, textTransform: "uppercase", color: STATUS_COLOR[status] }}>

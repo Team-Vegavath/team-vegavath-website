@@ -133,8 +133,10 @@ p, label, input, textarea, select, button {
 }
 
 /* Hide custom cursor chrome entirely on touch devices (public + admin).
-   CSS-only so there is no hydration flash before JS detection runs. */
-@media (pointer: coarse) {
+   CSS-only so there is no hydration flash before JS detection runs.
+   (hover: none) catches hybrid devices (S Pen / DeX) that report a
+   fine primary pointer while still being touch-driven. */
+@media (pointer: coarse), (hover: none) {
   .cursor-toggle-wrapper,
   [data-racing-cursor] {
     display: none !important;
@@ -423,28 +425,6 @@ p, label, input, textarea, select, button {
   color: var(--bg-base);
 }
 
-/* Hover description — expands below the domain name (Session 11).
-   Space is not reserved: the tile (and its grid row) grows on hover,
-   a deliberate expand interaction. Hidden on touch devices (no hover). */
-.domain-tile .domain-desc {
-  position: relative;
-  font-family: var(--font-space), sans-serif;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--text-primary);
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  margin-top: 0;
-  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
-}
-
-.domain-tile:hover .domain-desc {
-  max-height: 12rem;
-  opacity: 1;
-  margin-top: 0.55rem;
-}
-
 /* ── Stats grid (about page) ── */
 
 .stats-grid {
@@ -588,8 +568,9 @@ p, label, input, textarea, select, button {
 }
 
 .join-brand {
-  background: var(--accent);
-  color: var(--bg-base);
+  background: var(--bg-surface);
+  border-left: 4px solid var(--accent);
+  color: var(--text-primary);
   padding: 6.5rem 2rem 2.5rem;
   display: flex;
   flex-direction: column;

@@ -167,9 +167,9 @@ CI also expects:
 - NEXTAUTH_SECRET
 - NEXTAUTH_URL
 
-Important mismatch to fix/document:
-- README currently shows CLOUDFLARE_* names in one section, but implementation uses R2_* and NEXT_PUBLIC_R2_PUBLIC_URL.
-- New developers should follow code variables listed above.
+Note:
+- README env section was corrected 2026-07-11 to the R2_* / NEXT_PUBLIC_R2_PUBLIC_URL names above (it previously showed stale CLOUDFLARE_* names).
+- On any doubt, the code variables listed above are canonical.
 
 ## 11) Dev workflow for juniors
 

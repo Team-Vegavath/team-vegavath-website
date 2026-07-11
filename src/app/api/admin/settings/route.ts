@@ -13,7 +13,7 @@ export async function GET() {
   try {
     const [settings, applications] = await Promise.all([
       getAllSettings(),
-      getApplications(50),
+      getApplications({ limit: 50 }),
     ]);
     return NextResponse.json({ settings, applications });
   } catch (error) {

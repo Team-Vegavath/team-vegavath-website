@@ -50,7 +50,7 @@ export default async function AdminSettingsPage() {
   try {
     [settings, applications] = await Promise.all([
       getAllSettings(),
-      getApplications(50),
+      getApplications({ limit: 50 }),
     ]);
   } catch {
     settings = DEFAULT_SETTINGS;

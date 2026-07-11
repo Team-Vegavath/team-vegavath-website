@@ -53,7 +53,7 @@ export default async function AdminDashboardPage() {
 
   const [settings, applications, events, members, galleryItems, sponsors] = await Promise.all([
     getAllSettings().catch(() => DEFAULT_SETTINGS),
-    getApplications(10).catch(() => [] as Application[]),
+    getApplications({ limit: 10 }).catch(() => [] as Application[]),
     getEvents({ limit: 100 }).catch(() => [] as Event[]),
     getMembers().catch(() => [] as TeamMember[]),
     getGalleryItemsLimited(200).catch(() => [] as GalleryItem[]),

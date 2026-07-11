@@ -29,7 +29,7 @@ export function StatsTicker() {
       justifyContent: "center",
       alignItems: "center",
       gap: "0.75rem",
-      height: "2.75rem",
+      height: "4rem",
     }}>
       <AnimatePresence mode="wait">
         <motion.div
@@ -38,11 +38,11 @@ export function StatsTicker() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -16, opacity: 0 }}
           transition={{ duration: 0.35, ease: "easeInOut" }}
-          style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}
+          style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}
         >
           <span style={{
             fontFamily: "var(--font-mono)",
-            fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
+            fontSize: "clamp(1.6rem, 4vw, 2.2rem)",
             color: "var(--accent)",
             fontWeight: 700,
           }}>
@@ -50,8 +50,8 @@ export function StatsTicker() {
           </span>
           <span style={{
             fontFamily: "var(--font-mono)",
-            fontSize: "clamp(0.65rem, 1.2vw, 0.75rem)",
-            color: "var(--text-muted)",
+            fontSize: "clamp(0.7rem, 1.5vw, 0.85rem)",
+            color: "var(--text-secondary)",
             letterSpacing: "0.15em",
             textTransform: "uppercase",
           }}>
@@ -63,7 +63,7 @@ export function StatsTicker() {
       <div style={{ display: "flex", gap: "4px", marginLeft: "0.75rem" }}>
         {STATS.map((_, i) => (
           <div key={i} style={{
-            width: "4px", height: "4px",
+            width: "5px", height: "5px",
             background: i === index ? "var(--accent)" : "var(--text-muted)",
             transition: "background 0.3s",
           }} />

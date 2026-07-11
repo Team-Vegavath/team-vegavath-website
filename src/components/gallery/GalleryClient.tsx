@@ -133,6 +133,7 @@ export default function GalleryClient({ items, filters }: Props) {
                       alt={item.caption || item.event_label || "Gallery image"}
                       width={800}
                       height={600}
+                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                       style={{ width: "100%", height: "auto", objectFit: "cover", display: "block" }}
                     />
                     <div className="media-card-overlay">

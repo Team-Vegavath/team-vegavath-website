@@ -158,8 +158,33 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
       </div>
 
       <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
-        {saving ? "SAVING…" : saved ? "SAVED" : "SAVE CHANGES"}
+        {saving ? "SAVING…" : "SAVE CHANGES"}
       </button>
+      {saved && (
+        <span
+          style={{
+            alignSelf: "center",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            color: "var(--success)",
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.72rem",
+            letterSpacing: "0.1em",
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path
+              d="M1.5 6.5l3.5 3.5 6.5-7"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          SAVED
+        </span>
+      )}
     </form>
   );
 }

@@ -136,7 +136,9 @@ const HIT_W = 90;
 const HIT_H = 28;
 const OB_W = 40;
 const OB_H = 24;
-const OIL_W = 56;
+const OIL_H = 20; // stripe thickness
+const OIL_Y = HEIGHT / 2; // stripe centre line
+const OIL_KILL = 60; // vertical kill window either side of the centre line
 const TOP_KMH = 380;
 const HISCORE_KEY = "vg-404-hiscore";
 
@@ -323,18 +325,21 @@ export default function KartGame() {
       g.obstacles = g.obstacles.filter((o) => o.x > -120);
 
       // AABB collision: car 90×28 centred on (CAR_X, carY);
-      // each occupied lane is a 40×24 box (oil spans all lanes).
+      // each occupied lane is a 40×24 box (oil is a centre-line stripe).
       const carLeft = CAR_X - HIT_W / 2;
       const carRight = CAR_X + HIT_W / 2;
       const carTop = g.carY - HIT_H / 2;
       const carBottom = g.carY + HIT_H / 2;
       for (const o of g.obstacles) {
-        const obWidth = o.kind === "oil" ? OIL_W : OB_W;
-        if (o.x > carRight || o.x + obWidth < carLeft) continue;
         if (o.kind === "oil") {
-          die();
-          break;
+          // stripe covers [o.x, W] on the centre line; generous window — it signals run-end
+          if (o.x <= carRight && Math.abs(g.carY - OIL_Y) < OIL_KILL) {
+            die();
+            break;
+          }
+          continue;
         }
+        if (o.x > carRight || o.x + OB_W < carLeft) continue;
         let hit = false;
         for (const laneIdx of o.lanes) {
           const oy = laneY(laneIdx);
@@ -381,27 +386,23 @@ export default function KartGame() {
 
     function drawOil(x: number) {
       if (!ctx) return;
-      const cx = x + OIL_W / 2;
-      const grad = ctx.createLinearGradient(x, 0, x + OIL_W, HEIGHT);
+      // thin stripe on the centre line, stretching from its leading edge to
+      // the right canvas edge — dodgeable by holding the top or bottom lane
+      const stripeW = W - x;
+      if (stripeW <= 0) return;
+      const top = OIL_Y - OIL_H / 2;
+      const grad = ctx.createLinearGradient(x, top, W, top + OIL_H);
       grad.addColorStop(0, "rgba(22,22,30,0.9)");
       grad.addColorStop(0.3, "rgba(40,28,54,0.85)");
       grad.addColorStop(0.5, "rgba(18,44,50,0.85)");
       grad.addColorStop(0.7, "rgba(44,36,18,0.85)");
       grad.addColorStop(1, "rgba(22,22,30,0.9)");
       ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(cx, HEIGHT * 0.5, OIL_W * 0.55, HEIGHT * 0.46, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // faint warning sheen so it reads as a hazard at speed
+      ctx.fillRect(x, top, stripeW, OIL_H);
+      // faint warning edge so it reads as a hazard at speed
       ctx.strokeStyle = "rgba(239,68,68,0.35)";
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(cx, HEIGHT * 0.5, OIL_W * 0.55, HEIGHT * 0.46, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(240,240,240,0.12)";
-      ctx.beginPath();
-      ctx.ellipse(cx - 6, HEIGHT * 0.42, OIL_W * 0.3, HEIGHT * 0.22, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.strokeRect(x + 0.5, top + 0.5, stripeW - 1, OIL_H - 1);
     }
 
     function drawCar(x: number, y: number, w: number, h: number, liveryIdx: number) {
