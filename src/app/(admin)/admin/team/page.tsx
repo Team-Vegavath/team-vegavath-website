@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import BulkImportTeam from "@/components/admin/BulkImportTeam";
 import InlineDelete from "@/components/admin/InlineDelete";
 import MemberForm from "@/components/admin/MemberForm";
+import QuickPhotoUpload from "@/components/admin/QuickPhotoUpload";
 import { auth } from "@/lib/auth";
 import { getMembers } from "@/lib/services/team";
 import type { TeamMember } from "@/types/member";
 
 export const metadata: Metadata = {
-  title: "Team | Admin",
+  title: "Team",
 };
 
 export const dynamic = "force-dynamic";
@@ -116,6 +117,10 @@ export default async function AdminTeamPage({
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{member.display_order}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <QuickPhotoUpload
+                        memberId={member.id}
+                        currentPhotoUrl={member.photo_url}
+                      />
                       <Link href={`/admin/team/${member.id}/edit`} className="admin-row-action">
                         EDIT
                       </Link>

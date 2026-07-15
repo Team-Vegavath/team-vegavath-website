@@ -1,20 +1,20 @@
 # Team Vegavath Official Website
 
-The official website for Team Vegavath - the student innovation club of PES University, Electronic City Campus (PESU ECC). A dark, editorial, motorsport-inspired public site plus a full password-protected admin panel, rebuilt end-to-end in the 2026-07 frontend revamp (see `docs/revamp-log.md` for the session-by-session record).
+The official website for Team Vegavath - the student innovation club of PES University, Electronic City Campus (PESU ECC). A dark, editorial, motorsport-inspired public site plus a protected admin panel, built end-to-end. 
 
 ## Tech Stack
 
-| Layer      | Technology                                    |
-| ---------- | --------------------------------------------- |
-| Framework  | Next.js 16.1.7 App Router + TypeScript strict |
+| Layer      | Technology                                     |
+| ---------- | ---------------------------------------------- |
+| Framework  | Next.js 16.1.7 App Router + TypeScript strict  |
 | Styling    | Tailwind CSS v4 + design tokens in globals.css |
-| Animations | Framer Motion                                 |
-| 3D         | React Three Fiber + Drei                      |
-| Database   | Neon Postgres (serverless HTTP driver)        |
-| Media/CDN  | Cloudflare R2                                 |
-| Auth       | NextAuth.js v5 beta (credentials, bcrypt)     |
-| CI/CD      | GitHub Actions                                |
-| Deployment | Vercel                                        |
+| Animations | Framer Motion                                  |
+| 3D         | React Three Fiber + Drei                       |
+| Database   | Neon Postgres (serverless HTTP driver)         |
+| Media/CDN  | Cloudflare R2                                  |
+| Auth       | NextAuth.js v5 beta (credentials, bcrypt)      |
+| CI/CD      | GitHub Actions                                 |
+| Deployment | Vercel                                         |
 
 ## Features
 
@@ -27,7 +27,10 @@ The official website for Team Vegavath - the student innovation club of PES Univ
 - **Join** - 4-step application form (personal info → up to 3 domain picks → motivation → experience), honeypot anti-spam, apply-once cookie, closed state when recruitment is off
 - **Legal** - Privacy policy and terms of service
 - **404** - Playable canvas F1 mini-game
-- **Admin Panel** - Full CRUD for events, team (incl. CSV bulk import), gallery (multi-file R2 upload), sponsors, site settings, and application management (filter tabs, status pipeline, delete)
+- **Maintenance mode** - `NEXT_PUBLIC_MAINTENANCE_MODE=true` rewrites every public route to a static `/maintenance` page (admin and API stay reachable)
+- **Bootstrap** - Standalone live stall-status system for the Bootstrap event: volunteer dashboard at `/bootstrap` (own cookie auth, claim/queue/release actions, SVG campus map, freed-stall notifications, queue wait timers) plus an admin console at `/admin/bootstrap` (sessions, credentials, overrides, volunteer suggestions)
+- **Admin Panel** - Full CRUD for events, team (CSV bulk import + per-row quick photo upload), gallery (multi-file R2 upload), sponsors, site settings, milestones (drag-to-reorder "Road So Far" timeline), and application management (filter tabs, status pipeline, interview groups A-D, bulk status, CSV export, delete)
+- **Multi-admin accounts** - DB-backed admin accounts alongside an undeletable env "godfather" account: named invite links (`/admin/invite/[name]/[token]`, 48h, godfather-approved), godfather-issued password reset links (2h, single-use, invalidates all live sessions via token_version), login rate limiting (5 fails per IP per 15 min) and a login audit log on the dashboard
 
 ## Design System
 
@@ -58,7 +61,7 @@ npm install
 
 ### Environment Variables
 
-Create a `.env.local` file in the root (canonical list: Handoff.md §10):
+Create a `.env.local` file in the root:
 
 ```env
 # Database
@@ -66,8 +69,12 @@ DATABASE_URL=postgresql://...
 
 # Auth
 NEXTAUTH_SECRET=
-ADMIN_USERNAME=
+ADMIN_USERNAME=        # the env "godfather" account
 ADMIN_PASSWORD_HASH=   # bcrypt hash, not the plain password
+ADMIN_DISPLAY_NAME=    # optional display name for the godfather account
+
+# Ops
+NEXT_PUBLIC_MAINTENANCE_MODE=   # "true" = public site rewrites to /maintenance
 
 # Cloudflare R2
 R2_ACCOUNT_ID=
@@ -84,7 +91,7 @@ R2_PUBLIC_HOSTNAME=    # for next/image remotePatterns
 npm run dev
 ```
 
-Visit `http://localhost:3000`
+Visit `http://localhost:3000` or whichever the terminal shows, if your default port 3000 is busy.
 
 ### Build for Production
 
@@ -109,13 +116,21 @@ src/
 │   │   └── legal/
 │   ├── (admin)/           # Admin panel (middleware-protected)
 │   │   └── admin/
-│   │       ├── dashboard/
+│   │       ├── dashboard/ # incl. recent-logins audit table
 │   │       ├── events/
 │   │       ├── team/
 │   │       ├── gallery/
 │   │       ├── sponsors/
 │   │       ├── applications/
+│   │       ├── milestones/
+│   │       ├── accounts/
+│   │       ├── bootstrap/
 │   │       └── settings/
+│   ├── admin/             # PUBLIC token-gated pages (no AdminShell):
+│   │   ├── invite/[name]/[token]/          # admin registration via invite
+│   │   └── [username]/credentials/[token]/ # password reset
+│   ├── bootstrap/         # Volunteer stall dashboard (own cookie auth)
+│   ├── maintenance/       # Static maintenance page
 │   └── api/               # API routes (re-check admin session themselves)
 ├── components/
 │   ├── layout/            # Navbar, Footer, PageTransition, RacingCursor
@@ -125,10 +140,11 @@ src/
 │   ├── gallery/           # GalleryClient
 │   ├── join/              # JoinClient
 │   ├── sponsors/          # SponsorMarquee
+│   ├── bootstrap/         # StallCard/Grid, dashboards, login, campus map SVG
 │   └── admin/             # AdminShell, forms, tables, ApplicationsTable
 ├── lib/
 │   ├── db.ts              # Neon DB connection
-│   ├── auth.ts            # NextAuth config
+│   ├── auth.ts            # NextAuth config (DB accounts + env godfather)
 │   └── services/          # ALL SQL lives here - pages/routes call these
 └── types/                 # TypeScript types
 migrations/                # Numbered SQL files, applied to Neon manually
@@ -137,17 +153,29 @@ migrations/                # Numbered SQL files, applied to Neon manually
 ## Database Schema
 
 ```sql
-events         - id, title, slug, category, status, description, event_date, cover_image_url, registration_open
-team_members   - id, name, role, tier (core|crew|legacy), domain, photo_url, quote, linkedin_url, display_order
-gallery_items  - id, event_id, event_label, type (image|video), url, thumbnail_url, caption
-sponsors       - id, name, logo_url, website_url, description, tier (premium|community)
-applications   - id, name, email, domain_interest (+_2, _3), portfolio_url, mobile_number,
-                 srn_prn, semester, why_join, value_addition, domain_experience,
-                 design_portfolio_url, status, submitted_at
-site_settings  - key, value (recruitment_open, contact_email, social URLs, etc.)
+events               - id, title, slug, category, status, description, event_date, cover_image_url, registration_open
+team_members         - id, name, role, tier (core|crew|legacy), domain, photo_url, quote, linkedin_url, display_order
+gallery_items        - id, event_id, event_label, type (image|video), url, thumbnail_url, caption
+sponsors             - id, name, logo_url, website_url, description, tier (premium|community)
+applications         - id, name, email, domain_interest (+_2, _3), portfolio_url, mobile_number,
+                       srn_prn, semester, why_join, value_addition, domain_experience,
+                       design_portfolio_url, status, interview_group (A-D), submitted_at
+site_settings        - key, value (recruitment_open, contact_email, social URLs, etc.)
+milestones           - id, date_label, title, description, sort_order ("Road So Far" timeline)
+admin_accounts       - id, username, password_hash, display_name, mobile_number,
+                       role (admin|godfather), token_version
+admin_invite_tokens  - one-time invite links (48h expiry, pending_* registration fields,
+                       status pipeline generated → pending_approval → approved/rejected,
+                       invitee_name/invitee_slug for the URL)
+admin_password_reset_tokens - one-time reset links (2h expiry, single-use)
+admin_login_log      - attempted_at, success, ip_address, user_agent, device_hint
+bootstrap_sessions   - Bootstrap event sessions (is_active, stall count)
+bootstrap_stalls     - status (free|occupied|queued), claimed_by, queued_by, queued_at,
+                       map_x/map_y (percent coords on the SVG campus map)
+bootstrap_volunteers - per-session credentials, current_session_token, suggested_stall_id
 ```
 
-Application status pipeline: `pending → shortlisted → interview → selected / rejected` (legacy `reviewed` / `accepted` still valid). Schema changes are recorded as numbered files in `migrations/` and applied to Neon manually - never automatically.
+Application status pipeline: `pending → shortlisted → interview → selected / rejected` (legacy `reviewed` / `accepted` still valid). Schema changes are recorded as numbered files in `migrations/` and applied to Neon manually - never automatically. Migrations 001-012 are all applied as of 2026-07-15.
 
 ## Media Storage (Cloudflare R2)
 
@@ -164,23 +192,26 @@ R2 serves immutable cache headers - object keys are never overwritten; new uploa
 
 ## Admin Panel
 
-Access at `/admin` with credentials stored in environment variables. Protected twice: middleware on the route group plus a session re-check inside every admin API route.
+Access at `/admin`. Auth is NextAuth v5 credentials: DB-backed `admin_accounts` are checked first, then the undeletable env "godfather" account. Protected twice: middleware plus a session re-check inside every admin API route. Login is rate limited and every attempt is logged.
 
 Features:
 
 - Manage events (create, edit, archive, delete)
-- Manage team members (all tiers) + CSV bulk import
+- Manage team members (all tiers) + CSV bulk import + per-row quick photo upload
 - Multi-file gallery upload to R2
 - Manage sponsors
 - Site settings (recruitment toggle, social links, contact info)
-- Application management: filter by status, expand rows for full detail, advance the status pipeline, delete
+- Application management: filter by status or interview group, expand rows for full detail, advance the status pipeline, assign interview groups A-D, bulk status updates, CSV export, delete
+- Milestones: drag-to-reorder timeline editor feeding the About page
+- Accounts (godfather only): generate named invite links, approve/reject registrations, issue password reset links, delete accounts
+- Bootstrap: create/activate stall sessions, volunteer credentials CSV, live dashboard with overrides and stall suggestions
 
 ## Known Issues & Notes
 
 - Tailwind v4 `mx-auto` and some responsive prefix classes do not generate CSS in this setup - centering always uses inline `style={{ margin: "0 auto" }}`
 - Neon free tier suspends after 5 min inactivity - first request after suspension takes 2-5 seconds to wake
 - The Neon DB and R2 bucket are live production - there is no staging environment
-- Migrations 003-005 (multi-domain applications, FY26 join fields, status pipeline) must be applied to Neon **in order, before** deploying code that depends on them
+- All migrations (001-012) are applied to Neon as of 2026-07-15; future schema changes still go through numbered files in `migrations/`, applied manually before the code that depends on them is deployed
 
 ---
 

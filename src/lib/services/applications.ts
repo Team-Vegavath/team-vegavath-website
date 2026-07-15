@@ -27,21 +27,27 @@ export async function createApplication(
 }
 
 export async function getApplications(
-  options: { status?: ApplicationStatus; limit?: number } = {}
+  options: {
+    status?: ApplicationStatus;
+    interviewGroup?: string;
+    limit?: number;
+  } = {}
 ): Promise<Application[]> {
-  const { status, limit = 50 } = options;
-  if (status) {
-    const rows = await sql`
-      SELECT * FROM applications
-      WHERE status = ${status}
-      ORDER BY submitted_at DESC
-      LIMIT ${limit}`;
-    return rows as Application[];
-  }
-  const rows = await sql`
-    SELECT * FROM applications
-    ORDER BY submitted_at DESC
-    LIMIT ${limit}`;
+  const { status, interviewGroup, limit = 50 } = options;
+  // interview_group only referenced when actually filtering by it, so
+  // plain listing keeps working before migration 011 is applied.
+  const rows = interviewGroup
+    ? await sql`
+        SELECT * FROM applications
+        WHERE interview_group = ${interviewGroup}
+          AND (${status ?? null}::text IS NULL OR status = ${status ?? null})
+        ORDER BY submitted_at DESC
+        LIMIT ${limit}`
+    : await sql`
+        SELECT * FROM applications
+        WHERE (${status ?? null}::text IS NULL OR status = ${status ?? null})
+        ORDER BY submitted_at DESC
+        LIMIT ${limit}`;
   return rows as Application[];
 }
 
@@ -55,4 +61,23 @@ export async function updateApplicationStatus(
 
 export async function deleteApplication(id: string): Promise<void> {
   await sql`DELETE FROM applications WHERE id = ${id}`;
+}
+
+export async function setInterviewGroup(
+  id: string,
+  group: string | null
+): Promise<void> {
+  await sql`
+    UPDATE applications SET interview_group = ${group} WHERE id = ${id}`;
+}
+
+export async function bulkSetStatus(
+  ids: string[],
+  status: ApplicationStatus
+): Promise<string[]> {
+  const rows = await sql`
+    UPDATE applications SET status = ${status}
+    WHERE id = ANY(${ids}::uuid[])
+    RETURNING id`;
+  return (rows as { id: string }[]).map((r) => r.id);
 }

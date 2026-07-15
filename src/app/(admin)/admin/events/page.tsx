@@ -9,7 +9,7 @@ import { getEvents } from "@/lib/services/events";
 import type { Event } from "@/types/event";
 
 export const metadata: Metadata = {
-  title: "Events | Admin",
+  title: "Events",
 };
 
 export const dynamic = "force-dynamic";

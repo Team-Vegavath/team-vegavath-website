@@ -1,0 +1,26 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { getBootstrapStalls, getBootstrapVolunteers } from "@/lib/services/bootstrap";
+
+// Admin live-dashboard poll: stalls + volunteer lock status in one request.
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const [stalls, volunteers] = await Promise.all([
+      getBootstrapStalls(id),
+      getBootstrapVolunteers(id),
+    ]);
+    return NextResponse.json({ stalls, volunteers });
+  } catch (error) {
+    console.error("[GET /api/admin/bootstrap/sessions/[id]]", error);
+    return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });
+  }
+}

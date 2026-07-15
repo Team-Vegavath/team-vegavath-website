@@ -124,7 +124,13 @@ function carDataUri(l: Livery): string {
 
 /* ── Tuning constants ────────────────────────────────────── */
 
-const HEIGHT = 340;
+/* Canvas height scales with the viewport (45% of it), clamped so the game
+   stays playable on short laptops and doesn't balloon on tall monitors.
+   The real value is fixed once on mount inside the effect; the fallback
+   only sizes the SSR/first-paint element. */
+const FALLBACK_HEIGHT = 340;
+const MIN_HEIGHT = 300;
+const MAX_HEIGHT = 500;
 const LANE_FRAC = [0.22, 0.5, 0.78] as const;
 const GEARS = [3.5, 5.5, 8.0, 11.5] as const; // px/frame
 const GEAR_TIMES = [0, 15, 35, 60] as const; // seconds
@@ -136,8 +142,7 @@ const HIT_W = 90;
 const HIT_H = 28;
 const OB_W = 40;
 const OB_H = 24;
-const OIL_H = 20; // stripe thickness
-const OIL_Y = HEIGHT / 2; // stripe centre line
+const OIL_H = 12; // stripe thickness
 const OIL_KILL = 60; // vertical kill window either side of the centre line
 const TOP_KMH = 380;
 const HISCORE_KEY = "vg-404-hiscore";
@@ -166,6 +171,16 @@ export default function KartGame() {
     if (!wrap || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    /* Every lane/HUD position derives from HEIGHT, so it must stay fixed
+       for the life of the game loop — computed once on mount, not on
+       resize (a mid-run height change would teleport the car and slick). */
+    const HEIGHT = Math.min(
+      MAX_HEIGHT,
+      Math.max(MIN_HEIGHT, Math.floor(window.innerHeight * 0.45))
+    );
+    const OIL_Y = HEIGHT / 2; // oil stripe centre line
+    canvas.style.height = `${HEIGHT}px`;
 
     /* next/font families are only reachable via their CSS variables —
        resolve the real family strings once so ctx.font can use them. */
@@ -391,18 +406,22 @@ export default function KartGame() {
       const stripeW = W - x;
       if (stripeW <= 0) return;
       const top = OIL_Y - OIL_H / 2;
-      const grad = ctx.createLinearGradient(x, top, W, top + OIL_H);
-      grad.addColorStop(0, "rgba(22,22,30,0.9)");
-      grad.addColorStop(0.3, "rgba(40,28,54,0.85)");
-      grad.addColorStop(0.5, "rgba(18,44,50,0.85)");
-      grad.addColorStop(0.7, "rgba(44,36,18,0.85)");
-      grad.addColorStop(1, "rgba(22,22,30,0.9)");
+      // translucent iridescent sheen — purple → teal → amber → purple —
+      // so it reads as spilled oil rather than a solid wall
+      const grad = ctx.createLinearGradient(x, 0, W, 0);
+      grad.addColorStop(0, "rgba(80,0,120,0.55)");
+      grad.addColorStop(0.3, "rgba(0,180,120,0.45)");
+      grad.addColorStop(0.6, "rgba(180,80,0,0.5)");
+      grad.addColorStop(1, "rgba(80,0,120,0.4)");
       ctx.fillStyle = grad;
       ctx.fillRect(x, top, stripeW, OIL_H);
-      // faint warning edge so it reads as a hazard at speed
-      ctx.strokeStyle = "rgba(239,68,68,0.35)";
+      // bright edge along the top so it still reads as a hazard at speed
+      ctx.strokeStyle = "rgba(255,220,0,0.7)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, top + 0.5, stripeW - 1, OIL_H - 1);
+      ctx.beginPath();
+      ctx.moveTo(x, top + 0.5);
+      ctx.lineTo(W, top + 0.5);
+      ctx.stroke();
     }
 
     function drawCar(x: number, y: number, w: number, h: number, liveryIdx: number) {
@@ -687,7 +706,7 @@ export default function KartGame() {
         style={{
           display: "block",
           width: "100%",
-          height: `${HEIGHT}px`,
+          height: `${FALLBACK_HEIGHT}px`,
           border: "1px solid var(--border)",
           background: "var(--bg-base)",
           touchAction: "none",

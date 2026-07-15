@@ -1,9 +1,10 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useRouter } from "next/navigation";
 import InlineDelete from "@/components/admin/InlineDelete";
-import type { Application, ApplicationStatus } from "@/types/settings";
-import { APPLICATION_STATUSES } from "@/types/settings";
+import type { Application, ApplicationStatus, InterviewGroup } from "@/types/settings";
+import { APPLICATION_STATUSES, INTERVIEW_GROUPS } from "@/types/settings";
 
 // Dot colors per pipeline stage; 'reviewed'/'accepted' are legacy rows.
 const STATUS_COLORS: Record<ApplicationStatus, string> = {
@@ -50,13 +51,70 @@ interface ApplicationsTableProps {
 }
 
 export default function ApplicationsTable({ applications }: ApplicationsTableProps) {
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Local status overrides so a PATCH updates the dot without a full refetch.
   const [statuses, setStatuses] = useState<Record<string, ApplicationStatus>>({});
+  // Same optimistic pattern for interview groups.
+  const [groups, setGroups] = useState<Record<string, InterviewGroup | null>>({});
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<string>("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const statusOf = (app: Application): ApplicationStatus =>
     statuses[app.id] ?? app.status;
+
+  // Explicit undefined check: a stored null means "cleared", so ?? won't do.
+  const groupOf = (app: Application): InterviewGroup | null => {
+    const override = groups[app.id];
+    return override !== undefined ? override : app.interview_group ?? null;
+  };
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function changeGroup(id: string, group: InterviewGroup | null) {
+    const previous = groupOf(applications.find((a) => a.id === id)!);
+    setGroups((prev) => ({ ...prev, [id]: group }));
+    try {
+      const res = await fetch(`/api/admin/applications/${id}/group`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group }),
+      });
+      if (!res.ok) throw new Error("Group update failed");
+    } catch {
+      setGroups((prev) => ({ ...prev, [id]: previous }));
+      alert("Group update failed. Please retry.");
+    }
+  }
+
+  async function handleBulkStatus() {
+    if (!bulkStatus || selected.size === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/applications/bulk-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selected], status: bulkStatus }),
+      });
+      if (!res.ok) throw new Error("Bulk update failed");
+      setSelected(new Set());
+      setBulkStatus("");
+      router.refresh();
+    } catch {
+      alert("Bulk update failed. Please retry.");
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   async function changeStatus(id: string, status: ApplicationStatus) {
     setUpdatingId(id);
@@ -80,12 +138,28 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
       <table className="admin-table">
         <thead>
           <tr>
+            <th>
+              <input
+                type="checkbox"
+                aria-label="Select all filtered applications"
+                checked={applications.length > 0 && selected.size === applications.length}
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? new Set(applications.map((a) => a.id))
+                      : new Set()
+                  )
+                }
+                style={{ cursor: "pointer" }}
+              />
+            </th>
             <th>Name</th>
             <th>Email</th>
             <th>Domains</th>
             <th>Semester</th>
             <th>Date</th>
             <th>Status</th>
+            <th>Group</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -101,6 +175,16 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
                     style={{ cursor: "pointer" }}
                     aria-expanded={expanded}
                   >
+                    {/* Checkbox cell swallows clicks so the row doesn't toggle. */}
+                    <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${app.name}`}
+                        checked={selected.has(app.id)}
+                        onChange={() => toggleSelected(app.id)}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </td>
                     <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
                       {app.name}
                     </td>
@@ -123,6 +207,38 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
                         aria-hidden="true"
                       />
                       {updatingId === app.id ? "..." : status}
+                    </td>
+                    {/* Group tiles - only meaningful once an applicant reaches interview. */}
+                    <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
+                      {status === "interview" || status === "shortlisted" ? (
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          {INTERVIEW_GROUPS.map((g) => {
+                            const active = groupOf(app) === g;
+                            return (
+                              <button
+                                key={g}
+                                onClick={() => void changeGroup(app.id, active ? null : g)}
+                                aria-label={`Set ${app.name} to group ${g}`}
+                                aria-pressed={active}
+                                style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  background: active ? "var(--accent)" : "var(--bg-base)",
+                                  border: "1px solid var(--border)",
+                                  color: active ? "var(--bg-base)" : "var(--text-muted)",
+                                  fontFamily: "var(--font-mono)",
+                                  fontSize: "0.75rem",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {g}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>-</span>
+                      )}
                     </td>
                     {/* Actions cell swallows clicks so the row doesn't toggle. */}
                     <td style={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
@@ -160,7 +276,7 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
                   </tr>
                   {expanded && (
                     <tr>
-                      <td colSpan={7} style={{ background: "var(--bg-surface)", padding: "1.5rem" }}>
+                      <td colSpan={9} style={{ background: "var(--bg-surface)", padding: "1.5rem" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: "48rem" }}>
                           <div>
                             <p style={detailLabelStyle}>Applicant</p>
@@ -207,13 +323,78 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
             })
           ) : (
             <tr>
-              <td colSpan={7} className="admin-empty">
+              <td colSpan={9} className="admin-empty">
                 NO APPLICATIONS
               </td>
             </tr>
           )}
         </tbody>
       </table>
+
+      {selected.size > 0 && (
+        <div
+          style={{
+            position: "sticky",
+            bottom: 0,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-strong)",
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <span
+            style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-muted)" }}
+          >
+            {selected.size} SELECTED
+          </span>
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            aria-label="Bulk status"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.75rem",
+              background: "var(--bg-base)",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: 0,
+              padding: "6px 8px",
+            }}
+          >
+            <option value="">SET STATUS...</option>
+            {APPLICATION_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => void handleBulkStatus()}
+            disabled={!bulkStatus || bulkBusy}
+            style={{
+              background: bulkStatus ? "var(--accent)" : "var(--bg-base)",
+              border: "1px solid var(--border)",
+              color: bulkStatus ? "var(--bg-base)" : "var(--text-muted)",
+              fontFamily: "var(--font-chakra)",
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              padding: "6px 16px",
+              cursor: bulkBusy ? "wait" : "pointer",
+            }}
+          >
+            {bulkBusy ? "APPLYING..." : "APPLY"}
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            aria-label="Clear selection"
+            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "18px" }}
+          >
+            x
+          </button>
+        </div>
+      )}
     </section>
   );
 }

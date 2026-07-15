@@ -9,7 +9,7 @@ import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 export const metadata: Metadata = {
-  title: "Edit Member | Admin",
+  title: "Edit Member",
 };
 
 export const dynamic = "force-dynamic";

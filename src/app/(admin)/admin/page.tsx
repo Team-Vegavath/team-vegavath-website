@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 
 import { auth, signIn } from "@/lib/auth";
+import { logAdminLogin } from "@/lib/services/admin";
 
 export const metadata: Metadata = {
-  title: "Admin | Team Vegavath",
+  title: "Admin Login",
 };
 
 export default async function AdminLoginPage({
@@ -23,6 +25,35 @@ export default async function AdminLoginPage({
 
   async function handleLogin(formData: FormData) {
     "use server";
+    const h = await headers();
+    const ip =
+      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      h.get("x-real-ip") ??
+      undefined;
+    const userAgent = h.get("user-agent") ?? undefined;
+
+    // Rate limit: 5 failed attempts per IP per 15 minutes.
+    // DB-backed via admin_login_log - in-memory counters die across
+    // Vercel lambdas.
+    let locked = false;
+    if (ip) {
+      try {
+        const { sql } = await import("@/lib/db");
+        const rows = await sql`
+          SELECT count(*)::int AS n
+          FROM admin_login_log
+          WHERE ip_address = ${ip}
+            AND success = false
+            AND attempted_at > now() - INTERVAL '15 minutes'
+        `;
+        locked = (rows[0] as { n: number }).n >= 5;
+      } catch {
+        // DB unavailable - allow through rather than locking everyone out
+      }
+    }
+    // redirect() throws, so it must live outside the try/catch above
+    if (locked) redirect("/admin?error=locked");
+
     try {
       await signIn("credentials", {
         username: formData.get("username"),
@@ -33,8 +64,13 @@ export default async function AdminLoginPage({
       // instanceof survives production minification; string/constructor-name
       // checks do not; that mismatch was crashing prod on wrong passwords.
       if (error instanceof AuthError) {
+        // A DB write failure must never break the login flow
+        await logAdminLogin({ success: false, ip, userAgent }).catch(() => {});
         redirect("/admin?error=invalid");
       }
+      // signIn succeeds by throwing Next.js's internal redirect error,
+      // so reaching here with a non-AuthError IS the success path.
+      await logAdminLogin({ success: true, ip, userAgent }).catch(() => {});
       // Re-throw redirect errors so Next.js handles them correctly
       throw error;
     }
@@ -90,7 +126,9 @@ export default async function AdminLoginPage({
 
           {error ? (
             <p style={{ border: "1px solid rgba(239, 68, 68, 0.5)", background: "rgba(239, 68, 68, 0.08)", padding: "0.6rem 0.8rem", fontSize: "0.85rem", color: "var(--error)" }}>
-              Invalid username or password
+              {error === "locked"
+                ? "Too many failed attempts. Try again in 15 minutes."
+                : "Invalid username or password"}
             </p>
           ) : null}
 

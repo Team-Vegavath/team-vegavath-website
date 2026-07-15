@@ -9,7 +9,7 @@ import { getSponsors } from "@/lib/services/sponsors";
 import type { Sponsor } from "@/types/sponsor";
 
 export const metadata: Metadata = {
-  title: "Sponsors | Admin",
+  title: "Sponsors",
 };
 
 export const dynamic = "force-dynamic";

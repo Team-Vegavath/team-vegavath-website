@@ -8,7 +8,7 @@ import { getGalleryItemsLimited } from "@/lib/services/gallery";
 import type { GalleryItem } from "@/types/gallery";
 
 export const metadata: Metadata = {
-  title: "Gallery | Admin",
+  title: "Gallery",
 };
 
 export const dynamic = "force-dynamic";

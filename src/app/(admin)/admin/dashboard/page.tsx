@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
+import { getRecentLogins } from "@/lib/services/admin";
+import type { AdminLoginEntry } from "@/lib/services/admin";
 import { getApplications } from "@/lib/services/applications";
 import { getEvents } from "@/lib/services/events";
 import { getGalleryItemsLimited } from "@/lib/services/gallery";
@@ -15,7 +17,7 @@ import type { Sponsor } from "@/types/sponsor";
 import type { TeamMember } from "@/types/member";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Team Vegavath Admin",
+  title: "Dashboard",
 };
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,19 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default async function AdminDashboardPage() {
   const session = await auth();
 
@@ -51,13 +66,14 @@ export default async function AdminDashboardPage() {
     redirect("/admin");
   }
 
-  const [settings, applications, events, members, galleryItems, sponsors] = await Promise.all([
+  const [settings, applications, events, members, galleryItems, sponsors, logins] = await Promise.all([
     getAllSettings().catch(() => DEFAULT_SETTINGS),
     getApplications({ limit: 10 }).catch(() => [] as Application[]),
     getEvents({ limit: 100 }).catch(() => [] as Event[]),
     getMembers().catch(() => [] as TeamMember[]),
     getGalleryItemsLimited(200).catch(() => [] as GalleryItem[]),
     getSponsors().catch(() => [] as Sponsor[]),
+    getRecentLogins(10).catch(() => [] as AdminLoginEntry[]),
   ]);
 
   const activeSponsors = sponsors.filter((sponsor) => sponsor.is_active).length;
@@ -88,6 +104,59 @@ export default async function AdminDashboardPage() {
             <p className="admin-stat-label">{label}</p>
           </article>
         ))}
+      </section>
+
+      <section style={{ marginBottom: "2rem" }}>
+        <span className="admin-section-label">RECENT LOGINS</span>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Status</th>
+                <th>IP</th>
+                <th>Device</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logins.length > 0 ? (
+                logins.map((login) => (
+                  <tr key={login.id}>
+                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
+                      {formatDateTime(login.attempted_at)}
+                    </td>
+                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: "0.45rem",
+                          height: "0.45rem",
+                          marginRight: "0.5rem",
+                          background: login.success ? "var(--success)" : "var(--error)",
+                        }}
+                      />
+                      <span style={{ color: login.success ? "var(--success)" : "var(--error)" }}>
+                        {login.success ? "SUCCESS" : "FAILED"}
+                      </span>
+                    </td>
+                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
+                      {login.ip_address ?? "-"}
+                    </td>
+                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
+                      {login.device_hint ?? "-"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="admin-empty">
+                    NO LOGIN HISTORY YET
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="admin-table-wrap">

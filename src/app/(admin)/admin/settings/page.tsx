@@ -8,7 +8,7 @@ import SettingsForm from "@/components/admin/SettingsForm";
 import type { Application, SiteSettings } from "@/types/settings";
 
 export const metadata: Metadata = {
-  title: "Settings | Admin",
+  title: "Settings",
 };
 
 export const dynamic = "force-dynamic";

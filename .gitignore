@@ -48,21 +48,15 @@ docs/*.zip
 
 # Internal planning docs (not for public repo)
 
+Handoff.md
 docs/bootstrap-spec.md
-
+docs/revamp-log.md
 docs/planning-agent-briefing.md
-
 docs/push.md
 
-# Migration files applied directly to Neon (003+ not version controlled)
+# Migration files applied directly to Neon 
 
-migrations/001_initial_schema.sql
+migrations/00[1-9]_*.sql
+migrations/0[1-9][0-9]_*.sql
 
-migrations/002_add_coding_domain.sql
-
-migrations/003_multi_domain_applications.sql
-
-migrations/004_application_new_fields.sql
-
-migrations/005_application_status_pipeline.sql
-
+bootstrap_references/

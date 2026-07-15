@@ -58,6 +58,18 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/bootstrap",
+    label: "Bootstrap",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="1" y="4" width="14" height="9" rx="0" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="4" y1="4" x2="4" y2="2" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="8" y1="4" x2="8" y2="2" stroke="currentColor" strokeWidth="1.3" />
+        <line x1="12" y1="4" x2="12" y2="2" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/gallery",
     label: "Gallery",
     icon: (
@@ -65,6 +77,21 @@ const NAV_ITEMS = [
         <rect x="3" y="4" width="18" height="16" />
         <circle cx="9" cy="10" r="2" />
         <path d="M3 17l5-5 4 4 3-3 6 6" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/milestones",
+    label: "Road So Far",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <line x1="5" y1="3" x2="5" y2="21" />
+        <circle cx="5" cy="7" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="5" cy="13" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none" />
+        <line x1="9" y1="7" x2="20" y2="7" />
+        <line x1="9" y1="13" x2="20" y2="13" />
+        <line x1="9" y1="19" x2="16" y2="19" />
       </svg>
     ),
   },
@@ -90,6 +117,20 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/admin/accounts",
+    label: "Accounts",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.5" />
+        <path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+        <circle cx="16.5" cy="9" r="2.5" />
+        <path d="M17 14.5c2.7.4 4.5 2.6 4.5 5.5" />
+        <line x1="19" y1="4" x2="23" y2="4" />
+        <line x1="21" y1="2" x2="21" y2="6" />
+      </svg>
+    ),
+  },
 ] as const;
 
 interface AdminShellProps {
@@ -97,9 +138,11 @@ interface AdminShellProps {
   // SignOutButton is a server component (server action), so the server layout
   // passes it in as a slot; client components can't import it directly.
   signOutSlot: ReactNode;
+  // Orange dot on the Accounts link when registration requests await approval.
+  hasPendingAccounts?: boolean;
 }
 
-export default function AdminShell({ children, signOutSlot }: AdminShellProps) {
+export default function AdminShell({ children, signOutSlot, hasPendingAccounts = false }: AdminShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -178,7 +221,24 @@ export default function AdminShell({ children, signOutSlot }: AdminShellProps) {
               className="admin-nav-link"
               data-active={pathname === href || pathname.startsWith(`${href}/`)}
             >
-              {icon}
+              {href === "/admin/accounts" && hasPendingAccounts ? (
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  {icon}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: "-2px",
+                      right: "-3px",
+                      width: "6px",
+                      height: "6px",
+                      background: "var(--accent)",
+                    }}
+                  />
+                </span>
+              ) : (
+                icon
+              )}
               {label}
             </Link>
           ))}

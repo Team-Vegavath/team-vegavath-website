@@ -4,6 +4,7 @@ import AboutHeroImage from "@/components/about/AboutHeroImage";
 import { DomainGrid } from "@/components/home/DomainGrid";
 import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
 import { Reveal } from "@/components/ui/Reveal";
+import { getMilestones, type Milestone } from "@/lib/services/about";
 import { getActiveSponsors } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
@@ -18,23 +19,19 @@ const STATS = [
   { number: "6", label: "Domains" },
 ] as const;
 
-const TIMELINE = [
-  {
-    date: "SEP 2025",
-    title: "Freshers Day",
+// Fallback so the page never breaks before migration 010 runs; once the
+// milestones table is populated, the live data takes over.
+const TIMELINE_FALLBACK: Milestone[] = [
+  { id: "1", date_label: "SEP 2025", title: "Freshers Day",
     description: "First open event of the year, where the newest batch meets the team.",
-  },
-  {
-    date: "NOV 2025",
-    title: "Ignition 1.0",
+    sort_order: 1 },
+  { id: "2", date_label: "NOV 2025", title: "Ignition 1.0",
     description: "IoT hackathon, one of the largest campus hackathons at PESU ECC.",
-  },
-  {
-    date: "FEB 2026",
-    title: "EmbedX 2.0",
+    sort_order: 2 },
+  { id: "3", date_label: "FEB 2026", title: "EmbedX 2.0",
     description: "Embedded systems event continuing the technical series.",
-  },
-] as const;
+    sort_order: 3 },
+];
 
 const VALUES = [
   {
@@ -75,6 +72,8 @@ function ValueShape({ shape }: { shape: (typeof VALUES)[number]["shape"] }) {
 
 export default async function AboutPage() {
   const sponsors = await getActiveSponsors().catch(() => []);
+  const milestonesFromDb = await getMilestones().catch(() => TIMELINE_FALLBACK);
+  const milestones = milestonesFromDb.length > 0 ? milestonesFromDb : TIMELINE_FALLBACK;
 
   return (
     <main style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
@@ -94,21 +93,39 @@ export default async function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <blockquote
-              style={{
-                marginTop: "3.5rem",
-                borderLeft: "2px solid var(--accent)",
-                paddingLeft: "1.75rem",
-                fontSize: "clamp(1.3rem, 3vw, 1.75rem)",
-                fontStyle: "italic",
-                lineHeight: 1.5,
+            <div style={{
+              background: "var(--bg-card)",
+              borderLeft: "3px solid var(--accent)",
+              padding: "2rem 2.5rem",
+              margin: "2rem 0",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div aria-hidden style={{
+                position: "absolute", top: "-1rem", right: "1.5rem",
+                fontFamily: "var(--font-orbitron)", fontSize: "6rem",
+                color: "var(--accent)", opacity: 0.06, lineHeight: 1,
+                userSelect: "none", pointerEvents: "none",
+              }}>&quot;</div>
+              <p style={{
+                fontFamily: "var(--font-space)",
+                fontSize: "clamp(1rem, 1.8vw, 1.15rem)",
+                lineHeight: 1.75,
                 color: "var(--text-primary)",
-              }}
-            >
-              A <span style={{ color: "var(--gold)", fontStyle: "normal", fontWeight: 600 }}>future-ready community</span> where
-              technology, innovation, and teamwork converge, shaping the next generation of leaders in
-              mobility, robotics, and digital transformation.
-            </blockquote>
+                margin: 0, position: "relative", zIndex: 1,
+              }}>
+                A future-ready community where technology, innovation, and teamwork
+                converge, shaping the next generation of leaders in mobility, robotics,
+                and digital transformation.
+              </p>
+              <div style={{
+                marginTop: "1rem",
+                fontFamily: "var(--font-mono)", fontSize: "0.7rem",
+                letterSpacing: "0.15em", color: "var(--text-muted)", textTransform: "uppercase",
+              }}>
+                Team Vegavath -- Club Vision
+              </div>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -151,8 +168,8 @@ export default async function AboutPage() {
           </Reveal>
 
           <div style={{ borderLeft: "1px solid var(--border-strong)", paddingLeft: "2rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
-            {TIMELINE.map((entry, index) => (
-              <Reveal key={entry.title} delay={index * 0.08}>
+            {milestones.map((entry, index) => (
+              <Reveal key={entry.id} delay={index * 0.08}>
                 <div style={{ position: "relative" }}>
                   <span
                     aria-hidden="true"
@@ -165,8 +182,8 @@ export default async function AboutPage() {
                       background: "var(--accent)",
                     }}
                   />
-                  <time className="mono" dateTime={entry.date} style={{ fontSize: "0.75rem", letterSpacing: "0.18em", color: "var(--accent)" }}>
-                    {entry.date}
+                  <time className="mono" dateTime={entry.date_label} style={{ fontSize: "0.75rem", letterSpacing: "0.18em", color: "var(--accent)" }}>
+                    {entry.date_label}
                   </time>
                   <h3 style={{ marginTop: "0.4rem", fontSize: "1.25rem", fontWeight: 600, color: "var(--text-primary)" }}>
                     {entry.title}
@@ -197,7 +214,7 @@ export default async function AboutPage() {
                   <h3 style={{ marginTop: "1.1rem", fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>
                     {title}
                   </h3>
-                  <p style={{ marginTop: "0.6rem", fontSize: "0.9rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                  <p style={{ marginTop: "0.6rem", fontSize: "clamp(0.875rem, 1.2vw, 0.95rem)", lineHeight: 1.6, color: "var(--text-secondary)" }}>
                     {description}
                   </p>
                 </div>

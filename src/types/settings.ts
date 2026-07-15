@@ -16,7 +16,7 @@ export interface SiteSettings {
   github_url: string;
 }
 
-// FY26 recruitment domains — must stay in sync with JoinClient DOMAINS,
+// FY26 recruitment domains - must stay in sync with JoinClient DOMAINS,
 // /api/join VALID_DOMAINS, and the CHECKs in migrations/004.
 export type ApplicationDomain =
   | "Coding"
@@ -58,7 +58,7 @@ export interface Application {
   domain_interest_2?: string | null;
   domain_interest_3?: string | null;
   portfolio_url: string | null;
-  // FY26 fields (migration 004) — null on pre-FY26 rows
+  // FY26 fields (migration 004) - null on pre-FY26 rows
   mobile_number?: string | null;
   srn_prn?: string | null;
   semester?: "1" | "3" | "5" | null;
@@ -67,8 +67,13 @@ export interface Application {
   domain_experience?: string | null;
   design_portfolio_url?: string | null;
   status: ApplicationStatus;
+  // Migration 011 - null until an admin assigns a group
+  interview_group?: InterviewGroup | null;
   submitted_at: string;
 }
+
+export const INTERVIEW_GROUPS = ["A", "B", "C", "D"] as const;
+export type InterviewGroup = (typeof INTERVIEW_GROUPS)[number];
 
 export interface CreateApplicationInput {
   name: string;
