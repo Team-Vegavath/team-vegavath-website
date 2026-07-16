@@ -237,7 +237,7 @@ If you (the AI agent) encounter this folder while exploring the codebase or R2 b
 | `NEXT_PUBLIC_R2_PUBLIC_URL` | Client components   | Public base URL for R2 objects, exposed to browser |
 | `R2_PUBLIC_HOSTNAME`        | `next.config.ts`  | For`next/image` `remotePatterns`               |
 | `ADMIN_DISPLAY_NAME`        | `src/lib/auth.ts` | Optional display name for the env godfather account (S27) |
-| `NEXT_PUBLIC_MAINTENANCE_MODE` | `src/middleware.ts` | "true" rewrites all public routes to `/maintenance` (S29) |
+| `NEXT_PUBLIC_MAINTENANCE_MODE` | `src/middleware.ts` | Emergency override only (S30): normal path is the admin settings toggle (`site_settings.maintenance_mode`), read by middleware with a 60 s cache |
 
 ### 6.2 Known-stale documentation - do not follow these, do not "fix" the code to match them
 
@@ -278,7 +278,7 @@ Rebuilt across migrations 003/004/005/011 (all applied): `id` (UUID PK) · `name
 
 ### 7.6 `site_settings`
 
-Key-value store. `key` (PK) · `value` · `updated_at`. Known keys: `recruitment_open`, `maintenance_mode`, `maintenance_message`, `contact_email`, `contact_phone`, `contact_address`, `instagram_url`, `linkedin_url`, `github_url`. (Note: the S29 maintenance mode is driven by the `NEXT_PUBLIC_MAINTENANCE_MODE` env var at the Edge, not by these settings keys.)
+Key-value store. `key` (PK) · `value` · `updated_at`. Known keys: `recruitment_open`, `maintenance_mode`, `maintenance_message`, `contact_email`, `contact_phone`, `contact_address`, `instagram_url`, `linkedin_url`, `github_url`. (S30: `maintenance_mode` now drives the middleware rewrite directly - the `NEXT_PUBLIC_MAINTENANCE_MODE` env var is only an emergency override.)
 
 ### 7.7 Required indexes (from original doc, assume still applied - verify via `\di` if DB access available)
 
@@ -425,10 +425,11 @@ revamp-log entry for the named session has the full detail.
   invalidating every live session for that account.
 - Login audit log (S21) + DB-backed per-IP rate limiting, 5 fails / 15 min
   (S29).
-- Middleware (S29): matcher covers all non-static paths; token-gated public
-  pages are explicitly exempted; `NEXT_PUBLIC_MAINTENANCE_MODE=true`
-  rewrites the public site to a static `/maintenance` page while /admin and
-  /api stay reachable.
+- Middleware (S29/S30): matcher covers all non-static paths; token-gated
+  public pages are explicitly exempted; maintenance mode (admin settings
+  toggle in `site_settings`, 60 s Edge cache; `NEXT_PUBLIC_MAINTENANCE_MODE`
+  env var as emergency override) rewrites the public site to a static
+  `/maintenance` page while /admin and /api stay reachable.
 
 **Join / applications pipeline**
 - 4-step application form with up to 3 domain picks (FY26 domain set),

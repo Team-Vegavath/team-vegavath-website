@@ -77,6 +77,18 @@ export async function getActiveBootstrapSession(): Promise<BootstrapSession | nu
   return (rows[0] as BootstrapSession) ?? null;
 }
 
+export async function deleteBootstrapSession(id: string): Promise<void> {
+  // Refuse to delete an active session - must deactivate first
+  const rows = await sql`
+    SELECT is_active FROM bootstrap_sessions WHERE id = ${id}`;
+  if (!rows.length) throw new Error("Session not found");
+  if ((rows[0] as { is_active: boolean }).is_active) {
+    throw new Error("Cannot delete an active session. Deactivate it first.");
+  }
+  // ON DELETE CASCADE (migration 007) removes stalls + volunteers with it
+  await sql`DELETE FROM bootstrap_sessions WHERE id = ${id}`;
+}
+
 export async function setSessionActive(id: string, isActive: boolean): Promise<void> {
   if (isActive) {
     // single statement: activates this one, deactivates every other

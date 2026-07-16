@@ -1644,3 +1644,51 @@ API map, data model, quirks - incl. correcting the stale "mobile kart
 placeholder" advice) and added to .gitignore as an internal doc; the
 owner must run `git rm --cached Handoff.md` and `git mv agents.md
 AGENTS.md` for the case-only rename to register in git.
+
+## 15/07/2026 - Session 30: maintenance mode wired to settings toggle, legacy status tabs, bootstrap session delete
+
+**A. Maintenance mode (settings toggle now actually works).** S29's
+middleware only read the NEXT_PUBLIC_MAINTENANCE_MODE env var; the admin
+settings toggle wrote site_settings.maintenance_mode and nothing read it at
+the Edge. middleware.ts now queries site_settings directly (local neon()
+instance from @neondatabase/serverless - deliberately NOT lib/db.ts, so the
+Edge stays pinned to the HTTP driver even after the pending dev-TCP db.ts
+hand-merge). Result cached in a module-level variable for 60 s per Edge
+isolate, so a toggle flip propagates within a minute without a DB query per
+request; path checks run before the lookup so /admin, /api and /maintenance
+never pay for it. Env var kept as emergency override (DB down); on DB error
+the check fails open (site stays up). docs/push.md + architecture doc
+updated to say the toggle is the normal path.
+Note: (public)/layout.tsx also still renders its own maintenance panel from
+settings - now mostly shadowed by the middleware rewrite (only visible
+inside the 60 s cache window). Left in place as a harmless fallback.
+
+**B. Legacy status tabs.** ACCEPTED (LEGACY) and REVIEWED (LEGACY) tabs
+added after REJECTED in /admin/applications via a legacy flag on the
+existing FILTER_TABS array (no duplicated Link markup): opacity 0.5,
+0.65rem, muted underline when active. Muted mono note added below the tabs:
+use SELECTED/REJECTED for new decisions. CSV export already carries the
+active status filter (href appends ?status= at page.tsx:75) - confirmed, no
+change needed.
+
+**C. Bootstrap session delete.** deleteBootstrapSession() in
+services/bootstrap.ts refuses active sessions (deactivate first) and 404s
+unknown ids; the row DELETE cascades to stalls + volunteers via the
+migration-007 ON DELETE CASCADE FKs. New DELETE handler in
+/api/admin/bootstrap/sessions/[id] (auth + isAdmin re-check, service errors
+surface as 400 with message). BootstrapSessions.tsx shows a DELETE button
+(admin-row-action-danger) next to ACTIVATE on inactive rows only, behind a
+confirm() that spells out stalls + volunteer accounts go with it; shares the
+busyId lock with ACTIVATE (label now WORKING... while busy).
+
+**Verified:** npm run build compiled successfully (middleware compiles for
+Edge; only pre-existing Next 16 middleware->proxy deprecation warning);
+npx tsc --noEmit exit 0. Design gate clean on touched .tsx (no emoji, no
+rounded, no mx-auto); em dash grep clean on all touched files. NOT
+exercised against live DB: actual toggle flip -> rewrite, and a real
+session delete.
+
+**Needs user eyeball:** /admin/applications (legacy tabs + note),
+/admin/bootstrap (DELETE on an inactive row, confirm dialog, error path on
+an active session via direct API call), and flip the settings toggle on a
+deployed/dev instance to watch / rewrite to /maintenance within ~60 s.

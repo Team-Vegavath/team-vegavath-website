@@ -25,6 +25,29 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
     }
   }
 
+  async function handleDelete(id: string, name: string) {
+    if (
+      !confirm(
+        `Delete session "${name}"? This also deletes all stalls and volunteer accounts for this session. This cannot be undone.`
+      )
+    )
+      return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/bootstrap/sessions/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? "Delete failed");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (creating) {
     return (
       <BootstrapCreateSession
@@ -83,14 +106,23 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
                   </td>
                   <td>
                     {!s.is_active && (
-                      <button
-                        className="btn-outline"
-                        style={{ padding: "0.4rem 0.9rem", fontSize: "0.7rem", cursor: "pointer" }}
-                        disabled={busyId === s.id}
-                        onClick={() => activate(s.id)}
-                      >
-                        {busyId === s.id ? "ACTIVATING…" : "ACTIVATE"}
-                      </button>
+                      <span style={{ display: "inline-flex", gap: "0.5rem" }}>
+                        <button
+                          className="btn-outline"
+                          style={{ padding: "0.4rem 0.9rem", fontSize: "0.7rem", cursor: "pointer" }}
+                          disabled={busyId === s.id}
+                          onClick={() => activate(s.id)}
+                        >
+                          {busyId === s.id ? "WORKING…" : "ACTIVATE"}
+                        </button>
+                        <button
+                          className="admin-row-action admin-row-action-danger"
+                          disabled={busyId === s.id}
+                          onClick={() => handleDelete(s.id, s.name)}
+                        >
+                          DELETE
+                        </button>
+                      </span>
                     )}
                   </td>
                 </tr>

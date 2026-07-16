@@ -14,12 +14,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// Tab set = the S19 pipeline; legacy 'reviewed'/'accepted' rows show under ALL.
-// Group tabs (S28) filter by interview_group instead of status.
+// Tab set = the S19 pipeline. Group tabs (S28) filter by interview_group
+// instead of status. 'accepted'/'reviewed' are legacy statuses (pre-S19 rows)
+// - rendered muted so old rows stay reachable without cluttering the pipeline.
 const FILTER_TABS: {
   label: string;
   status: ApplicationStatus | null;
   group?: InterviewGroup;
+  legacy?: boolean;
 }[] = [
   { label: "ALL", status: null },
   { label: "PENDING", status: "pending" },
@@ -32,6 +34,8 @@ const FILTER_TABS: {
   })),
   { label: "SELECTED", status: "selected" },
   { label: "REJECTED", status: "rejected" },
+  { label: "ACCEPTED (LEGACY)", status: "accepted", legacy: true },
+  { label: "REVIEWED (LEGACY)", status: "reviewed", legacy: true },
 ];
 
 export default async function AdminApplicationsPage({
@@ -108,14 +112,17 @@ export default async function AdminApplicationsPage({
               href={href}
               className="heading"
               style={{
-                borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                borderBottom: active
+                  ? `2px solid ${tab.legacy ? "var(--text-muted)" : "var(--accent)"}`
+                  : "2px solid transparent",
                 marginBottom: "-1px",
                 padding: "0.65rem 1.1rem",
-                fontSize: "0.8rem",
+                fontSize: tab.legacy ? "0.65rem" : "0.8rem",
                 fontWeight: 600,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 color: active ? "var(--text-primary)" : "var(--text-muted)",
+                opacity: tab.legacy ? 0.5 : 1,
                 textDecoration: "none",
                 transition: "color 0.2s, border-color 0.2s",
                 whiteSpace: "nowrap",
@@ -126,6 +133,13 @@ export default async function AdminApplicationsPage({
           );
         })}
       </div>
+
+      <p
+        className="mono"
+        style={{ fontSize: "0.68rem", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "1.5rem" }}
+      >
+        Use SELECTED/REJECTED for new decisions. ACCEPTED and REVIEWED are legacy statuses.
+      </p>
 
       <ApplicationsTable applications={applications} />
     </>
