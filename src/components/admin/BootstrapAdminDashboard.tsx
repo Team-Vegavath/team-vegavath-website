@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import BootstrapMapSVG from "@/components/bootstrap/BootstrapMapSVG";
 import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootstrap/StallCard";
 import type {
+  BootstrapFeedbackSummary,
   BootstrapSession,
   BootstrapStall,
   BootstrapVolunteer,
@@ -28,75 +29,6 @@ function downloadCredentialsCsv(credentials: VolunteerCredential[]) {
   URL.revokeObjectURL(url);
 }
 
-const mapHintStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono), monospace",
-  fontSize: "0.65rem",
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "var(--text-muted)",
-};
-
-// Own draft state per row so typing X/Y survives the 4s poll re-render.
-function StallPositionRow({
-  stall,
-  onSave,
-}: {
-  stall: BootstrapStall;
-  onSave: (stallId: string, x: number, y: number) => Promise<boolean>;
-}) {
-  const [x, setX] = useState(stall.map_x != null ? String(stall.map_x) : "");
-  const [y, setY] = useState(stall.map_y != null ? String(stall.map_y) : "");
-  const [saved, setSaved] = useState(false);
-
-  async function save() {
-    const numX = Number(x);
-    const numY = Number(y);
-    if (!Number.isFinite(numX) || !Number.isFinite(numY)) return;
-    if (await onSave(stall.id, numX, numY)) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }
-  }
-
-  return (
-    <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end", flexWrap: "wrap" }}>
-      <div style={{ minWidth: "10rem", ...mapHintStyle, color: "var(--text-primary)" }}>
-        {stall.stall_name}
-      </div>
-      <div>
-        <div style={mapHintStyle}>Distance from left edge %</div>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          className="admin-input"
-          value={x}
-          onChange={(e) => setX(e.target.value)}
-          style={{ width: "6rem", fontSize: "0.75rem", marginTop: "0.25rem" }}
-        />
-      </div>
-      <div>
-        <div style={mapHintStyle}>Distance from top edge %</div>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          className="admin-input"
-          value={y}
-          onChange={(e) => setY(e.target.value)}
-          style={{ width: "6rem", fontSize: "0.75rem", marginTop: "0.25rem" }}
-        />
-      </div>
-      <button
-        style={{ ...bootstrapBtnStyle, width: "auto" }}
-        onClick={save}
-      >
-        {saved ? "Saved" : "Set position"}
-      </button>
-    </div>
-  );
-}
-
 export default function BootstrapAdminDashboard({
   session,
   initialStalls,
@@ -113,6 +45,13 @@ export default function BootstrapAdminDashboard({
   const [overrideStatus, setOverrideStatus] = useState<BootstrapStall["status"]>("free");
   const [overrideClaimedBy, setOverrideClaimedBy] = useState("");
   const [busy, setBusy] = useState(false);
+  // S33 pin-drop: which stall the next map click positions
+  const [editingStall, setEditingStall] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<BootstrapFeedbackSummary | null>(null);
+  // window.location only exists client-side; set after mount to avoid a
+  // hydration mismatch on the feedback URL line
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
 
   const poll = useCallback(async () => {
     try {
@@ -187,13 +126,27 @@ export default function BootstrapAdminDashboard({
     }
   }
 
-  async function saveStallPosition(stallId: string, x: number, y: number): Promise<boolean> {
-    const res = await fetch(`/api/admin/bootstrap/stalls/${stallId}/position`, {
+  // S33 pin-drop: click a stall's PLACE PIN, then click the map - optimistic
+  // local update so the pin lands instantly; the 4s poll confirms
+  async function handlePositionSet(stallId: string, x: number, y: number) {
+    await fetch(`/api/admin/bootstrap/stalls/${stallId}/position`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ map_x: x, map_y: y }),
-    }).catch(() => null);
-    return res?.ok ?? false;
+    }).catch(() => {});
+    setStalls((prev) => prev.map((s) => (s.id === stallId ? { ...s, map_x: x, map_y: y } : s)));
+    setEditingStall(null); // deselect after placing
+  }
+
+  async function handleClearPosition(stallId: string) {
+    await fetch(`/api/admin/bootstrap/stalls/${stallId}/position`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ map_x: null, map_y: null }),
+    }).catch(() => {});
+    setStalls((prev) =>
+      prev.map((s) => (s.id === stallId ? { ...s, map_x: null, map_y: null } : s))
+    );
   }
 
   async function unlock(volunteerId: string) {
@@ -246,6 +199,31 @@ export default function BootstrapAdminDashboard({
     poll();
   }
 
+  // ------------------------------------------------ S32: roles
+
+  async function setRole(volunteerId: string, role: "stall" | "lead") {
+    // optimistic - the toggle flips instantly, poll confirms
+    setVolunteers((prev) => prev.map((v) => (v.id === volunteerId ? { ...v, role } : v)));
+    await fetch(`/api/admin/bootstrap/volunteers/${volunteerId}/role`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }).catch(() => {});
+    poll();
+  }
+
+  const loadFeedback = useCallback(async () => {
+    const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/feedback`).catch(
+      () => null
+    );
+    if (res?.ok) setFeedback(await res.json());
+  }, [session.id]);
+
+  // feedback is low-churn - load once, refresh on demand (not on the 4s poll)
+  useEffect(() => {
+    loadFeedback();
+  }, [loadFeedback]);
+
   // groups stuck in the queue past 15 min - derived from polled data, no extra API
   const longWaiters = stalls.filter(
     (s) =>
@@ -291,6 +269,20 @@ export default function BootstrapAdminDashboard({
           </button>
         </div>
       </header>
+
+      {/* S33: check-in URLs are per group lead (on their own dashboards);
+          only the shared feedback URL lives in admin */}
+      <div
+        style={{
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "0.75rem",
+          color: "var(--text-secondary)",
+          marginBottom: "1.5rem",
+          wordBreak: "break-all",
+        }}
+      >
+        FEEDBACK URL: {origin ? `${origin}/bootstrap/feedback` : "/bootstrap/feedback"}
+      </div>
 
       {/* Long-wait alerts - refresh with the 4s poll */}
       {longWaiters.map((s) => {
@@ -411,6 +403,7 @@ export default function BootstrapAdminDashboard({
               <th>Volunteer</th>
               <th>Username</th>
               <th>Status</th>
+              <th>Role</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -438,6 +431,31 @@ export default function BootstrapAdminDashboard({
                   >
                     {v.is_active ? "ACTIVE" : "LOGGED OUT"}
                   </span>
+                </td>
+                <td>
+                  {/* stall = simple occupied/free toggle UI, lead = full dashboard */}
+                  <div style={{ display: "flex", gap: "4px" }}>
+                    {(["stall", "lead"] as const).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRole(v.id, r)}
+                        aria-pressed={v.role === r}
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: "0.65rem",
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          padding: "4px 10px",
+                          background: v.role === r ? "var(--accent)" : "var(--bg-base)",
+                          color: v.role === r ? "var(--bg-base)" : "var(--text-muted)",
+                          border: "1px solid var(--border)",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </td>
                 <td>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -503,6 +521,107 @@ export default function BootstrapAdminDashboard({
         </table>
       </section>
 
+      {/* Feedback summary (S32) - refresh on demand, not on the 4s poll */}
+      <section style={{ marginTop: "2.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.75rem" }}>
+          <h2
+            style={{
+              fontFamily: "var(--font-chakra), sans-serif",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--text-primary)",
+              margin: 0,
+            }}
+          >
+            Feedback
+          </h2>
+          <span
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.68rem",
+              color: "var(--text-muted)",
+              letterSpacing: "0.06em",
+            }}
+          >
+            {feedback ? `${feedback.total} RESPONSES` : "…"}
+          </span>
+          <button
+            className="btn-outline"
+            style={{ padding: "0.4rem 1rem", fontSize: "0.68rem", cursor: "pointer" }}
+            onClick={loadFeedback}
+          >
+            REFRESH
+          </button>
+        </div>
+
+        {feedback && feedback.perStall.length > 0 && (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Stall</th>
+                  <th>Avg rating</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feedback.perStall.map((row) => (
+                  <tr key={row.stall_name}>
+                    <td className="admin-td-primary">{row.stall_name}</td>
+                    <td className="admin-cell-mono">{row.avg_rating.toFixed(2)} / 5</td>
+                    <td className="admin-cell-mono">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {feedback && feedback.recentComments.length > 0 && (
+          <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {feedback.recentComments.map((c, i) => (
+              <div
+                key={`${c.submitted_at}-${i}`}
+                style={{
+                  border: "1px solid var(--border)",
+                  padding: "10px 14px",
+                  fontSize: "0.85rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "0.68rem",
+                    color: "var(--text-muted)",
+                    marginRight: "0.6rem",
+                  }}
+                >
+                  {c.rating != null ? `${c.rating}/5` : "—"}
+                  {c.stall_name ? ` · ${c.stall_name}` : ""}
+                </span>
+                {c.comment}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {feedback && feedback.total === 0 && (
+          <p
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.75rem",
+              color: "var(--text-muted)",
+            }}
+          >
+            No feedback yet. Visitors submit at /bootstrap/feedback.
+          </p>
+        )}
+      </section>
+
       {/* Map setup - native <details> for the collapsible, no toggle state */}
       {session.is_active && (
         <details style={{ marginTop: "2.5rem" }}>
@@ -528,14 +647,82 @@ export default function BootstrapAdminDashboard({
               maxWidth: "40rem",
             }}
           >
-            {/* live preview of the hardcoded SVG map so admin can eyeball
-                percentages while setting positions */}
+            {/* S33 pin-drop: pick a stall below, then click the map to place
+                its pin - no more typing X/Y percentages by trial and error */}
             <div style={{ position: "relative", height: "300px", overflow: "hidden" }}>
-              <BootstrapMapSVG stalls={stalls} onClose={() => {}} inline />
+              <BootstrapMapSVG
+                stalls={stalls}
+                onClose={() => {}}
+                inline
+                editingStallId={editingStall}
+                onPositionSet={handlePositionSet}
+              />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {stalls.map((stall) => (
-                <StallPositionRow key={stall.id} stall={stall} onSave={saveStallPosition} />
+            <div>
+              {stalls.map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                    padding: "8px 0",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
+                  <button
+                    onClick={() => setEditingStall(editingStall === s.id ? null : s.id)}
+                    aria-pressed={editingStall === s.id}
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.1em",
+                      padding: "4px 12px",
+                      background: editingStall === s.id ? "var(--accent)" : "var(--bg-base)",
+                      color: editingStall === s.id ? "var(--bg-base)" : "var(--text-muted)",
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {editingStall === s.id ? "PLACING..." : "PLACE PIN"}
+                  </button>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-chakra)",
+                      fontSize: "0.85rem",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {s.stall_name}
+                  </span>
+                  {s.map_x != null && (
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.7rem",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      ({s.map_x}%, {s.map_y}%)
+                    </span>
+                  )}
+                  {s.map_x != null && (
+                    <button
+                      onClick={() => handleClearPosition(s.id)}
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "0.65rem",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      CLEAR
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>

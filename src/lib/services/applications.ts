@@ -71,6 +71,28 @@ export async function setInterviewGroup(
     UPDATE applications SET interview_group = ${group} WHERE id = ${id}`;
 }
 
+// Round-robin unassigned interview applicants into panels A..(panelCount).
+// Oldest submissions first so panel A doesn't skew recent. Returns how many
+// rows were assigned.
+export async function autoAssignInterviewGroups(panelCount: number): Promise<number> {
+  const panels = ["A", "B", "C", "D"].slice(0, panelCount);
+  const rows = await sql`
+    SELECT id FROM applications
+    WHERE status = 'interview' AND interview_group IS NULL
+    ORDER BY submitted_at ASC`;
+  if (!rows.length) return 0;
+  const idArr = (rows as { id: string }[]).map((r) => r.id);
+  const grpArr = idArr.map((_, i) => panels[i % panels.length]);
+  // unnest pairs ids with groups so the whole assignment is ONE statement
+  await sql`
+    UPDATE applications SET interview_group = data.grp
+    FROM (
+      SELECT unnest(${idArr}::uuid[]) AS id, unnest(${grpArr}::text[]) AS grp
+    ) AS data
+    WHERE applications.id = data.id`;
+  return idArr.length;
+}
+
 export async function bulkSetStatus(
   ids: string[],
   status: ApplicationStatus

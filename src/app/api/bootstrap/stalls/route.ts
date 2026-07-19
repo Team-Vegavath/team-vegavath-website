@@ -19,6 +19,8 @@ export async function GET() {
       stalls,
       session: { map_image_url: session?.map_image_url ?? null },
       mySuggestion: volunteer.suggested_stall_name ?? null,
+      volunteerRole: volunteer.role ?? "stall", // S32 - picks the dashboard view
+      checkinToken: volunteer.checkin_token ?? null, // S33 - lead's stable QR token
     });
   } catch (error) {
     console.error("[GET /api/bootstrap/stalls]", error);

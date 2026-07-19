@@ -48,11 +48,19 @@ function domainList(app: Application): string {
 
 interface ApplicationsTableProps {
   applications: Application[];
+  // S32: page sets this on the plain INTERVIEW tab (no group filter) so the
+  // panel auto-assign action appears exactly where it makes sense.
+  showPanelAssign?: boolean;
 }
 
-export default function ApplicationsTable({ applications }: ApplicationsTableProps) {
+export default function ApplicationsTable({
+  applications,
+  showPanelAssign = false,
+}: ApplicationsTableProps) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [panelCount, setPanelCount] = useState<number | null>(null);
+  const [assigning, setAssigning] = useState(false);
   // Local status overrides so a PATCH updates the dot without a full refetch.
   const [statuses, setStatuses] = useState<Record<string, ApplicationStatus>>({});
   // Same optimistic pattern for interview groups.
@@ -116,6 +124,24 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
     }
   }
 
+  async function handleAutoAssign() {
+    if (!panelCount) return;
+    setAssigning(true);
+    try {
+      const res = await fetch("/api/admin/applications/auto-assign-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ panel_count: panelCount }),
+      });
+      if (!res.ok) throw new Error("Auto-assign failed");
+      router.refresh();
+    } catch {
+      alert("Auto-assign failed. Please retry.");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   async function changeStatus(id: string, status: ApplicationStatus) {
     setUpdatingId(id);
     try {
@@ -133,8 +159,83 @@ export default function ApplicationsTable({ applications }: ApplicationsTablePro
     }
   }
 
+  const hasUnassignedInterviewees = applications.some(
+    (app) => statusOf(app) === "interview" && groupOf(app) === null
+  );
+
   return (
     <section className="admin-table-wrap">
+      {showPanelAssign && hasUnassignedInterviewees && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            padding: "12px 0",
+            marginBottom: "1rem",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.68rem",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+            }}
+          >
+            Panels:
+          </span>
+          {/* segmented tiles - same treatment as the Bootstrap max-occupancy picker */}
+          <div style={{ display: "flex" }}>
+            {([1, 2, 3, 4] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPanelCount(panelCount === n ? null : n)}
+                aria-pressed={panelCount === n}
+                style={{
+                  minWidth: "3.2rem",
+                  padding: "0.5rem 0.6rem",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.75rem",
+                  cursor: "pointer",
+                  background: panelCount === n ? "var(--accent)" : "transparent",
+                  color: panelCount === n ? "var(--bg-base)" : "var(--text-primary)",
+                  border: "1px solid var(--border)",
+                  borderLeft: n === 1 ? "1px solid var(--border)" : "none",
+                }}
+              >
+                {n === 1 ? "A" : `A–${["", "B", "C", "D"][n - 1]}`}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleAutoAssign()}
+            disabled={!panelCount || assigning}
+            style={{
+              background: panelCount ? "var(--accent)" : "var(--bg-base)",
+              border: "1px solid var(--border)",
+              color: panelCount ? "var(--bg-base)" : "var(--text-muted)",
+              fontFamily: "var(--font-chakra)",
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              padding: "0.5rem 1.25rem",
+              cursor: assigning ? "wait" : panelCount ? "pointer" : "default",
+            }}
+          >
+            {assigning ? "ASSIGNING..." : "AUTO-ASSIGN"}
+          </button>
+          <span
+            style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem", color: "var(--text-muted)" }}
+          >
+            Round-robins interviewees without a panel, oldest first.
+          </span>
+        </div>
+      )}
       <table className="admin-table">
         <thead>
           <tr>

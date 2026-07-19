@@ -10,14 +10,15 @@ const EXPECTED_HEADER = [
   "domain",
   "quote",
   "linkedin_url",
+  "github_url",
   "display_order",
 ];
 
 const TEMPLATE_CSV =
-  "name,role,tier,domain,quote,linkedin_url,display_order\n" +
+  "name,role,tier,domain,quote,linkedin_url,github_url,display_order\n" +
   // "Programming" per the team_members CHECK constraint — "Coding" is only
   // valid for the applications table.
-  "Example Name,Member,crew,Programming,,https://linkedin.com/in/example,0";
+  "Example Name,Member,crew,Programming,,https://linkedin.com/in/example,https://github.com/example,0";
 
 type Status = "idle" | "previewing" | "importing" | "done" | "error";
 
@@ -217,7 +218,7 @@ export default function BulkImportTeam() {
                 letterSpacing: "0.08em",
               }}
             >
-              name,role,tier,domain,quote,linkedin_url,display_order
+              name,role,tier,domain,quote,linkedin_url,github_url,display_order
             </span>
           </div>
           <div style={{ marginTop: "0.9rem", display: "flex", gap: "1.5rem", alignItems: "center" }}>

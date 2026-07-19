@@ -15,6 +15,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
+    // null/null removes the pin (S33 pin-drop CLEAR)
+    if (body?.map_x === null && body?.map_y === null) {
+      await setStallMapPosition(id, null, null);
+      return NextResponse.json({ ok: true });
+    }
     const x = Number(body?.map_x);
     const y = Number(body?.map_y);
     if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 100 || y < 0 || y > 100) {

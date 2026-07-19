@@ -16,22 +16,48 @@ interface Props {
   // of a full-viewport takeover - position:fixed escapes any wrapper, so the
   // preview mode has to swap to absolute and drop the header
   inline?: boolean;
+  // S33 pin-drop mode: while editingStallId is set, a click on the map
+  // reports the position (as % of the SVG box) instead of doing nothing
+  editingStallId?: string | null;
+  onPositionSet?: (stallId: string, x: number, y: number) => void;
 }
 
-// Geometry traced from bootstrap_references/googlemaps.png + googleearth.png
-// (S27). Campus drawn with its NE-SW axis nearly horizontal so the corridor
-// (where all stalls sit) runs left-to-right; real north points up-right.
-// Labels rotate(-10) to follow the drawn diagonal - the stall position data
-// is nearly flat in y, so a steeper tilt would contradict the dots.
-export default function BootstrapMapSVG({ stalls, onClose, inline = false }: Props) {
-  const W = 1000, H = 700;
+// Geometry measured from bootstrap_references/college1.png (S31): the image
+// is pre-rotated so the Bootstrap road runs horizontal, and the viewBox
+// matches its 1024x419 pixel size exactly - stall map_x/map_y percentages
+// (extracted from the same image's annotation blobs) land on the drawing
+// with zero conversion error. Only the 6 ground-truthed structures are drawn.
+export default function BootstrapMapSVG({
+  stalls,
+  onClose,
+  inline = false,
+  editingStallId = null,
+  onPositionSet,
+}: Props) {
+  const W = 1024, H = 419;
+
+  const editingStall = editingStallId
+    ? stalls.find((s) => s.id === editingStallId) ?? null
+    : null;
+
+  // % of the rendered element - the svg's height is intrinsic (width 100%,
+  // viewBox ratio), so element box === viewBox and no letterbox offset creeps in
+  function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
+    if (!editingStallId || !onPositionSet) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = parseFloat((((e.clientX - rect.left) / rect.width) * 100).toFixed(1));
+    const y = parseFloat((((e.clientY - rect.top) / rect.height) * 100).toFixed(1));
+    onPositionSet(editingStallId, x, y);
+  }
 
   const label = (x: number, y: number, text: string, size = 10, fill = "#444") => (
     <text x={x} y={y} fill={fill} fontFamily="var(--font-mono)" fontSize={size}
-      textAnchor="middle" letterSpacing="2" transform={`rotate(-10 ${x} ${y})`}>
+      textAnchor="middle" letterSpacing="2">
       {text}
     </text>
   );
+
+  const positioned = stalls.filter(s => s.map_x != null && s.map_y != null);
 
   return (
     <div style={{
@@ -56,101 +82,83 @@ export default function BootstrapMapSVG({ stalls, onClose, inline = false }: Pro
         </div>
       )}
 
+      {/* Pin-drop banner - only while a stall is being placed */}
+      {editingStall && (
+        <div
+          style={{
+            padding: "8px 20px",
+            background: `${BS.accent}1f`,
+            borderBottom: `1px solid ${BS.accent}`,
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "11px",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: BS.accent,
+            flexShrink: 0,
+          }}
+        >
+          Click to place: {editingStall.stall_name}
+        </div>
+      )}
+
       {/* Map - scrollable on very small screens */}
       <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          style={{ width: "100%", minWidth: "320px", display: "block" }}
+          style={{
+            width: "100%",
+            minWidth: "320px",
+            display: "block",
+            cursor: editingStallId ? "crosshair" : "default",
+          }}
+          onClick={handleSvgClick}
           xmlns="http://www.w3.org/2000/svg"
         >
-          <defs>
-            {/* subtle rooftop solar-panel grid, angled with the campus */}
-            <pattern id="solar" width="26" height="20" patternUnits="userSpaceOnUse"
-              patternTransform="rotate(-10)">
-              <rect x="1" y="1" width="22" height="16" fill="none"
-                stroke="#1e2a1e" strokeWidth="0.6" opacity="0.4" />
-            </pattern>
-          </defs>
-
           {/* Background */}
           <rect width={W} height={H} fill="#0d0d0d" />
 
-          {/* MECHANICAL BLOCK - large solar-roofed block, left ~35% of campus */}
-          <polygon points="110,320 430,265 465,540 145,595"
+          {/* PARKING APRON - west open ground, go-kart showcase lives here */}
+          <polygon points="60,45 185,48 228,200 292,330 130,340 88,175"
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <polygon points="110,320 430,265 465,540 145,595" fill="url(#solar)" />
-          {label(287, 440, "MECHANICAL BLOCK")}
+          {label(165, 195, "PARKING", 9)}
 
-          {/* MAIN ACADEMIC BLOCK - spine along the corridor + three wings
-              pointing away from it (rough E shape from above) */}
-          <polygon points="439,236 854,169 865,238 450,305"
+          {/* CLASSROOM WING 1 (Mech sessions) - west solar-roofed wing */}
+          <polygon points="428,65 588,58 592,198 432,203"
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <polygon points="415,88 504,74 528,222 439,236"
-            fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <polygon points="578,62 667,48 691,196 602,210"
-            fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <polygon points="741,35 830,21 854,169 765,183"
-            fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <polygon points="439,236 854,169 865,238 450,305" fill="url(#solar)" />
-          <polygon points="415,88 504,74 528,222 439,236" fill="url(#solar)" />
-          <polygon points="578,62 667,48 691,196 602,210" fill="url(#solar)" />
-          <polygon points="741,35 830,21 854,169 765,183" fill="url(#solar)" />
-          {label(650, 243, "MAIN ACADEMIC BLOCK")}
+          {label(510, 135, "CLASSROOM", 9)}
 
-          {/* AMPHITHEATER - curved band on the main block's NE corner,
-              opening toward the campus interior (SW) */}
-          <path d="M 820,20 A 160 160 0 0 1 980,180 L 920,180 A 100 100 0 0 0 820,80 Z"
+          {/* CLASSROOM WING 2 (Main sessions) - east solar-roofed wing */}
+          <polygon points="592,32 744,26 748,138 596,144"
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          <text x="908" y="93" fill="#444" fontFamily="var(--font-mono)" fontSize="9"
-            textAnchor="middle" letterSpacing="2" transform="rotate(40 908 93)">
-            AMPH
-          </text>
+          {label(668, 90, "CLASSROOM", 9)}
 
-          {/* PESU LIBRARY - standalone, in the open area between the blocks */}
-          <polygon points="505,435 595,420 610,485 520,500"
+          {/* CLUB ROOM - section of the mechanical block, engines stall */}
+          <polygon points="515,325 610,318 615,402 520,408"
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          {label(557, 468, "LIBRARY", 9, "#555")}
+          {label(565, 368, "CLUB ROOM", 8)}
 
-          {/* KUKA INDIA - small separate building past the corridor's SE end */}
-          <polygon points="790,400 880,385 895,455 805,470"
+          {/* AVIONS - separate building past the corridor's east end
+              (S32: was mislabeled KUKA; the KUKA stall sits in the corridor) */}
+          <polygon points="858,272 1015,247 1022,355 868,378"
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
-          {label(843, 437, "KUKA", 9)}
+          {label(940, 318, "AVIONS", 9)}
 
-          {/* BOOTSTRAP ZONE - the open corridor between the two blocks */}
-          <polygon points="300,340 740,270 790,390 350,460"
-            fill="rgba(239,93,8,0.07)"
-            stroke="rgba(239,93,8,0.25)"
+          {/* BOOTSTRAP ZONE - the road corridor between the blocks; the notch
+              at x 855-995 skirts the main block's protruding east end */}
+          <polygon points="250,220 590,205 625,150 855,125 865,178 985,170 995,118 1024,114 1024,240 1015,247 858,272 840,242 395,268 255,335"
+            fill="rgba(239,93,8,0.08)"
+            stroke="rgba(239,93,8,0.3)"
             strokeWidth="1.5"
             strokeDasharray="6,4"
           />
-          <text x="430" y="325" fill="rgba(239,93,8,0.4)"
+          <text x="360" y="248" fill="rgba(239,93,8,0.4)"
             fontFamily="var(--font-mono)" fontSize="11"
-            textAnchor="middle" letterSpacing="3"
-            transform="rotate(-10 430 325)">
+            textAnchor="middle" letterSpacing="3">
             BOOTSTRAP ZONE
           </text>
 
-          {/* PESU ECC Main Rd along the south edge */}
-          <line x1="30" y1="650" x2="970" y2="612" stroke="#222"
-            strokeWidth="1.5" strokeDasharray="10,8" />
-          <text x="500" y="678" fill="#333" fontFamily="var(--font-mono)"
-            fontSize="9" textAnchor="middle" letterSpacing="2">
-            PESU ECC MAIN RD
-          </text>
-
-          {/* Compass - real north points up-right of the drawn campus */}
-          <g transform="translate(70, 70)">
-            <circle cx="0" cy="0" r="18" fill="#161616" stroke="#2a2a2a" strokeWidth="1" />
-            <g transform="rotate(25)">
-              <line x1="0" y1="6" x2="0" y2="-8" stroke="#555" strokeWidth="1" />
-              <path d="M -3,-5 L 0,-11 L 3,-5 Z" fill="#555" />
-            </g>
-            <text x="0" y="32" fill="#555" fontFamily="var(--font-mono)"
-              fontSize="9" textAnchor="middle">N</text>
-          </g>
-
           {/* === STALL DOTS === */}
-          {stalls.filter(s => s.map_x != null && s.map_y != null).map(s => {
+          {positioned.map((s, i) => {
             const cx = (s.map_x! / 100) * W;
             const cy = (s.map_y! / 100) * H;
             const color = s.status === "free" ? BS.free
@@ -166,8 +174,9 @@ export default function BootstrapMapSVG({ stalls, onClose, inline = false }: Pro
                   fill={color}
                   stroke="rgba(255,255,255,0.7)" strokeWidth="1.5"
                 />
-                {/* Label */}
-                <text x={cx} y={cy + 22}
+                {/* Label - alternate above/below so the tightly packed
+                    corridor stalls don't overwrite each other */}
+                <text x={cx} y={i % 2 === 0 ? cy + 22 : cy - 15}
                   fill={BS.text} fontFamily="var(--font-mono)"
                   fontSize="9" textAnchor="middle"
                   style={{ textShadow: "0 1px 3px #000" }}>

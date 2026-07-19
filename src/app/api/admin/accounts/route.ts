@@ -31,6 +31,12 @@ export async function DELETE(req: NextRequest) {
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!session.user.isGodfather) {
+    return NextResponse.json(
+      { error: "Only the godfather can delete accounts" },
+      { status: 403 }
+    );
+  }
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {

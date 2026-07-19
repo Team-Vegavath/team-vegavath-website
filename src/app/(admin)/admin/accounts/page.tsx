@@ -142,20 +142,21 @@ export default async function AdminAccountsPage() {
                   <td style={{ whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
                       {isGodfather && <ResetPasswordButton accountId={account.id} />}
-                      {accounts.length > 1 ? (
-                        <InlineDelete
-                          endpoint={`/api/admin/accounts?id=${account.id}`}
-                          confirmMessage={`Delete admin account "${account.display_name}"? This cannot be undone.`}
-                        />
-                      ) : (
-                        <span
-                          className="mono"
-                          title="Cannot delete last admin"
-                          style={{ fontSize: "0.7rem", color: "var(--text-muted)", cursor: "not-allowed" }}
-                        >
-                          DELETE
-                        </span>
-                      )}
+                      {isGodfather &&
+                        (accounts.length > 1 ? (
+                          <InlineDelete
+                            endpoint={`/api/admin/accounts?id=${account.id}`}
+                            confirmMessage={`Delete admin account "${account.display_name}"? This cannot be undone.`}
+                          />
+                        ) : (
+                          <span
+                            className="mono"
+                            title="Cannot delete last admin"
+                            style={{ fontSize: "0.7rem", color: "var(--text-muted)", cursor: "not-allowed" }}
+                          >
+                            DELETE
+                          </span>
+                        ))}
                     </div>
                   </td>
                 </tr>

@@ -51,6 +51,7 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
   if (creating) {
     return (
       <BootstrapCreateSession
+        sessions={sessions}
         onDone={() => {
           setCreating(false);
           router.refresh();

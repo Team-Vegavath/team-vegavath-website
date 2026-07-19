@@ -23,6 +23,7 @@ const EXPECTED_HEADER = [
   "domain",
   "quote",
   "linkedin_url",
+  "github_url",
   "display_order",
 ] as const;
 
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest) {
       domain = "",
       quote = "",
       linkedin_url = "",
+      github_url = "",
       display_order_raw = "",
     ] = rows[i] ?? [];
     const rowNum = i + 1; // 1-indexed for user-facing messages
@@ -153,6 +155,7 @@ export async function POST(req: NextRequest) {
       domain: domain ? (domain as Domain) : null,
       quote: quote || null,
       linkedin_url: linkedin_url || null,
+      github_url: github_url || null,
       photo_url: null,
       display_order: display_order_raw ? parseInt(display_order_raw, 10) || 0 : 0,
       is_active: true,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import BulkImportTeam from "@/components/admin/BulkImportTeam";
+import BulkTeamPhotoUpload from "@/components/admin/BulkTeamPhotoUpload";
 import InlineDelete from "@/components/admin/InlineDelete";
 import MemberForm from "@/components/admin/MemberForm";
 import QuickPhotoUpload from "@/components/admin/QuickPhotoUpload";
@@ -75,6 +76,10 @@ export default async function AdminTeamPage({
           </Link>
         </div>
       </header>
+
+      <BulkTeamPhotoUpload
+        members={members.map((m) => ({ id: m.id, name: m.name, photo_url: m.photo_url }))}
+      />
 
       <section className="admin-table-wrap">
         <table className="admin-table">

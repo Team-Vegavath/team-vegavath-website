@@ -51,6 +51,23 @@ function LinkedInLink({ member }: { member: TeamMember }) {
   );
 }
 
+function GitHubLink({ member }: { member: TeamMember }) {
+  if (!member.github_url) return null;
+  return (
+    <a
+      href={member.github_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${member.name} on GitHub`}
+      style={{ color: "var(--text-muted)", display: "inline-flex" }}
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+      </svg>
+    </a>
+  );
+}
+
 function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean }) {
   return (
     <div style={{ padding: compact ? "1rem" : "1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
@@ -78,16 +95,19 @@ function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean
       ) : null}
       <div style={{ marginTop: "auto", paddingTop: "0.6rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
         {member.domain ? <span className="label-tech">{member.domain}</span> : <span />}
-        <LinkedInLink member={member} />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.75rem" }}>
+          <GitHubLink member={member} />
+          <LinkedInLink member={member} />
+        </span>
       </div>
     </div>
   );
 }
 
-function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+function SectionHeading({ title, subtitle, muted }: { title: string; subtitle: string; muted?: boolean }) {
   return (
     <div style={{ marginBottom: "2rem" }}>
-      <h2 className="heading" style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)" }}>
+      <h2 className="heading" style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-primary)", ...(muted ? { opacity: 0.6 } : {}) }}>
         {title}
       </h2>
       <p style={{ marginTop: "0.4rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>{subtitle}</p>
@@ -155,7 +175,7 @@ export default async function CrewPage() {
 
         {legacyMembers.length > 0 ? (
           <section>
-            <SectionHeading title="Legacy" subtitle="The seniors who built the foundation" />
+            <SectionHeading title="Legacy" subtitle="The seniors and past members who built the foundation." muted />
             <div className="crew-grid">
               {legacyMembers.map((member) => (
                 <article key={member.id} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>

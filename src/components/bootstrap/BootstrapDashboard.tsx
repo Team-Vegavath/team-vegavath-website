@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BootstrapStall } from "@/lib/services/bootstrap";
 import BootstrapMapSVG from "./BootstrapMapSVG";
 import StallCard, { BS, StallGrid, type VolunteerStallAction } from "./StallCard";
+import StallVolunteerView from "./StallVolunteerView";
 
 const POLL_MS = 4000;
 const TOP_BAR_H = 64;
@@ -12,12 +13,22 @@ const TOP_BAR_H = 64;
 export default function BootstrapDashboard({
   displayName,
   username,
+  initialRole = "stall",
 }: {
   displayName: string;
   username: string;
+  initialRole?: "stall" | "lead";
 }) {
   const [stalls, setStalls] = useState<BootstrapStall[]>([]);
   const [mySuggestion, setMySuggestion] = useState<string | null>(null);
+  // server-rendered role avoids flashing the wrong view until the first poll;
+  // the poll keeps it live so an admin role flip lands within 4s
+  const [volunteerRole, setVolunteerRole] = useState<"stall" | "lead">(initialRole);
+  // S33 - the lead's stable QR check-in token (rides the poll payload);
+  // origin is set after mount because window doesn't exist during SSR
+  const [checkinToken, setCheckinToken] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
   const [showMap, setShowMap] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -47,6 +58,8 @@ export default function BootstrapDashboard({
       const newStalls = data.stalls as BootstrapStall[];
       setStalls(newStalls);
       setMySuggestion(data.mySuggestion ?? null);
+      setVolunteerRole(data.volunteerRole ?? "stall");
+      setCheckinToken(data.checkinToken ?? null);
       setLastUpdated(Date.now());
       failCount.current = 0;
       setConnectionIssue(false);
@@ -87,9 +100,11 @@ export default function BootstrapDashboard({
           .map((s) => ({
             id: s.id,
             name: s.stall_name,
+            // scale % deltas by the map's pixel dimensions (1024x419) so
+            // distance is isotropic - raw % would overweight the y axis
             dist: Math.sqrt(
-              Math.pow(s.map_x! - myQueuedStall.map_x!, 2) +
-                Math.pow(s.map_y! - myQueuedStall.map_y!, 2)
+              Math.pow((s.map_x! - myQueuedStall.map_x!) * (1024 / 100), 2) +
+                Math.pow((s.map_y! - myQueuedStall.map_y!) * (419 / 100), 2)
             ),
           }))
           .sort((a, b) => a.dist - b.dist);
@@ -168,6 +183,22 @@ export default function BootstrapDashboard({
   }
 
   const secondsAgo = lastUpdated ? Math.max(0, Math.round((now - lastUpdated) / 1000)) : null;
+
+  // S32 role split - stall volunteers get the simple occupied/free toggle:
+  // no MAP button, no queue, no freed/redirect notifications (lead-only).
+  if (volunteerRole === "stall") {
+    return (
+      <StallVolunteerView
+        displayName={displayName}
+        username={username}
+        stalls={stalls}
+        connectionIssue={connectionIssue}
+        liveLabel={secondsAgo !== null ? `LIVE · ${secondsAgo}s ago` : "CONNECTING…"}
+        onAction={(stallId, action) => void sendAction(stallId, action)}
+        onSignOut={() => void signOut()}
+      />
+    );
+  }
 
   return (
     <div style={{ minHeight: "100svh", background: BS.bg, color: BS.text }}>
@@ -290,6 +321,54 @@ export default function BootstrapDashboard({
       )}
 
       <main style={{ maxWidth: "56rem", margin: "0 auto", padding: "16px 16px 48px" }}>
+        {/* S33 - each group lead carries their own check-in link; the token is
+            stable (migration 015), so a printed/QR'd URL survives re-logins */}
+        {checkinToken && (
+          <div
+            style={{
+              background: BS.surface,
+              border: `1px solid ${BS.border}`,
+              borderRadius: "8px",
+              padding: "16px",
+              marginBottom: "16px",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "11px",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: BS.muted,
+                marginBottom: "8px",
+              }}
+            >
+              Your group check-in link
+            </div>
+            <code
+              style={{
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "13px",
+                color: BS.text,
+                wordBreak: "break-all",
+                userSelect: "all",
+              }}
+            >
+              {`${origin}/bootstrap/checkin/${checkinToken}`}
+            </code>
+            <div
+              style={{
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "10px",
+                color: BS.muted,
+                marginTop: "8px",
+              }}
+            >
+              Show this URL as a QR code for students to scan.
+            </div>
+          </div>
+        )}
+
         {freedNotifications.map((n) => (
           <div
             key={n.id}

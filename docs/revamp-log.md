@@ -1692,3 +1692,328 @@ session delete.
 /admin/bootstrap (DELETE on an inactive row, confirm dialog, error path on
 an active session via direct API call), and flip the settings toggle on a
 deployed/dev instance to watch / rewrite to /maintenance within ~60 s.
+
+## 19/07/2026 - Session 31: crew GitHub + Core '26, godfather-only delete, campus map redraw, bulk photo upload
+
+**A. Migration 013 (`013_github_url_legacy_tier.sql`).** Adds
+`team_members.github_url TEXT` and rebuilds the tier CHECK to
+('core','crew','legacy','faculty'). NOT yet applied to Neon - user applies
+it manually, then runs the separately provided s31_data_migration.sql.
+Verified before writing: github_url did NOT exist (fresh add);
+team_members.name has NO UNIQUE constraint (only events.slug is UNIQUE) -
+data SQL using ON CONFLICT (name) would fail; createMembersBulk already
+dedupes by pre-checking names for the same reason.
+
+**B. github_url end to end.** TeamMember type + CreateMemberInput gain
+`github_url: string | null`. services/team.ts: INSERT (createMember),
+bulk INSERT (createMembersBulk, 9->10 params per row), UPDATE (COALESCE
+like linkedin_url); SELECTs use * so no change. MemberForm: GITHUB URL
+field after LinkedIn (admin-input style, placeholder
+https://github.com/username), included in payload + edit-page initialData.
+BulkImportTeam + /api/admin/import/team: header is now
+name,role,tier,domain,quote,linkedin_url,github_url,display_order (client
+preview and server parser kept in sync - both validate the exact header),
+template CSV updated, blank -> null.
+
+**C. Crew page.** Legacy tier section already existed (001 schema always
+allowed 'legacy'); heading renamed Legacy -> "Core '26" with opacity 0.6
+on the h2 (muted prop on SectionHeading), cards unchanged, section still
+skipped when empty. New GitHubLink icon (16px octocat SVG) renders left of
+LinkedInLink in every card's footer, only when github_url is set - unlike
+LinkedIn there is no club-org fallback URL.
+
+**D. Godfather-only account deletion.** DELETE /api/admin/accounts now
+403s non-godfather admins ("Only the godfather can delete accounts") on
+top of the isAdmin check; the accounts page hides the InlineDelete /
+disabled-DELETE cell behind isGodfather so plain admins no longer see it.
+
+**E. Campus map redrawn from college1.png ground truth.**
+Blob-centroid extraction (Pillow/numpy/scipy in a throwaway scratchpad
+venv - nothing installed in the project) over the annotated satellite
+image gave stall positions (map_x%, map_y%): red go-kart (15.7,30.9),
+orange engines/club room (54.8,83.9), white sponsor 1 (50.4,59.7) +
+sponsor 2 (82.1,51.4) (two genuine paint blobs confirmed by crop
+inspection - rooftops/map-pins rejected via size+compactness filter),
+green classroom mech (48.1,25.2) / classroom main (63.0,18.2) / KUKA
+(77.6,69.2), bikes (71.3,39.0) (blob is magenta - the prompt's pink mask
+missed it, b>190; re-extracted with r>200,g<180,b>200), yellow go-kart
+parking/lawnmower (61.4,52.9), blue maruti (66.4,50.4) + lancer
+(75.7,49.0), brown tyre (70.9,49.5). DEFAULT_STALL_POSITIONS in
+services/bootstrap.ts replaced with these; speculative bmw/mahindra/avions
+keys dropped (not ground-truthed - unmatched stalls fall back to admin
+map-setup placement). Buildings traced via 50px grid overlay + iterated
+validation overlay (college1_grid.png / college1_validation.png in
+bootstrap_references/, gitignored): overlay confirmed aligned after one
+iteration (parking apron right edge pulled off the tree canopy; road
+corridor given a notch at x 855-995 to skirt the main block's protruding
+east end). BootstrapMapSVG.tsx rewritten: viewBox 0 0 1024 419 (exact
+image dims so % positions land with zero conversion error), only the 6
+measured structures (parking apron, corridor, classroom x2, club room,
+KUKA), corridor in the spec'd dashed accent style, all fake buildings /
+amphitheater / compass / solar pattern deleted. Stall labels now alternate
+above/below dots (corridor stalls are ~45px apart and were overlapping).
+Legend kept as-is incl. its pre-existing 50% border-radius status dots
+(they mirror the circular SVG dots; S27 pattern). E4: proximity distance
+in BootstrapDashboard 5b now scales % deltas by 1024/100 and 419/100 so
+distance is isotropic. E5: bootstrap_references/ was already gitignored -
+no change.
+
+**F. Bulk team photo upload.** New BulkTeamPhotoUpload.tsx on /admin/team
+above the table: multi-select images, auto-match filename -> member (slug
+exact, then all name parts, then first name), per-row preview + manual
+reassign/skip select, uploads via existing /api/admin/upload with
+timestamped keys (R2 immutable-cache rule) then PATCHes photo_url via
+/api/admin/team. Deviations from the provided spec code: success message
+moved outside the matches-branch (setMatches([]) unmounts that branch, so
+"ALL PHOTOS UPLOADED" could never render there), object URLs revoked on
+cancel too, redundant color ternary in MATCHED TO simplified, `first`
+name-part guarded for noUncheckedIndexedAccess.
+
+**Verified:** npx tsc --noEmit exit 0; npm run build compiled clean;
+design-gate grep (rounded-*) clean on all touched .tsx. NOT verified
+against live DB (migration 013 unapplied - github_url writes will fail
+until it runs). package-lock.json picked up an npm-version metadata churn
+(libc fields removed, no dependency changes) - user may discard.
+Mid-session note: sections A-D were applied, then the working tree was
+reverted externally (only ignored/new files survived); all A-D edits were
+re-applied afterwards and re-verified.
+
+**Needs user eyeball:** /crew (Core '26 muted heading, GitHub icons),
+/admin/team (GITHUB URL field, bulk photo upload flow, CSV import with new
+header), /admin/accounts as non-godfather (no delete), bootstrap stall map
+(new geometry + dot positions), redirect suggestions ordering.
+
+## 19/07/2026 - Session 32: bootstrap visitor check-in, group leads, volunteer roles, panel auto-assign
+
+**A. Quick fixes.** A1: the east-end building in BootstrapMapSVG was
+mislabeled - label renamed KUKA -> AVIONS (shape/position unchanged).
+DEFAULT_STALL_POSITIONS: "avions" gets the S31-measured centroid
+(77.6,69.2) that had been keyed as kuka; "kuka" moved to the spec'd
+corridor spot (63.0,74.0). A2: ACCEPTED (LEGACY) / REVIEWED (LEGACY)
+filter tabs removed from /admin/applications along with the `legacy`
+tab styling; tab order now ALL / PENDING / SHORTLISTED / INTERVIEW /
+SELECTED / REJECTED / INTERVIEW A-D (group tabs moved to the end per
+spec). Legacy rows stay reachable via ALL; the status dropdown still
+lists the legacy statuses.
+
+**B. Interview panel auto-assign.** New
+`autoAssignInterviewGroups(panelCount)` in services/applications.ts:
+selects interview-status rows with NULL interview_group ordered by
+submitted_at ASC, round-robins A..(A+n-1), and applies the whole
+assignment in ONE UPDATE via unnest($ids::uuid[], $groups::text[]) -
+same array-param style the Neon driver already handles in
+bulkSetStatus. Route POST /api/admin/applications/auto-assign-groups
+(double isAdmin check, panel_count validated 1-4, returns {assigned}).
+UI in ApplicationsTable behind a new `showPanelAssign` prop that the
+page sets only on the plain INTERVIEW tab (no group param): segmented
+A / A-B / A-C / A-D tiles (max-occupancy tile style) + AUTO-ASSIGN
+button (disabled until a count is picked, spinner text, then
+router.refresh()); the whole bar only renders when at least one
+interviewee has no group.
+
+**C. Migration 014 (`014_bootstrap_visitor_groups.sql`).** Verified
+first: bootstrap_volunteers had NO role column (007 never defined one).
+Adds role TEXT NOT NULL DEFAULT 'stall' CHECK (stall|lead);
+bootstrap_groups (session FK CASCADE, name, team_lead_id FK SET NULL,
+UNIQUE(session_id,name)); bootstrap_visitors (name/prn/phone, group FK
+SET NULL); bootstrap_feedback (optional stall FK, rating CHECK 1-5,
+comment); indexes on visitors.session_id + groups.session_id. NOT
+auto-applied - MUST run in Neon before deploying S32:
+getBootstrapVolunteers/getVolunteerByToken now SELECT v.role, so the
+admin bootstrap page AND volunteer login 500 until 014 is applied.
+
+**D. Volunteer role system.** BootstrapVolunteer gains
+`role: "stall"|"lead"`; setVolunteerRole(). GET /api/bootstrap/stalls
+adds volunteerRole to the poll payload (mySuggestion preserved).
+BootstrapDashboard: role state seeded from a new `initialRole` prop
+(page.tsx passes volunteer.role server-side, so stall volunteers never
+flash the lead dashboard while waiting for the first poll) and kept
+live by the poll; when role==="stall" it early-returns the new
+StallVolunteerView, which structurally removes MAP, queue actions, and
+the freed/redirect notification blocks (they only exist in the lead
+branch). StallVolunteerView.tsx: parent keeps the single 4s poll and
+passes stalls down (no second poll loop against the same endpoint);
+no-stall state = tappable claim grid (free or occupied-with-room),
+claimed state = one big card with square status dot + MARK FREE/MARK
+OCCUPIED toggle and a "Switch stall" link. "My stall" is local state on
+top of claimed_by because release removes the volunteer from
+claimed_by - the DB alone can't remember a stall that's sitting FREE;
+re-syncs from claimed_by after reload while occupied. Admin: volunteer
+table gains a ROLE column with STALL/LEAD toggle tiles (optimistic
+update + poll confirm) hitting new PATCH
+/api/admin/bootstrap/volunteers/[id]/role.
+
+**E. Visitor check-in.** Public page /bootstrap/checkin (bootstrap
+layout, no navbar, no auth): "hasn't started yet" state when no active
+session, else name/PRN/phone form -> POST /api/bootstrap/checkin
+(public; validates presence + length caps, finds the active session
+server-side, never trusts a session id from the client). Service
+checkinVisitor() assigns the least-loaded group (COUNT ORDER BY ASC,
+name tiebreak); if the session has zero groups it creates A-D then
+re-picks (fixed the spec snippet, which used the pre-creation empty
+result). Success screen shows the group name. Admin GROUPS section on
+BootstrapAdminDashboard: group table (name / visitor count / lead /
+ASSIGN LEAD dropdown listing volunteers with leads sorted first),
+AUTO-BATCH [N] GROUPS (number input default 4 -> POST
+/api/admin/bootstrap/sessions/[id]/groups, which ensures N groups then
+round-robins unassigned visitors via assignUnassignedVisitors - one
+unnest UPDATE), visitor total, CHECK-IN URL line (origin read in a
+mount effect to dodge hydration mismatch; admin pastes it into any QR
+generator - no npm dep), and a lazy <details> full visitor list (GET
+.../visitors fetches on first open). Groups ride the existing 4s admin
+poll: GET /api/admin/bootstrap/sessions/[id] now returns
+stalls+volunteers+groups, and the page passes initialGroups
+(.catch(()=>[]) so the dashboard still renders pre-014). New PATCH
+/api/admin/bootstrap/groups/[id]/lead.
+
+**F. Session creation.** Step 3 of BootstrapCreateSession gains
+NUMBER OF VISITOR GROUPS (default 12, 1-26); POST
+/api/admin/bootstrap/sessions validates it (defaults to 12 when the
+body omits it - older clients keep working) and calls
+createBootstrapGroups after stalls+volunteers.
+
+**G. Feedback.** Public page /bootstrap/feedback: stall dropdown
+(server-rendered from the active session, "Overall / not sure"
+default), 1-5 rating tiles, optional comment -> POST
+/api/bootstrap/feedback (public; rating validated 1-5 int, stall_id
+verified to belong to the ACTIVE session, comment capped 2000).
+Service submitBootstrapFeedback + getBootstrapFeedbackSummary (total,
+per-stall avg/count over rated rows, 20 newest non-empty comments).
+Admin FEEDBACK section: response count, avg-rating table, recent
+comments; loads once on mount + REFRESH button rather than riding the
+4s poll (low churn, keeps Neon traffic down). GET
+/api/admin/bootstrap/sessions/[id]/feedback (double-auth).
+
+**Middleware.** No code gate needed: auth() only guards /admin and
+/api/admin, so /bootstrap/checkin, /bootstrap/feedback and the two
+/api/bootstrap POSTs are public by construction - a comment in
+middleware.ts now records this so nobody "fixes" it later. Maintenance
+mode still rewrites the two public pages (they're not under /admin or
+/api), same as the volunteer /bootstrap page - acceptable, flagged.
+
+**Verified:** npx tsc --noEmit exit 0; npm run build 0 errors, route
+list shows /bootstrap/checkin + /bootstrap/feedback as dynamic public
+pages and all 6 new API routes; design-gate grep
+(rounded-full/xl/2xl/9999px/mx-auto) clean on every touched .tsx.
+NOT verified against live DB (014 unapplied). No new dependencies.
+
+**Needs user eyeball:** /admin/applications INTERVIEW tab (panel
+tiles + auto-assign), /admin/bootstrap (ROLE toggles, GROUPS section,
+FEEDBACK section, check-in URL), /bootstrap as a stall-role volunteer
+(claim grid -> toggle card) and as a lead (unchanged full dashboard),
+/bootstrap/checkin + /bootstrap/feedback on a phone, map AVIONS label.
+
+## 19/07/2026 - Session 33: bootstrap architecture fix, per-lead check-in QR, stall-lead accounts, map pin-drop
+
+**MUST RUN BEFORE DEPLOY: migration 015
+(`015_bootstrap_stall_leads_groupsize.sql`)** - adds
+bootstrap_stalls.lead_names TEXT, bootstrap_sessions.max_group_size INT
+NOT NULL DEFAULT 20, bootstrap_volunteers.checkin_token TEXT UNIQUE.
+Then run the backfill (also included as a comment in the migration file)
+so pre-015 lead accounts get a QR token:
+`UPDATE bootstrap_volunteers SET checkin_token =
+encode(gen_random_bytes(20),'hex') WHERE checkin_token IS NULL;`
+Until 015 runs, session creation 500s (INSERT names max_group_size) and
+volunteer login/polling 500s (getVolunteerByToken selects checkin_token).
+
+**A. Groups moved out of Bootstrap admin.** The whole GROUPS section
+(AUTO-BATCH, visitor totals, group table, ASSIGN LEAD dropdowns, CHECK-IN
+URL line, lazy full-visitor list) is gone from BootstrapAdminDashboard,
+along with its state/handlers and the initialGroups prop (admin page no
+longer fetches groups). Everything else kept: stats bar, stall grid +
+override, volunteer table with STALL/LEAD toggle, SUGGEST STALL, UNLOCK,
+REGENERATE, DEACTIVATE, FEEDBACK. Per C4 the header area now shows only
+the shared FEEDBACK URL; check-in URLs are per group lead (see D). The
+S32 admin routes groups POST / groups/[id]/lead PATCH / visitors GET
+still exist (auth-guarded) but no UI calls them. Panel auto-assign was
+verified already correct from S32 (ApplicationsTable behind
+showPanelAssign, set on the plain INTERVIEW tab; route present) - no
+change needed.
+
+**B. Session creation redesigned (BootstrapCreateSession rewrite).**
+Step 1: session name + MAX VISITORS PER GROUP (1-100, default 20,
+stored on bootstrap_sessions) + carry-forward chooser when previous
+sessions exist (dropdown + YES, COPY LEADS / START FRESH; preview line
+fetches the new GET /api/admin/bootstrap/sessions/[id]/stall-leads).
+Step 2: stall builder gains a per-stall STALL LEAD NAMES textarea (one
+per line or comma-separated, max 3, hidden on carry-forward); names show
+under the stall in the draft list. Step 3: volunteer count relabeled
+GROUP LEAD ACCOUNTS (1-26, defaults to stall count) with a summary of
+how many stall-lead accounts step 2 produces. POST body:
+stalls[].lead_names, volunteer_count (= group leads), max_group_size,
+copy_stall_leads_from. SPEC DEVIATIONS (spec sections C1 and C3
+contradicted each other): C1 wins - stall leads are NAMED accounts
+generated from the stall-builder names, not counted stall-N accounts;
+lead_names ride each stall object instead of {stall_id,names}[] because
+stall ids don't exist before creation; credentials come as two role
+CSVs (below), not one type-column CSV.
+
+**C. Stall-lead accounts + carry-forward (service).**
+createStallLeadVolunteers(): role='stall' account per name, username
+generated from the name (generateUsername: first word + first 2 letters
+of the concatenated rest, numeric suffix on collision - "Sharanya N" ->
+sharanyan, "Kethan K B" -> kethankb), tied to its stall via the existing
+suggested_stall_id (S28 mechanism, no new column); stall.lead_names also
+stored as informational text and rendered as a muted "Leads: ..." line on
+StallCard. createGroupLeadVolunteers(): lead-N / "Group Lead N" role='lead'
+accounts, each with a stable checkin_token (randomBytes(20) hex) minted at
+creation; createBootstrapGroups() now takes leadIds so Group A..N are
+pre-assigned lead-1..N - the ASSIGN LEAD admin step is gone.
+copyStallLeadVolunteers(): single INSERT..SELECT copies role='stall'
+accounts with IDENTICAL usernames AND password hashes (the spec's "with
+new passwords" line contradicted its own "Day 1 CSV works all 5 days"
+requirement - identical hashes win), re-links suggested_stall_id by
+case-insensitive stall_name match and carries stalls.lead_names over;
+checkin_token deliberately NOT copied (globally UNIQUE, and stall leads
+don't run check-in). Credentials page shows two tables + two downloads
+(bootstrap-stall-lead-credentials.csv with a stall column, and
+bootstrap-group-lead-credentials.csv); the stall-lead button is hidden on
+carry-forward sessions (nothing new to hand out) and a note says the Day 1
+CSV still works. REGENERATE CREDENTIALS still rotates every account incl.
+carried ones - the old CSVs die, that's pre-existing behavior.
+
+**D. Per-lead visitor check-in.** /bootstrap/checkin and
+/api/bootstrap/checkin (tokenless, S32) are DELETED; replaced by
+/bootstrap/checkin/[token] + POST /api/bootstrap/checkin/[token], where
+[token] is the lead's stable checkin_token - the printed QR survives
+logouts and password regenerations. getCheckinContext(token) resolves
+lead -> group -> session (active only) + max_group_size + visitor count;
+the page renders "not started/invalid link", "group is full - ask a
+different group lead", or the form (now labeled "Joining Group X").
+checkinVisitorToGroup() replaces least-loaded checkinVisitor(): capacity
+check and INSERT are ONE statement (INSERT..SELECT..WHERE count<max), so
+two phones taking the last slot can't both get in; the API returns 409
+and the form surfaces it. Lead dashboards (BootstrapDashboard, lead
+branch only) show a YOUR GROUP CHECK-IN LINK card fed by checkinToken on
+the GET /api/bootstrap/stalls poll payload. Middleware needed NO gate
+change (auth only guards /admin + /api/admin; comment updated); the
+maintenance-mode rewrite still covers these public pages, same
+pre-existing tradeoff as S32.
+
+**E. Map pin-drop.** BootstrapMapSVG gains editingStallId +
+onPositionSet: while set, a CLICK TO PLACE banner shows, the SVG cursor
+is crosshair, and a click reports (x,y) as % of the element box (safe
+because the svg height is intrinsic to its 1024x419 viewBox - no
+letterbox offset). The admin STALL POSITIONS ON MAP section drops the
+X/Y number inputs (StallPositionRow deleted) for a PLACE PIN /
+PLACING... toggle per stall + current (x%, y%) + CLEAR; placing PATCHes
+the existing /position route and updates local state optimistically,
+then deselects. The position route + setStallMapPosition now accept
+map_x/map_y null-null to clear a pin.
+
+**Verified:** npm run build compiled successfully, route list shows
+/bootstrap/checkin/[token] + /api/bootstrap/checkin/[token] +
+/api/admin/bootstrap/sessions/[id]/stall-leads and the old tokenless
+checkin routes gone; npx tsc --noEmit exit 0 (after the deleted pages
+fell out of .next generated types on rebuild); design gate clean on all
+touched .tsx (no emoji via Unicode sweep, no rounded-full/xl/2xl/9999px,
+no mx-auto). NOT verified against live DB (015 unapplied): create
+session, carry-forward copy, QR check-in, capacity 409, pin-drop PATCH.
+
+**Needs user eyeball:** /admin/bootstrap create flow (all 3 steps, fresh
++ carry-forward variants, both CSV downloads), active-session dashboard
+(GROUPS gone, FEEDBACK URL line, pin-drop under STALL POSITIONS ON MAP),
+/bootstrap as a group lead (check-in link card), a phone run of
+/bootstrap/checkin/[token] (form, success, full-group, and bad-token
+states), stall cards showing "Leads: ..." after a session created with
+lead names.

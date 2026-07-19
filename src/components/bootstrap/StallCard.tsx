@@ -245,6 +245,20 @@ export default function StallCard({
             {meta.label}
           </span>
         </div>
+        {/* S33 - informational stall leads from session creation */}
+        {stall.lead_names && (
+          <div
+            style={{
+              marginTop: "0.35rem",
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.7rem",
+              letterSpacing: "0.04em",
+              color: BS.muted,
+            }}
+          >
+            Leads: {stall.lead_names}
+          </div>
+        )}
         <div
           style={{
             marginTop: "0.5rem",

@@ -23,11 +23,11 @@ export async function createMember(input: CreateMemberInput): Promise<TeamMember
   const rows = await sql`
     INSERT INTO team_members (
       name, role, tier, domain, quote,
-      linkedin_url, photo_url, display_order, is_active
+      linkedin_url, github_url, photo_url, display_order, is_active
     ) VALUES (
       ${input.name}, ${input.role}, ${input.tier},
       ${input.domain ?? null}, ${input.quote ?? null},
-      ${input.linkedin_url ?? null}, ${input.photo_url ?? null}, ${input.display_order}, ${input.is_active}
+      ${input.linkedin_url ?? null}, ${input.github_url ?? null}, ${input.photo_url ?? null}, ${input.display_order}, ${input.is_active}
     ) RETURNING *`;
   return rows[0] as TeamMember;
 }
@@ -47,8 +47,8 @@ export async function createMembersBulk(
 
   const values = fresh
     .map((_, i) => {
-      const base = i * 9;
-      return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9})`;
+      const base = i * 10;
+      return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9},$${base + 10})`;
     })
     .join(",");
 
@@ -59,6 +59,7 @@ export async function createMembersBulk(
     m.domain ?? null,
     m.quote ?? null,
     m.linkedin_url ?? null,
+    m.github_url ?? null,
     m.photo_url ?? null,
     m.display_order ?? 0,
     m.is_active ?? true,
@@ -67,7 +68,7 @@ export async function createMembersBulk(
   // Neon driver v1 only allows parameterized (non-template) calls via .query()
   const result = await sql.query(
     `INSERT INTO team_members
-       (name, role, tier, domain, quote, linkedin_url, photo_url, display_order, is_active)
+       (name, role, tier, domain, quote, linkedin_url, github_url, photo_url, display_order, is_active)
      VALUES ${values}
      RETURNING id`,
     params
@@ -91,6 +92,7 @@ export async function updateMember(
       domain = COALESCE(${input.domain ?? null}, domain),
       quote = COALESCE(${input.quote ?? null}, quote),
       linkedin_url = COALESCE(${input.linkedin_url ?? null}, linkedin_url),
+      github_url = COALESCE(${input.github_url ?? null}, github_url),
       photo_url = COALESCE(${input.photo_url ?? null}, photo_url),
       display_order = COALESCE(${input.display_order ?? null}, display_order)
     WHERE id = ${id}

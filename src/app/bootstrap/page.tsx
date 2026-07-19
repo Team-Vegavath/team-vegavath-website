@@ -25,6 +25,7 @@ export default async function BootstrapPage() {
     <BootstrapDashboard
       displayName={volunteer.display_name}
       username={volunteer.username}
+      initialRole={volunteer.role ?? "stall"}
     />
   );
 }

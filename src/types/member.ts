@@ -6,6 +6,7 @@ export interface TeamMember {
   domain: "Automotive" | "Robotics" | "Design" | "Media" | "Marketing" | "Programming" | "Operations" | null;
   quote: string | null;
   linkedin_url: string | null;
+  github_url: string | null;
   photo_url: string | null;
   display_order: number;
   is_active: boolean;

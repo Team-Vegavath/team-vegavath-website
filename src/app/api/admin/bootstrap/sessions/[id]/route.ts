@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   deleteBootstrapSession,
+  getBootstrapGroups,
   getBootstrapStalls,
   getBootstrapVolunteers,
 } from "@/lib/services/bootstrap";
 
-// Admin live-dashboard poll: stalls + volunteer lock status in one request.
+// Admin live-dashboard poll: stalls + volunteers + visitor groups (S32)
+// in one request.
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,11 +20,12 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const [stalls, volunteers] = await Promise.all([
+    const [stalls, volunteers, groups] = await Promise.all([
       getBootstrapStalls(id),
       getBootstrapVolunteers(id),
+      getBootstrapGroups(id),
     ]);
-    return NextResponse.json({ stalls, volunteers });
+    return NextResponse.json({ stalls, volunteers, groups });
   } catch (error) {
     console.error("[GET /api/admin/bootstrap/sessions/[id]]", error);
     return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });

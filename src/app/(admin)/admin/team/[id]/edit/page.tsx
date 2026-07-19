@@ -54,6 +54,7 @@ export default async function EditMemberPage({
           domain: member.domain,
           quote: member.quote,
           linkedin_url: member.linkedin_url,
+          github_url: member.github_url,
           display_order: member.display_order,
           is_active: member.is_active,
           photo_url: member.photo_url,

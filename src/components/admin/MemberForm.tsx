@@ -16,6 +16,7 @@ interface MemberFormProps {
     domain?: string;
     quote?: string;
     linkedin_url?: string;
+    github_url?: string;
     display_order?: number;
     is_active?: boolean;
     photo_url?: string | null;
@@ -31,6 +32,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
   const [domain, setDomain] = useState(initialData?.domain ?? "Automotive");
   const [quote, setQuote] = useState(initialData?.quote ?? "");
   const [linkedin_url, setLinkedinUrl] = useState(initialData?.linkedin_url ?? "");
+  const [github_url, setGithubUrl] = useState(initialData?.github_url ?? "");
   const [display_order, setDisplayOrder] = useState(initialData?.display_order ?? 0);
   const [is_active, setIsActive] = useState(initialData?.is_active ?? true);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
@@ -77,6 +79,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
         domain,
         quote,
         linkedin_url,
+        github_url,
         display_order,
         is_active,
         ...imageFields,
@@ -206,6 +209,21 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           className="admin-input"
         />
         <p className="admin-hint">Shows the LinkedIn icon on /crew when set</p>
+      </div>
+
+      <div>
+        <label htmlFor="github_url" className="admin-label">
+          GITHUB URL
+        </label>
+        <input
+          id="github_url"
+          type="url"
+          value={github_url}
+          onChange={(event) => setGithubUrl(event.target.value)}
+          placeholder="https://github.com/username"
+          className="admin-input"
+        />
+        <p className="admin-hint">Shows the GitHub icon on /crew when set</p>
       </div>
 
       <span className="admin-section-label">Media</span>
