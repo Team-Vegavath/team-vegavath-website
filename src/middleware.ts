@@ -56,7 +56,8 @@ export default auth(async (req) => {
 
   // Auth only gates /admin and /api/admin below. Everything else - including
   // the public visitor routes /bootstrap/checkin/[token] (S33, per-lead QR),
-  // /bootstrap/feedback and their /api/bootstrap/* endpoints - passes through
+  // /bootstrap/feedback, /bootstrap/register/{stall,group} (S35 volunteer
+  // self-registration) and their /api/bootstrap/* endpoints - passes through
   // with no session.
   const isAdminRoute = pathname.startsWith("/admin") && pathname !== "/admin";
   const isAdminApiRoute = pathname.startsWith("/api/admin");

@@ -1,5 +1,5 @@
-# Team Vegavath — Frontend Revamp Context
-**For Claude Code / Fable 5 — Read this before touching a single file.**
+# Team Vegavath -- Frontend Revamp Context
+**For Claude Code / Fable 5 -- Read this before touching a single file.**
 
 Prepared by: Claude Sonnet 4.6 (planning layer)  
 Date: July 2026  
@@ -10,11 +10,11 @@ Live site: https://teamvegavath.vercel.app
 
 ## 1. What This Is and What We're Doing
 
-Team Vegavath is a student innovation and motorsport club at PES University, Electronic City Campus (PESU ECC). The club makes go-karts, runs IoT hackathons, and hosts campus events — biggest one so far was Ignition 1.0 (Nov 2025), 200+ footfall, one of the largest campus hackathons at PESU ECC.
+Team Vegavath is a student innovation and motorsport club at PES University, Electronic City Campus (PESU ECC). The club makes go-karts, runs IoT hackathons, and hosts campus events -- biggest one so far was Ignition 1.0 (Nov 2025), 200+ footfall, one of the largest campus hackathons at PESU ECC.
 
 **The website was built by an AI coding agent (Claude).** It works. Architecture is solid. Data layer is solid. Database is live. R2 has 793MB of media. Auth works. Admin panel exists.
 
-**The problem is purely frontend: it looks like AI-generated slop.** Anyone who works in tech can clock it in 3 seconds. We are rebuilding the UI layer from scratch — same codebase, same data, same API routes, same services. You are NOT touching:
+**The problem is purely frontend: it looks like AI-generated slop.** Anyone who works in tech can clock it in 3 seconds. We are rebuilding the UI layer from scratch -- same codebase, same data, same API routes, same services. You are NOT touching:
 
 - `src/lib/` (any file)
 - `src/types/` (any file)
@@ -33,11 +33,11 @@ Team Vegavath is a student innovation and motorsport club at PES University, Ele
 
 ---
 
-## 2. Current State — What Exists and Works
+## 2. Current State -- What Exists and Works
 
-### Data / Backend (DO NOT TOUCH — all working)
-- Neon Postgres DB: `events`, `team_members`, `gallery_items`, `sponsors`, `applications`, `site_settings` tables — all populated with real data
-- Cloudflare R2 bucket `vegavath-media` — live, 793MB, folders: `gallery/`, `icons/`, `models/`, `payments/`, `sponsors/`, `team/`
+### Data / Backend (DO NOT TOUCH -- all working)
+- Neon Postgres DB: `events`, `team_members`, `gallery_items`, `sponsors`, `applications`, `site_settings` tables -- all populated with real data
+- Cloudflare R2 bucket `vegavath-media` -- live, 793MB, folders: `gallery/`, `icons/`, `models/`, `payments/`, `sponsors/`, `team/`
 - All API routes functional: `/api/events`, `/api/team`, `/api/gallery`, `/api/sponsors`, `/api/join`, plus all `/api/admin/*` routes
 - Auth: NextAuth v5, JWT sessions, admin credentials in env vars
 - Middleware: admin route protection working
@@ -62,7 +62,7 @@ Team Vegavath is a student innovation and motorsport club at PES University, Ele
 
 ---
 
-## 3. The Problems — Exact AI-Slop Tells To Eliminate
+## 3. The Problems -- Exact AI-Slop Tells To Eliminate
 
 Every single one of these must be gone from the final output:
 
@@ -81,18 +81,18 @@ Every single one of these must be gone from the final output:
 - Generic shadow-box cards → replace with border-accent cards, sharp corners
 - The `⊕` symbol on About for no reason → remove
 - Gradient text on headings (if any) → replace with solid color accent
-- "Start Engine" button next to "Explore Vegavath →" — incoherent dual CTA
+- "Start Engine" button next to "Explore Vegavath →" -- incoherent dual CTA
 
 ### Structure
-- Fake timeline (2020/2021/2022/2023) → leave placeholder "Timeline coming soon — contact seniors" or omit section until real data available
-- Stats "10+ Projects, 3+ Awards" — unverifiable, keep "200+ footfall, 2 events, 85 members, 6 domains" which are real
+- Fake timeline (2020/2021/2022/2023) → leave placeholder "Timeline coming soon -- contact seniors" or omit section until real data available
+- Stats "10+ Projects, 3+ Awards" -- unverifiable, keep "200+ footfall, 2 events, 85 members, 6 domains" which are real
 - Footer: four column layout is broken on mobile, social icons are not right sized
 
 ---
 
 ## 4. Design Philosophy
 
-The target is: **premium engineering aesthetic — think Lockheed Martin precision meets motorsport aggression meets minor cyberpunk edge, with a thin thread of Suits-level authority in typography**. The club logo is an orange panther head on a black and gold shield. The vibe should feel like a serious technical team, not a student project website.
+The target is: **premium engineering aesthetic -- think Lockheed Martin precision meets motorsport aggression meets minor cyberpunk edge, with a thin thread of Suits-level authority in typography**. The club logo is an orange panther head on a black and gold shield. The vibe should feel like a serious technical team, not a student project website.
 
 **What we are NOT doing:**
 - Making it look like a gaming site (no neon green, no RGB effects, no particle systems)
@@ -100,21 +100,21 @@ The target is: **premium engineering aesthetic — think Lockheed Martin precisi
 - Adding anything that makes it obvious it was AI-generated
 
 **What we ARE doing:**
-- Strong typographic hierarchy — text does the design work
+- Strong typographic hierarchy -- text does the design work
 - CSS-only patterns for section backgrounds (zero weight)
 - Framer Motion scroll reveals (already installed, wire it)
 - Auto Animate for list transitions (install)
-- Sharp angular design language — no rounded corners on primary elements
+- Sharp angular design language -- no rounded corners on primary elements
 - Color from the logo: orange (#EF5D08) and gold (#F29C04) on near-black
 
 ---
 
-## 5. Design System — Locked, Do Not Deviate
+## 5. Design System -- Locked, Do Not Deviate
 
 ### Color Tokens
 
 ```css
-/* globals.css — CSS custom properties */
+/* globals.css -- CSS custom properties */
 
 :root {
   /* Backgrounds */
@@ -123,7 +123,7 @@ The target is: **premium engineering aesthetic — think Lockheed Martin precisi
   --bg-card:       #161616;
   --bg-elevated:   #1d1d1d;
 
-  /* Accent — from club logo */
+  /* Accent -- from club logo */
   --accent:        #EF5D08;   /* Cayenne orange */
   --accent-hover:  #d44f06;
   --accent-dim:    rgba(239, 93, 8, 0.12);   /* for subtle glows / borders */
@@ -228,8 +228,8 @@ BANNED: rounded-full, rounded-xl, rounded-2xl on ANY interactive element
 ## 6. Library Decisions
 
 ### Already Installed (wire properly)
-- **Framer Motion** — use `motion.div` with `whileInView={{ opacity: 1, y: 0 }}` + `initial={{ opacity: 0, y: 24 }}` for section reveals. Stagger children 0.1s. Mount `PageTransition` in root layout (it exists but is not mounted).
-- **React Three Fiber + Drei** — keep the kart model section. If `.glb` not in R2, show a static event photo from R2 with a coming-soon overlay.
+- **Framer Motion** -- use `motion.div` with `whileInView={{ opacity: 1, y: 0 }}` + `initial={{ opacity: 0, y: 24 }}` for section reveals. Stagger children 0.1s. Mount `PageTransition` in root layout (it exists but is not mounted).
+- **React Three Fiber + Drei** -- keep the kart model section. If `.glb` not in R2, show a static event photo from R2 with a coming-soon overlay.
 
 ### Install These (add to package.json)
 ```bash
@@ -244,7 +244,7 @@ Pattern Monster (pattern.monster) generates pure SVG/CSS patterns. Export as inl
 
 Suggested pattern CSS (paste directly into globals.css, zero external request):
 ```css
-/* Speed Lines pattern — for hero and join CTA backgrounds */
+/* Speed Lines pattern -- for hero and join CTA backgrounds */
 .pattern-speed-lines {
   background-color: var(--bg-base);
   background-image: repeating-linear-gradient(
@@ -256,7 +256,7 @@ Suggested pattern CSS (paste directly into globals.css, zero external request):
   );
 }
 
-/* Dot grid — for about / stats sections */
+/* Dot grid -- for about / stats sections */
 .pattern-dots {
   background-color: var(--bg-surface);
   background-image: radial-gradient(
@@ -270,11 +270,11 @@ Suggested pattern CSS (paste directly into globals.css, zero external request):
 - GSAP, Lenis, or any scroll hijacking library
 - Framer Motion `useSpring` parallax on images (kills mobile performance)
 - Full Shadcn/Radix component library for public site (admin is different)
-- Any icon library as a full package — import individual SVGs or use inline SVG
+- Any icon library as a full package -- import individual SVGs or use inline SVG
 - Audio / music on page load
 
 ### Audio (if ever added)
-User opt-in toggle only. Muted by default. Never autoplay. An ambient electrical hum or engine idle from R2 behind a speaker icon in the corner. Not recommended — visual motion is enough.
+User opt-in toggle only. Muted by default. Never autoplay. An ambient electrical hum or engine idle from R2 behind a speaker icon in the corner. Not recommended -- visual motion is enough.
 
 ---
 
@@ -289,7 +289,7 @@ User opt-in toggle only. Muted by default. Never autoplay. An ambient electrical
 
 **Mobile:**
 - Left: shield icon
-- Right: hamburger → full-screen dark overlay with links in Orbitron large (this is the ONE place Orbitron is used besides the hero — for the mobile menu overlay)
+- Right: hamburger → full-screen dark overlay with links in Orbitron large (this is the ONE place Orbitron is used besides the hero -- for the mobile menu overlay)
 - "JOIN US" visible at bottom of overlay, full-width button
 
 **Styling:**
@@ -304,7 +304,7 @@ User opt-in toggle only. Muted by default. Never autoplay. An ambient electrical
 Current footer is broken and generic. Replace entirely.
 
 **Layout (desktop):** Two rows
-- Row 1: Logo left | "TEAM VEGAVATH — PESU ECC" in Chakra Petch | Social icons right (just SVG icons, no next/image for these)
+- Row 1: Logo left | "TEAM VEGAVATH -- PESU ECC" in Chakra Petch | Social icons right (just SVG icons, no next/image for these)
 - Row 2: Nav links in Space Grotesk small | "© 2026 Team Vegavath" center | "Built by the Vegavath Coding Domain" right
 
 **Mobile:** Stack vertically. Logo + name → social icons → nav links → legal line
@@ -321,7 +321,7 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 - Full `100svh`
 - Center aligned, large
 - "VEGAVATH" in `--font-orbitron`, `clamp(72px, 16vw, 160px)`, letter-spacing tight
-- Below: "PESU ECC — RACING TOWARD INNOVATION" in Chakra Petch, small caps, Space Grotesk tracking-widest would also work
+- Below: "PESU ECC -- RACING TOWARD INNOVATION" in Chakra Petch, small caps, Space Grotesk tracking-widest would also work
 - Below: "Karts. Code. Innovation." in Space Grotesk, `--text-secondary`
 - Two CTAs in a row: `[JOIN THE TEAM]` (orange fill, sharp) · `[VIEW EVENTS]` (transparent, `--border-strong` border, white text). Both rectangular, no radius, Chakra Petch Bold uppercase
 - No emojis. No arrows on buttons unless it's a real `→` character, not an arrow emoji.
@@ -334,7 +334,7 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 - On mobile: horizontal scroll or marquee
 
 **3D Kart Section:**
-- Keep React Three Fiber. Load with `dynamic(() => import(...), { ssr: false })` — this is already the pattern
+- Keep React Three Fiber. Load with `dynamic(() => import(...), { ssr: false })` -- this is already the pattern
 - If `.glb` not in R2 `models/` folder, show a Vegavath event photo from R2 as a full-width editorial image instead, with text overlay: "BUILD REVEAL COMING SOON"
 
 **Domains Section:**
@@ -345,13 +345,13 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 - Thin `1px solid var(--border)` between tiles, no border-radius
 
 **Events Section:**
-- Remove "Upcoming Events / Past Events" h2 headers — replace with a single heading "EVENTS" and a `[VIEW ALL →]` link
-- Upcoming: if none, show: "Next event — TBA. Follow [@teamvegavath_pesu](https://www.instagram.com/teamvegavath_pesu/) to stay updated." — not just "Check back soon."
+- Remove "Upcoming Events / Past Events" h2 headers -- replace with a single heading "EVENTS" and a `[VIEW ALL →]` link
+- Upcoming: if none, show: "Next event -- TBA. Follow [@teamvegavath_pesu](https://www.instagram.com/teamvegavath_pesu/) to stay updated." -- not just "Check back soon."
 - Past event cards: Editorial horizontal layout on desktop. `border-left: 2px solid var(--accent)` on each card. Date in Space Mono small at top. Title in Chakra Petch. Category as uppercase plain text label (no pill). No box-shadow.
 - Framer Motion stagger on cards: `whileInView`, stagger 0.08s
 
 **Sponsors Strip:**
-- CSS marquee (existing) — style fix: all logos `filter: brightness(0) invert(1)` at 60% opacity, full white on hover. `object-fit: contain` inside `64px` height containers. No border, no card, just the logo images scrolling.
+- CSS marquee (existing) -- style fix: all logos `filter: brightness(0) invert(1)` at 60% opacity, full white on hover. `object-fit: contain` inside `64px` height containers. No border, no card, just the logo images scrolling.
 
 **Join CTA Section:**
 - `clip-path: polygon(0 32px, 100% 0, 100% 100%, 0 100%)` on top edge
@@ -368,7 +368,7 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 **Hero:**
 - Team photo from R2 (`team/team-photo.jpeg`) full-bleed, dark gradient overlay (bottom-heavy)
 - Text overlay: "BUILT BY STUDENTS." line break "FOR STUDENTS." in Chakra Petch Bold, white, large
-- No "Who We Are" label, no "About Team Vegavath" subhead — the photo + text IS the header
+- No "Who We Are" label, no "About Team Vegavath" subhead -- the photo + text IS the header
 
 **Mission / What We Do:**
 - Mission: pull-quote styling. Large, italic, Space Grotesk. `--gold` color accent word or phrase. No "Our Mission" heading.
@@ -410,7 +410,7 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 - Hover: slight brightness lift, reveal "VIEW DETAILS →" as overlay or link
 
 **Auto Animate:**
-- Apply `useAutoAnimate` to the grid container — list reorders/filters animate smoothly
+- Apply `useAutoAnimate` to the grid container -- list reorders/filters animate smoothly
 
 ---
 
@@ -420,7 +420,7 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 - Date / category in Space Mono
 - Cover image full-width (once admin upload is implemented)
 - Gallery grid from DB
-- Registration status is live (SSR, no cache) — if `registration_open: false`, show "Registration is closed for this event." Clean, no emoji.
+- Registration status is live (SSR, no cache) -- if `registration_open: false`, show "Registration is closed for this event." Clean, no emoji.
 
 ---
 
@@ -454,18 +454,18 @@ Social icons: Inline SVG, not next/image. White at 60% opacity, full white on ho
 
 **Recruitment Open state:**
 
-Desktop — split layout:
+Desktop -- split layout:
 - Left 40%: `--accent` orange background, "JOIN\nTHE\nTEAM" in Chakra Petch Black, stacked vertically, `--bg-base` text. Club logo mark. Domain list in small Chakra Petch.
 - Right 60%: dark background, form
 
-Mobile — stacked:
+Mobile -- stacked:
 - Top: branding bar (orange strip, logo + "JOIN THE TEAM")
 - Below: form
 
 **Form styling:**
 - Input fields: `border: none`, `border-bottom: 1px solid var(--border-strong)`, `background: transparent`, bottom-border goes `--accent` on focus
 - No box-border inputs
-- Domain selection: 6 tap-target tiles (not a dropdown) — same domain tile treatment as other sections, selected = orange fill
+- Domain selection: 6 tap-target tiles (not a dropdown) -- same domain tile treatment as other sections, selected = orange fill
 - Submit: full-width `--accent` background button, "SUBMIT APPLICATION", Chakra Petch Bold, uppercase, NO emoji
 
 **Recruitment Closed state:**
@@ -479,9 +479,9 @@ Mobile — stacked:
 ### `/admin` pages
 
 - Fix the password crash: add `try/catch` around the bcrypt compare in `src/lib/auth.ts` credentials provider
-- Admin styling: minimal, functional. Dark sidebar nav, sharp tabs for content areas. NOT pretty — it's internal tooling.
+- Admin styling: minimal, functional. Dark sidebar nav, sharp tabs for content areas. NOT pretty -- it's internal tooling.
 - Admin events page: implement the create/edit form with image upload to R2 via `/api/admin/upload`. This unlocks event thumbnails on the public site.
-- Admin team page: same — implement the create/edit form with photo upload.
+- Admin team page: same -- implement the create/edit form with photo upload.
 
 ---
 
@@ -490,7 +490,7 @@ Mobile — stacked:
 **What to animate (Framer Motion):**
 - Section reveals: `opacity: 0 → 1`, `y: 24 → 0`, triggered by `whileInView`, `once: true`
 - Staggered children: `staggerChildren: 0.08` on the parent `variants`
-- Navbar background: `useScrollY` threshold at 80px — animate `backgroundColor` from transparent to `--bg-base`
+- Navbar background: `useScrollY` threshold at 80px -- animate `backgroundColor` from transparent to `--bg-base`
 - Page transition: mount `PageTransition` (it exists in `src/components/layout/PageTransition.tsx`), simple fade 200ms
 
 **What NOT to animate:**
@@ -502,7 +502,7 @@ Mobile — stacked:
 
 ---
 
-## 9. Sponsors Carousel — Consistency Fix
+## 9. Sponsors Carousel -- Consistency Fix
 
 All sponsor logos in the marquee and standalone sponsor grid MUST:
 - Render inside a fixed-height container: `height: 48px` (marquee) / `height: 64px` (sponsors grid)
@@ -517,20 +517,20 @@ All sponsor logos in the marquee and standalone sponsor grid MUST:
 
 ## 10. Prompting Strategy for Claude Code
 
-### Order of operations — do not skip steps
+### Order of operations -- do not skip steps
 
-**Session 0 — Context load:** Feed this document, README.md, Handoff.md, agents.md. Tell Claude Code: "You are revamping the frontend of this Next.js 16 App Router site. Architecture, data layer, and API routes are complete and working. You only touch files listed under 'You ARE touching' in context_for_revamp.md."
+**Session 0 -- Context load:** Feed this document, README.md, Handoff.md, agents.md. Tell Claude Code: "You are revamping the frontend of this Next.js 16 App Router site. Architecture, data layer, and API routes are complete and working. You only touch files listed under 'You ARE touching' in context_for_revamp.md."
 
-**Session 1 — Design tokens + fonts:**  
+**Session 1 -- Design tokens + fonts:**  
 Task: "Set up the font stack in `src/app/layout.tsx` using `next/font/google` for Orbitron (900), Chakra Petch (400/600/700), Space Grotesk (400/500/600), Space Mono (400/700). Pass them as CSS variables. Update `src/app/globals.css` with the full CSS custom property block from the design system section. Remove all existing `@apply` blocks that reference the old color names. Run `npm run build` and confirm 0 errors before continuing."
 
-**Session 2 — Global components:**  
+**Session 2 -- Global components:**  
 Task: "Rebuild `src/components/layout/Navbar.tsx` per the spec in context_for_revamp.md Section 7. Then rebuild `src/components/layout/Footer.tsx`. Then wire the existing `PageTransition` component into `src/app/layout.tsx`. Run `npm run build` and confirm 0 errors."
 
-**Session 3 — Home page:**  
+**Session 3 -- Home page:**  
 Task: "Rebuild `src/app/(public)/page.tsx` and all components under `src/components/home/` per spec. Do not change any data fetching logic. Hero, stats ticker, domain tiles (new DomainGrid component), events preview, sponsors strip, join CTA. Verify: no emojis, no pill badges, no 'Our X' headings, no gradient text."
 
-**Session 4 — About page:**  
+**Session 4 -- About page:**  
 Task: "Rebuild `/about`..." (same pattern)
 
 **Sessions 5–8:** Events → Crew → Join → Gallery/Sponsors → Admin fixes
@@ -543,7 +543,7 @@ Before moving to the next session, verify:
 4. Section headings use Chakra Petch (not Orbitron, not Inter)
 5. "VEGAVATH" in hero uses Orbitron
 6. Mobile layout is correct on 375px viewport
-7. No `mx-auto` — use `style={{ margin: "0 auto" }}` where centering needed
+7. No `mx-auto` -- use `style={{ margin: "0 auto" }}` where centering needed
 
 ---
 
@@ -551,13 +551,13 @@ Before moving to the next session, verify:
 
 1. **Tailwind v4 centering:** `mx-auto` does not work. Use `style={{ margin: "0 auto" }}`. This is documented behavior, not a bug to fix.
 
-2. **R2 bucket structure mismatch:** Live R2 has `gallery/`, `icons/`, `models/`, `payments/`, `sponsors/`, `team/`. Architecture doc shows `events/` prefix folder which may not exist yet. Event media may be directly under `gallery/` without event subdirectories. The `payments/` folder contains payment guide screenshots — NOT application data, NOT gallery content.
+2. **R2 bucket structure mismatch:** Live R2 has `gallery/`, `icons/`, `models/`, `payments/`, `sponsors/`, `team/`. Architecture doc shows `events/` prefix folder which may not exist yet. Event media may be directly under `gallery/` without event subdirectories. The `payments/` folder contains payment guide screenshots -- NOT application data, NOT gallery content.
 
 3. **Admin CRUD incomplete:** Tasks.md shows admin events CRUD with image upload as NOT done. Event `cover_image_url` is null for all events, hence blank previews. Implementing the admin upload flow (using `/api/admin/upload` which already exists) is part of this revamp's scope.
 
 4. **Auth crash:** Missing try/catch in bcrypt compare in `src/lib/auth.ts`. Fix this in Session 2 (global components session). It's one try/catch block.
 
-5. **Font loading:** `Chakra_Petch` is the import name (underscore, not hyphen). `Space_Grotesk` and `Space_Mono` similarly. Double-check `next/font/google` import names — they use underscores matching the function name, not the display name.
+5. **Font loading:** `Chakra_Petch` is the import name (underscore, not hyphen). `Space_Grotesk` and `Space_Mono` similarly. Double-check `next/font/google` import names -- they use underscores matching the function name, not the display name.
 
 6. **PageTransition:** Component exists at `src/components/layout/PageTransition.tsx` but is not mounted in `src/app/layout.tsx`. Mount it in Session 2.
 
@@ -583,14 +583,14 @@ If limited on time or credits:
 
 ---
 
-## 13. Copy Reference — Real Vegavath Data
+## 13. Copy Reference -- Real Vegavath Data
 
 Use this instead of letting Claude Code hallucinate content:
 
 **Events (real, from DB):**
-- Freshers Day 2025 — 17 Sep 2025
-- Ignition 1.0 — 07 Nov 2025 (IoT/Hackathon, 200+ footfall, one of the largest campus hackathons at PESU ECC)
-- EmbedX 2.0 — 20 Feb 2026
+- Freshers Day 2025 -- 17 Sep 2025
+- Ignition 1.0 -- 07 Nov 2025 (IoT/Hackathon, 200+ footfall, one of the largest campus hackathons at PESU ECC)
+- EmbedX 2.0 -- 20 Feb 2026
 
 **Sponsors (real, from R2 and DB):**
 Xylem, Ather Energy, Mahindra, BMW Motorrad, SOLIDWORKS

@@ -19,6 +19,7 @@ export function SponsorMarquee({ sponsors }: SponsorMarqueeProps) {
               width={160}
               height={48}
               className="marquee-logo"
+              unoptimized // small logo, no WebP/multi-size benefit
             />
           );
 

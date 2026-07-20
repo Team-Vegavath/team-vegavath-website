@@ -2017,3 +2017,353 @@ session, carry-forward copy, QR check-in, capacity 409, pin-drop PATCH.
 /bootstrap/checkin/[token] (form, success, full-group, and bad-token
 states), stall cards showing "Leads: ..." after a session created with
 lead names.
+
+## 20/07/2026 - Session 35: volunteer self-registration, two-table admin dashboard, CSV credentials removed
+
+Authorized exceptions: migration 016, new public registration routes,
+complete replacement of the admin volunteer table, removal of CSV
+credential generation.
+
+**A. Migration 016 (NOT applied - run in Neon before deploying).**
+bootstrap_volunteers gains phone, srn, login_code (plaintext, admin-
+visible by design - these accounts only reach /bootstrap), group_number
+(FCFS on activation), in_classroom (bool, default false), and created_at
+(007 never had a timestamp; needed for FCFS ordering - existing rows all
+get now(), harmless since they predate self-registration). password_hash
+keeps NOT NULL: self-registered accounts still store a bcrypt hash of the
+login_code, so login is unchanged.
+
+**B. Self-registration (public, no auth).** /bootstrap/register/stall
+and /bootstrap/register/group + POST /api/bootstrap/register/{stall,group}.
+Username IS the lowercased SRN; password is an 8-char generatePassword()
+login code, returned once on screen AND stored plaintext in login_code
+for the admin tables. Shared BootstrapRegister component (BS tokens,
+same card style as BootstrapLogin); "Registration is not open yet" when
+no active session. Stall variant has a dropdown of the active session's
+stalls; registering sets suggested_stall_id (the existing volunteer->
+stall link, drives the admin STALL column + volunteer dashboard) AND
+claims the stall (claimed_by append, status occupied) per spec - note:
+this shows the stall as OCCUPIED on the public board from the moment of
+registration. Duplicate SRN for the session -> 409 "ask an admin for
+your login code" (admin can read it off the dashboard). Middleware
+needed NO gate change (auth only guards /admin + /api/admin; comment
+updated).
+
+**C. Group numbers.** assignGroupNumbers(sessionId): round-robin over
+the session's groups in name order (Group A = 1, ...), leads ordered by
+created_at; idempotent (only fills NULLs) and continues the rotation on
+re-runs via a count offset. Called from setSessionActive(true) per spec
+AND after every group registration - spec gap: registration requires an
+ACTIVE session, so everyone registers after activation and the
+activation-time pass alone would never number anyone. First lead into a
+group also becomes bootstrap_groups.team_lead_id (QR check-in resolves
+through it); getCheckinContext gained a group_number->'Group '||chr(64+n)
+join fallback so a second lead sharing a group still resolves their
+group. Lead dashboard shows a YOUR GROUP card (groupNumber rides the
+GET /api/bootstrap/stalls poll payload via getVolunteerByToken).
+
+**D. Admin dashboard: two tables, credentials machinery deleted.**
+The unified volunteer table (role toggle + suggest on everyone) is
+replaced by STALL VOLUNTEERS (Name/Username/Stall/Phone/Login code/
+Status/Actions=UNLOCK) and GROUP VOLUNTEERS (adds Group, Classroom, and
+keeps the SUGGEST STALL dropdown - group volunteers only). Login codes
+render plaintext in a code cell. CLASSROOM shows IN CLASS from
+in_classroom but NO toggle exists anywhere yet (the column reads em-dash
+until that feature is built - flagged, not invented). REGENERATE
+CREDENTIALS button, downloadCredentialsCsv, and the S32 role toggle are
+gone. DELETED routes: sessions/[id]/regenerate, /credentials,
+/stall-leads. DELETED service code: createStallLeadVolunteers,
+createGroupLeadVolunteers, copyStallLeadVolunteers,
+getStallLeadVolunteers, regenerateVolunteerCredentials,
+generateUsername, VolunteerCredential/StallLeadCredential types.
+NOTE: /api/admin/bootstrap/volunteers/[id]/role is now unused by the UI
+(role is baked in at registration) - left in place, flagged for a human
+decision (flipping a stall volunteer to lead would leave them without a
+checkin_token).
+
+**E. Session creation: 2 steps, links instead of CSVs.** Step 3
+(volunteer count) and the S33 carry-forward flow are gone -
+carry-forward existed to keep credential CSVs valid across days, which
+no longer applies. Step 1 gains a "Visitor groups" count (1-26, default
+4) since groups are still created up front and the count previously
+derived from the lead-account count. Step 2 unchanged except the
+lead-names hint now says informational-only (still stored on
+stalls.lead_names for the stall cards; no accounts). Success screen
+shows the two registration links (window.location.origin, same pattern
+as the feedback URL). POST /api/admin/bootstrap/sessions: only
+createBootstrapSession + createBootstrapStalls + createBootstrapGroups,
+response is { session }. Sessions list shows a muted "inactive for 7+
+days, consider deleting" note per row (created_at-based - sessions have
+no deactivated_at); deletion stays manual, cascade unchanged.
+
+**Verified:** npm run build compiled successfully (route list shows
+/bootstrap/register/{stall,group} + API twins; regenerate/credentials/
+stall-leads gone); npx tsc --noEmit exit 0; design gate clean on touched
+.tsx (no emoji, no rounded-full/xl/2xl/9999px, no mx-auto; new
+BootstrapRegister uses the same inline 10/16px radii as the existing
+bootstrap card UI). NOT verified against live DB (016 unapplied):
+registration flows, duplicate-SRN 409, group numbering, activation hook.
+
+**Needs user eyeball:** /bootstrap/register/stall + /register/group
+(form, success screen, no-session state), /admin/bootstrap create flow
+(2 steps + links screen), active-session dashboard (both tables, login
+codes, suggest dropdown only on group table), sessions list stale note,
+lead dashboard YOUR GROUP card.
+
+---
+
+## Session 36 -- Stall-claim fix, classroom toggle, QR check-in, feedback v2, phone normalisation (2026-07-20)
+
+**A. Stall no longer claimed at registration.** `registerStallVolunteer`
+(bootstrap.ts) dropped the `UPDATE bootstrap_stalls SET status='occupied',
+claimed_by=…` block. A stall volunteer now only gets a `bootstrap_volunteers`
+row with `suggested_stall_id`; the stall stays FREE until they log in and tap
+OCCUPIED when the first group arrives. suggested_stall_id still drives the admin
+STALL column and the dashboard highlight.
+
+**B. Classroom-mode toggle (leads).** New `setClassroomMode(id, val)` service +
+`PATCH /api/bootstrap/classroom` (cookie-auth, flips the caller's own row).
+`in_classroom` now rides `getVolunteerByToken` → surfaced as `inClassroom` on
+`GET /api/bootstrap/stalls`. BootstrapDashboard (lead view) gained a
+CLASSROOM MODE / IN CLASSROOM toggle in the top bar; while on, it (a) suppresses
+redirect suggestions -- gated on the fresh poll value `data.inClassroom`, not the
+stale state closure -- and (b) makes stall cards read-only (no onAction → no
+CLAIM/QUEUE buttons) behind a "CLASSROOM MODE ACTIVE -- QUEUE ACTIONS PAUSED"
+banner. Persists across re-login because it's read from the poll each cycle.
+
+**C. Feedback form v2.** Migration `017_feedback_extra.sql` (ADD COLUMN IF NOT
+EXISTS: overall_rating 1-10, memorable_stall, join_likelihood 1-5, suggestions;
+old `rating`/`comment` kept). NOT auto-applied -- must run in Neon before the new
+form works. `submitBootstrapFeedback` now takes an object
+(overallRating req, stallId, stallRating [reuses `rating`], joinLikelihood,
+memorableStall, suggestions). `getBootstrapFeedbackSummary` adds avgOverall (/10)
+and avgJoinLikelihood (/5); recent list now `coalesce(suggestions, comment)`.
+POST /api/bootstrap/feedback validates the new fields (overall 1-10 required,
+stall/join 1-5 optional). BootstrapFeedback.tsx rewritten as 5 tap-tile
+questions (only Q1 required; Q3 shows only when a stall is picked). Admin view:
+3 stat tiles (avg overall, avg join likelihood, responses) + recent suggestions
+in a `<details>` (last 5).
+
+**D. Phone normalisation.** New `src/lib/utils/phone.ts` → `normalisePhone()`
+strips non-digits and a leading 91 (12-digit), returns 10 digits or null.
+Applied server-side in register/stall, register/group (phone required → 400 on
+bad input) and join (mobile_number stays optional: normalise only when present).
+JoinClient mobile field pattern relaxed to `[+0-9\s-]{10,16}` so "+91 …" isn't
+blocked client-side; placeholder "10-digit number" + hint. BootstrapRegister
+phone gained the same placeholder/hint; SRN label → "SRN / PRN",
+placeholder "Your SRN or PRN".
+
+**E. QR check-in.** `npm install qrcode.react` (4.2.0). New
+`CheckinQROverlay.tsx` (COPY LINK + SHOW QR → full-screen centred overlay, tap
+to close). Logo read from `NEXT_PUBLIC_R2_PUBLIC_URL` env (`/icons/logo.png`,
+same asset as Navbar/Footer) -- falls back to no logo if the env is unset, so it
+never renders a broken image. BootstrapDashboard's lead check-in card now shows
+the overlay instead of the raw `<code>` URL.
+
+**G. /bootstrap hub.** BootstrapLogin gained "First time? Register below." with
+links to /bootstrap/register/{stall,group}. Both register success screens gained
+a "← Back to login" link to /bootstrap.
+
+**H. Legacy account hygiene.** `getBootstrapVolunteers` now filters
+`login_code IS NOT NULL`, hiding legacy CSV-generated (vol-N) accounts from admin
+tables going forward. One-time cleanup DELETE (login_code IS NULL) is PENDING --
+handed to the user to run in Neon (live-DB rule); not executed here.
+
+**Verified:** `npm run build` → compiled successfully, 45/45 pages; route list
+shows /api/bootstrap/classroom + register twins + feedback. `npx tsc --noEmit`
+exit 0. qrcode.react bundled (import compiled). Design gate clean on all touched
+.tsx (no emoji, no rounded-full/xl/2xl/9999px, no mx-auto). NOT verified against
+live DB: migration 017 unapplied, so the new feedback POST will error on
+overall_rating until it's run; classroom persistence, phone-normalised inserts,
+and the legacy DELETE are all untested against Neon.
+
+**Needs user action:** (1) apply `migrations/017_feedback_extra.sql` in Neon
+before using the new feedback form; (2) run the H1 DELETE cleanup in Neon if
+desired. **Needs eyeball:** lead dashboard classroom toggle + read-only grid,
+QR overlay centred at 375px, /bootstrap login registration links, /bootstrap/
+feedback new 5-question form, admin feedback stat tiles + suggestions details,
+/join mobile field with +91.
+
+---
+
+## Session 37 -- 07/20/2026 -- Vercel image transformation quota fix
+
+At 3.8k/5k monthly image transformations with Bootstrap week (Aug 10–17)
+expected to surge /crew traffic. Three targeted fixes to stay well under quota.
+Narrow authorized `next.config.ts` exception (same precedent as remotePatterns);
+no migration.
+
+**A. next.config.ts (additive only, remotePatterns untouched).** Before: no
+`deviceSizes`/`imageSizes`/`minimumCacheTTL` set → Vercel defaults (8 device
+sizes × 2 formats). Added `deviceSizes: [384, 768, 1200]` (3 sizes) and
+`minimumCacheTTL: 31536000` (1 year). `imageSizes` left at default. The TTL is
+the highest-impact change: once an (image, size, format) is transformed it is
+CDN-cached indefinitely, so N students loading the same photo cost 1 credit.
+
+**B/D. Crew photos → `unoptimized`.** Confirmed ALL crew `photo_url` values are
+R2-hosted: MemberForm sets photo_url only via `uploadFile` → `/api/admin/upload`
+→ `${R2_PUBLIC_URL}/${path}` (no external-URL input for photos; bulk-import team
+route sets photo_url to null). Since Cloudflare/R2 already CDN-delivers them,
+added `unoptimized` to the crew `<Image>` (kept existing `fill` + `sizes`,
+harmless). Crew transformations 210+ → 0.
+
+**C1. Sponsor logos → `unoptimized`.** Both tiers on the sponsors page plus
+SponsorMarquee. Small logos, no WebP/multi-size benefit.
+
+**C2. Event logo → `unoptimized`.** 64px `objectFit: contain` logo on the event
+detail page.
+
+**C3/covers kept optimized.** Gallery images already carried correct `sizes`
+props (grid `sizes` + lightbox is a separate full-size load) -- left optimized as
+full-quality photos worth transforming. Event covers (EventCard + detail hero)
+already had `sizes` -- left optimized.
+
+**Verified:** `npx tsc --noEmit` exit 0. `npm run build` → compiled successfully
+in 9.4s, 45/45 static pages. Design gate clean on touched .tsx (crew, sponsors,
+SponsorMarquee, event detail): only `unoptimized` props + why-comments added -- no
+emoji, no rounded radii, no mx-auto. Expected worst-case monthly transformations
+after this session: <300 (crew 0, sponsor/event logos 0, gallery ~90). NOT
+verified: actual Vercel dashboard transformation count post-deploy.
+
+**Needs eyeball:** /crew (photos still render from R2 unoptimized), /sponsors
+(logos crisp), event detail page (64px logo), homepage sponsor marquee.
+
+## Session 37B -- 07/20/2026 -- Favicon override fix + Open Graph image
+
+Tiny targeted session. No migration.
+
+**A. Deleted `src/app/favicon.ico`.** It was overriding `icon.tsx` (the orange
+shield V) because browsers request `/favicon.ico` first and a static file wins
+over the generated route. With it gone, App Router serves `icon.tsx` exclusively.
+Confirmed no `favicon` asset in the build output afterward.
+
+**B. Root metadata Open Graph / Twitter (layout.tsx).** An `openGraph` block
+already existed (title/description/type only) -- merged rather than replaced,
+keeping the existing description ("Student innovation club at PES University
+ECC"). Added `url`, `siteName`, `images` (1197×1050 R2 logo), `locale: en_IN`,
+and a new `twitter` (`summary`) block. Image URL built from a module-level `R2`
+const: `process.env.NEXT_PUBLIC_R2_PUBLIC_URL` with the pub-*.r2.dev URL as
+fallback (NEXT_PUBLIC_* is inlined at build, safe in static metadata).
+
+**Verified:** `npm run build` → compiled successfully in 8.8s, 44/44 static
+pages. `npx tsc --noEmit` exit 0. `ls .next/static/` → no favicon.ico.
+
+## Session 38 -- 07/20/2026 -- Bootstrap feedback AI summary + stale-docs sweep
+
+Authorized exception: one new admin API route for the Gemini summary. No
+migration.
+
+**A. Gemini feedback summary route** -- `POST /api/admin/bootstrap/sessions/
+[id]/summarize`. Double-auth (`auth()` + `isAdmin`) like every admin route.
+It pulls all feedback rows for the session, computes avg overall (/10) and avg
+join likelihood (/5), builds a compact per-response text block, and asks Gemini
+1.5 Flash (`gemini-1.5-flash:generateContent`, temp 0.3, maxOutputTokens 1024)
+for a 6-part leadership summary (overall experience, what worked, what needs
+improvement, stall insights, recruitment signal, top-3 actions). Returns
+`{ summary, responseCount, avgOverall, avgJoin }`. Failure modes are explicit:
+404 no feedback, 503 when `GEMINI_API_KEY` is unset, 502 on Gemini
+error/empty, 500 otherwise.
+
+**Deviation from the session spec (deliberate):** the spec inlined the SELECT in
+the route. CLAUDE.md's architecture contract says all SQL lives in the service
+layer, and CLAUDE.md wins on conflict -- so the query became
+`getBootstrapFeedbackRaw(sessionId)` in `services/bootstrap.ts` (new
+`BootstrapFeedbackRow` type, `LIMIT 500`), and the route just shapes text +
+calls Gemini. No inline SQL added.
+
+**B. SUMMARISE FEEDBACK button + modal** in `BootstrapAdminDashboard.tsx`,
+beside the existing feedback REFRESH button (disabled while summarising or when
+there are 0 responses). Fixed-overlay modal (backdrop + centered panel, no
+rounded corners -- outside the /bootstrap BS-palette exemption, so it follows the
+sharp-corner house style): header with response-count/averages, scrollable body
+that renders `**bold**` markdown as styled spans, footer crediting Gemini 1.5
+Flash. New state: `summaryOpen/summary/summaryMeta/summarizing/summaryError`.
+
+**C. Stale-docs sweep.** Added a "Last updated: Session 38" line to each and
+made targeted (not from-scratch) updates:
+- `docs/bootstrap-spec.md` -- the most out-of-date: its whole v4 body describes
+  the retired admin-CSV `vol-N` credential model. Prepended a "CURRENT STATE
+  (Session 38)" section covering self-registration (SRN username, plaintext
+  login_code), stall vs group-lead roles, visitor groups/check-in QR, classroom
+  mode, feedback + AI summary, and the SVG map; left the v4 body as historical
+  record.
+- `Handoff.md` -- header date, migrations 001-017, data model (bootstrap_groups/
+  visitors/feedback + the new volunteer/stall columns), API map (register,
+  checkin, classroom, feedback, summarize, visitors, groups, role, group lead),
+  `GEMINI_API_KEY` env, and the vegavath.live / teamvegavath Vercel deployment.
+- `README.md` -- deployment, Bootstrap feature copy, DB-schema block,
+  `GEMINI_API_KEY` env, migration status 001-017.
+- `docs/planning-agent-briefing.md` -- Bootstrap architecture, env, migration
+  status, docs table, and a condensed S30–S38 timeline.
+
+**Verified:** `npx tsc --noEmit` exit 0. `npm run build` → compiled
+successfully in 13.5s; the `/api/admin/bootstrap/sessions/[id]/summarize` route
+is listed in the build output.
+
+**Not verified:** a live Gemini call -- `GEMINI_API_KEY` is not in `.env.local`,
+so locally the route returns its 503 path (this is the expected, correct
+behaviour when the key is absent; a real call needs the key set in
+`.env.local` or Vercel env). The prompt/response wiring is standard
+`generateContent` and unchanged from the spec.
+
+**Needs eyeball:** /admin/bootstrap feedback section -- the SUMMARISE FEEDBACK
+button placement, and (once `GEMINI_API_KEY` is set) the summary modal's layout
+and bold rendering.
+NOT verified: live OG preview (needs deploy + social-card debugger).
+
+## Session 39 -- 07/20/2026 -- Em dash removal + in-app docs site at /docs
+
+**A. Em dash sweep across all markdown.** Ran a repo-wide script replacing
+U+2014 (em dash) with `--` in every `.md` file outside node_modules/.next/.git:
+**10 files, 270 replacements**. Added a "Writing style" section (no em dashes,
+no emoji in source, straight quotes only) to both `CLAUDE.md` and `AGENTS.md`.
+Gate: `grep` for em dashes across `**/*.md` now returns 0.
+
+**B. Packages.** `npm install react-markdown remark-gfm` (authorized for this
+session). Now in package.json: react-markdown ^10.1.0, remark-gfm ^4.0.1.
+
+**C. Docs site infrastructure (new `(docs)` route group).**
+- `src/lib/docs-config.ts` -- DOC_SECTIONS nav config (Getting Started /
+  Reference / Systems) + ALL_DOC_PAGES.
+- `src/app/(docs)/docs/layout.tsx` -- site Navbar + sticky sidebar + content
+  column. Two corrections vs the spec draft: imported the Navbar as a NAMED
+  export (`import { Navbar }` -- it has no default export, so the spec's default
+  import would not have compiled), and used the real Navbar height of 72px (spec
+  assumed 64px, which would tuck content under the fixed nav).
+- `src/components/docs/DocsSidebar.tsx` -- client sidebar, active-link
+  highlight. Used `var(--accent-dim)` for the active tint instead of a
+  hardcoded `rgba(...)` to stay tokens-only.
+- `src/components/docs/DocsContent.tsx` -- shared react-markdown renderer, all
+  elements styled with design tokens. Adapted the `code` renderer for
+  react-markdown v10 (which dropped the `inline` prop the draft relied on):
+  block vs inline is now detected via the `language-*` className / a newline, so
+  inline code still renders inline instead of as a full-width block.
+- `src/app/(docs)/docs/page.tsx` (reads docs/wiki/README.md) and
+  `[slug]/page.tsx` (reads docs/wiki/<slug>.md, generateStaticParams +
+  generateMetadata, notFound on missing).
+
+**D. Documentation (`docs/wiki/`, 7 files).** Written from the actual source
+(routes/migrations/services/components read directly), 6 in parallel:
+README (overview), architecture, routes (all 82 routes -- 28 pages + 54 API),
+database (all 17 tables across migrations 001-017), bootstrap (~4.5k words),
+admin, deployment (14 env vars, values redacted -- verified no secret leaked).
+
+**E. Navbar.** Added `{ href: "/docs", label: "DOCS" }` as the last nav item,
+then removed it at the user's request: the docs are for independent / coding-team
+review and future development, not public navigation. The `/docs` routes remain
+live and reachable by direct URL -- they are simply no longer surfaced in the
+public Navbar.
+
+**Verified:** `npm run build` -> compiled successfully, 0 errors;
+`npx tsc --noEmit` exit 0; em-dash gate 0; design gate on all touched .tsx
+(no emoji / banned radii / mx-auto) clean. All 7 docs prerender in the build
+manifest: /docs, /docs/{architecture,deployment,routes,database,bootstrap,admin}.
+
+**Notes flagged by the doc pass (documented as-is, not "fixed"):**
+`bootstrap_sessions.map_image_url` + the `sessions/[id]/map` route still exist
+but live views render the hardcoded SVG map; `docs/bootstrap-spec.md` lower
+sections remain stale relative to the shipped self-registration model.
+
+**Needs eyeball:** /docs and a couple of sub-pages in the dev server -- sidebar
+active state, markdown typography (headings, tables, inline vs block code), and
+the 72px nav offset. DOCS link in the Navbar.

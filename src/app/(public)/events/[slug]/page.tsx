@@ -82,6 +82,7 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                         width={64}
                         height={64}
                         style={{ height: "64px", width: "64px", objectFit: "contain", border: "1px solid var(--border)", background: "var(--bg-card)", padding: "0.4rem" }}
+                        unoptimized // 64px logo, no transformation benefit
                       />
                     ) : null}
                     <div>

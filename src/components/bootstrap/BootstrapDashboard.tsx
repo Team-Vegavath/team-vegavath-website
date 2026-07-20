@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BootstrapStall } from "@/lib/services/bootstrap";
 import BootstrapMapSVG from "./BootstrapMapSVG";
+import CheckinQROverlay from "./CheckinQROverlay";
 import StallCard, { BS, StallGrid, type VolunteerStallAction } from "./StallCard";
 import StallVolunteerView from "./StallVolunteerView";
 
@@ -27,6 +28,11 @@ export default function BootstrapDashboard({
   // S33 - the lead's stable QR check-in token (rides the poll payload);
   // origin is set after mount because window doesn't exist during SSR
   const [checkinToken, setCheckinToken] = useState<string | null>(null);
+  // S35 - group number, assigned FCFS once the session is active
+  const [groupNumber, setGroupNumber] = useState<number | null>(null);
+  // S36 - lead classroom mode: rides the poll payload so it survives re-login
+  // and stays in sync if an admin ever flips it server-side
+  const [inClassroom, setInClassroom] = useState(false);
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
   const [showMap, setShowMap] = useState(false);
@@ -60,6 +66,8 @@ export default function BootstrapDashboard({
       setMySuggestion(data.mySuggestion ?? null);
       setVolunteerRole(data.volunteerRole ?? "stall");
       setCheckinToken(data.checkinToken ?? null);
+      setGroupNumber(data.groupNumber ?? null);
+      setInClassroom(data.inClassroom ?? false);
       setLastUpdated(Date.now());
       failCount.current = 0;
       setConnectionIssue(false);
@@ -94,7 +102,9 @@ export default function BootstrapDashboard({
       const genuinelyFreed = justFreed.filter((s) => prevOf(s.id)?.queued_by == null);
       const myQueuedStall = newStalls.find((s) => s.queued_by === username);
 
-      if (genuinelyFreed.length > 0 && myQueuedStall && myQueuedStall.map_x != null) {
+      // S36 - classroom mode suppresses redirect suggestions (read fresh from
+      // the poll payload, not the possibly-stale state closure)
+      if (!(data.inClassroom ?? false) && genuinelyFreed.length > 0 && myQueuedStall && myQueuedStall.map_x != null) {
         const ranked = genuinelyFreed
           .filter((s) => s.map_x != null && s.map_y != null)
           .map((s) => ({
@@ -257,6 +267,34 @@ export default function BootstrapDashboard({
             />
             {secondsAgo !== null ? `LIVE · ${secondsAgo}s ago` : "CONNECTING…"}
           </span>
+          {/* S36 - classroom mode: pause redirect suggestions + queue actions
+              while a lead runs a classroom session */}
+          <button
+            onClick={async () => {
+              const next = !inClassroom;
+              setInClassroom(next);
+              await fetch("/api/bootstrap/classroom", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ in_classroom: next }),
+              }).catch(() => {});
+            }}
+            style={{
+              minHeight: "48px",
+              padding: "0 14px",
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "11px",
+              letterSpacing: "0.1em",
+              background: inClassroom ? `${BS.accent}1f` : "transparent",
+              border: `1px solid ${inClassroom ? BS.accent : BS.borderStrong}`,
+              borderRadius: "8px",
+              color: inClassroom ? BS.accent : BS.muted,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {inClassroom ? "IN CLASSROOM" : "CLASSROOM MODE"}
+          </button>
           {/* SVG map is hardcoded, so the button no longer depends on a URL */}
           <button
             onClick={() => setShowMap(true)}
@@ -321,6 +359,46 @@ export default function BootstrapDashboard({
       )}
 
       <main style={{ maxWidth: "56rem", margin: "0 auto", padding: "16px 16px 48px" }}>
+        {/* S35 - the lead's group assignment, handed out FCFS at registration
+            once the session is active */}
+        <div
+          style={{
+            background: BS.surface,
+            border: `1px solid ${BS.border}`,
+            borderRadius: "8px",
+            padding: "16px",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "baseline",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "11px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: BS.muted,
+            }}
+          >
+            Your group
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-chakra), sans-serif",
+              fontWeight: 700,
+              fontSize: "1.125rem",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: groupNumber ? BS.text : BS.muted,
+            }}
+          >
+            {groupNumber ? `Group ${groupNumber}` : "Not assigned yet"}
+          </span>
+        </div>
+
         {/* S33 - each group lead carries their own check-in link; the token is
             stable (migration 015), so a printed/QR'd URL survives re-logins */}
         {checkinToken && (
@@ -345,27 +423,17 @@ export default function BootstrapDashboard({
             >
               Your group check-in link
             </div>
-            <code
-              style={{
-                fontFamily: "var(--font-mono), monospace",
-                fontSize: "13px",
-                color: BS.text,
-                wordBreak: "break-all",
-                userSelect: "all",
-              }}
-            >
-              {`${origin}/bootstrap/checkin/${checkinToken}`}
-            </code>
             <div
               style={{
                 fontFamily: "var(--font-mono), monospace",
-                fontSize: "10px",
+                fontSize: "12px",
                 color: BS.muted,
-                marginTop: "8px",
+                marginBottom: "10px",
               }}
             >
-              Show this URL as a QR code for students to scan.
+              Students scan this QR to register into your group.
             </div>
+            <CheckinQROverlay checkinUrl={`${origin}/bootstrap/checkin/${checkinToken}`} />
           </div>
         )}
 
@@ -516,13 +584,34 @@ export default function BootstrapDashboard({
           </div>
         )}
 
+        {inClassroom && (
+          <div
+            style={{
+              background: `${BS.accent}14`,
+              border: `1px solid ${BS.accent}`,
+              borderRadius: "8px",
+              padding: "12px 16px",
+              marginBottom: "12px",
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "12px",
+              letterSpacing: "0.08em",
+              color: BS.accent,
+              textAlign: "center",
+            }}
+          >
+            CLASSROOM MODE ACTIVE — QUEUE ACTIONS PAUSED
+          </div>
+        )}
+
         <StallGrid>
           {stalls.map((stall) => (
             <StallCard
               key={stall.id}
               stall={stall}
-              username={username}
-              onAction={(action) => sendAction(stall.id, action)}
+              // S36 - in classroom mode the cards go read-only (no onAction),
+              // so no CLAIM/QUEUE buttons render while the lead runs a session
+              username={inClassroom ? undefined : username}
+              onAction={inClassroom ? undefined : (action) => sendAction(stall.id, action)}
             />
           ))}
         </StallGrid>

@@ -51,7 +51,6 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
   if (creating) {
     return (
       <BootstrapCreateSession
-        sessions={sessions}
         onDone={() => {
           setCreating(false);
           router.refresh();
@@ -59,6 +58,13 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
       />
     );
   }
+
+  // S35: self-registered volunteer accounts pile up in old sessions; nudge the
+  // admin to clean up (no automated deletion - DELETE stays a manual click).
+  // created_at is the only timestamp on sessions, so "inactive for 7+ days"
+  // means an inactive session created more than 7 days ago.
+  const isStale = (s: BootstrapSession) =>
+    !s.is_active && Date.now() - new Date(s.created_at).getTime() > 7 * 24 * 60 * 60 * 1000;
 
   return (
     <>
@@ -88,7 +94,24 @@ export default function BootstrapSessions({ sessions }: { sessions: BootstrapSes
             {sessions.length > 0 ? (
               sessions.map((s) => (
                 <tr key={s.id}>
-                  <td className="admin-td-primary" style={{ fontWeight: 500 }}>{s.name}</td>
+                  <td className="admin-td-primary" style={{ fontWeight: 500 }}>
+                    {s.name}
+                    {isStale(s) && (
+                      <span
+                        style={{
+                          display: "block",
+                          fontFamily: "var(--font-mono), monospace",
+                          fontSize: "0.68rem",
+                          color: "var(--text-muted)",
+                          marginTop: "2px",
+                          fontWeight: 400,
+                        }}
+                      >
+                        Session inactive for 7+ days. Consider deleting to remove
+                        volunteer accounts.
+                      </span>
+                    )}
+                  </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                     {new Date(s.created_at).toLocaleDateString("en-IN", {
                       day: "2-digit",

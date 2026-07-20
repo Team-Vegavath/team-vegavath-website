@@ -8,13 +8,37 @@ const labelStyle: React.CSSProperties = {
   display: "block",
   fontFamily: "var(--font-mono), monospace",
   fontSize: "0.7rem",
-  letterSpacing: "0.18em",
+  letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: BS.muted,
   marginBottom: "0.5rem",
 };
 
-// Visitor feedback form (S32): stall dropdown, 1-5 rating tiles, comment.
+const hintStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono), monospace",
+  fontSize: "0.62rem",
+  letterSpacing: "0.04em",
+  color: BS.muted,
+  marginTop: "0.4rem",
+  lineHeight: 1.5,
+};
+
+function tileStyle(active: boolean): React.CSSProperties {
+  return {
+    minHeight: "48px",
+    background: active ? BS.accent : BS.surface,
+    color: active ? "#ffffff" : BS.text,
+    border: `1px solid ${active ? BS.accent : BS.borderStrong}`,
+    borderRadius: "8px",
+    fontFamily: "var(--font-chakra), sans-serif",
+    fontWeight: 700,
+    fontSize: "1rem",
+    cursor: "pointer",
+  };
+}
+
+// S36 visitor feedback: 5 quick questions, mostly taps. Only the overall
+// rating (1-10) is required; everything else is optional.
 export default function BootstrapFeedback({
   hasSession,
   stalls,
@@ -22,16 +46,18 @@ export default function BootstrapFeedback({
   hasSession: boolean;
   stalls: { id: string; stall_name: string }[];
 }) {
+  const [overall, setOverall] = useState<number | null>(null);
   const [stallId, setStallId] = useState("");
-  const [rating, setRating] = useState<number | null>(null);
-  const [comment, setComment] = useState("");
+  const [stallRating, setStallRating] = useState<number | null>(null);
+  const [joinLikelihood, setJoinLikelihood] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!rating) return;
+    if (!overall) return;
     setBusy(true);
     setError("");
     try {
@@ -39,9 +65,11 @@ export default function BootstrapFeedback({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          overall_rating: overall,
           stall_id: stallId || undefined,
-          rating,
-          comment: comment.trim() || undefined,
+          stall_rating: stallId && stallRating ? stallRating : undefined,
+          join_likelihood: joinLikelihood || undefined,
+          suggestions: suggestions.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -69,7 +97,7 @@ export default function BootstrapFeedback({
         padding: "24px 16px",
       }}
     >
-      <div style={{ width: "100%", maxWidth: "24rem" }}>
+      <div style={{ width: "100%", maxWidth: "26rem" }}>
         <p
           style={{
             fontFamily: "var(--font-mono), monospace",
@@ -123,23 +151,54 @@ export default function BootstrapFeedback({
               style={{
                 fontFamily: "var(--font-chakra), sans-serif",
                 fontWeight: 700,
-                fontSize: "1.5rem",
+                fontSize: "1.4rem",
                 textTransform: "uppercase",
                 margin: "0 0 1.5rem",
+                lineHeight: 1.3,
               }}
             >
-              How was your experience?
+              How was your Vegavath Bootstrap experience?
             </h1>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* Q1 - overall, 1-10, required */}
+              <div>
+                <span style={labelStyle}>1. Overall experience *</span>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: "8px",
+                  }}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setOverall(n)}
+                      aria-pressed={overall === n}
+                      aria-label={`Rate ${n} out of 10`}
+                      style={tileStyle(overall === n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p style={hintStyle}>Tap to rate out of 10.</p>
+              </div>
+
+              {/* Q2 - which stall (optional) */}
               <div>
                 <label htmlFor="fb-stall" style={labelStyle}>
-                  Which stall?
+                  2. Which stall did you visit?
                 </label>
                 <select
                   id="fb-stall"
                   value={stallId}
-                  onChange={(e) => setStallId(e.target.value)}
+                  onChange={(e) => {
+                    setStallId(e.target.value);
+                    if (!e.target.value) setStallRating(null);
+                  }}
                   style={{
                     width: "100%",
                     minHeight: "52px",
@@ -162,45 +221,59 @@ export default function BootstrapFeedback({
                 </select>
               </div>
 
+              {/* Q3 - rate that stall, only when Q2 answered (optional) */}
+              {stallId && (
+                <div>
+                  <span style={labelStyle}>3. Rate that stall</span>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setStallRating(n)}
+                        aria-pressed={stallRating === n}
+                        aria-label={`Rate stall ${n} out of 5`}
+                        style={{ ...tileStyle(stallRating === n), flex: 1, minHeight: "52px" }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Q4 - likelihood to join, 1-5 (optional) */}
               <div>
-                <span style={labelStyle}>Rating</span>
+                <span style={labelStyle}>4. Likelihood to join Vegavath</span>
                 <div style={{ display: "flex", gap: "8px" }}>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
                       type="button"
-                      onClick={() => setRating(n)}
-                      aria-pressed={rating === n}
-                      aria-label={`Rate ${n} out of 5`}
-                      style={{
-                        flex: 1,
-                        minHeight: "52px",
-                        background: rating === n ? BS.accent : BS.surface,
-                        color: rating === n ? "#ffffff" : BS.text,
-                        border: `1px solid ${rating === n ? BS.accent : BS.borderStrong}`,
-                        borderRadius: "8px",
-                        fontFamily: "var(--font-chakra), sans-serif",
-                        fontWeight: 700,
-                        fontSize: "1.1rem",
-                        cursor: "pointer",
-                      }}
+                      onClick={() => setJoinLikelihood(n)}
+                      aria-pressed={joinLikelihood === n}
+                      aria-label={`Likelihood ${n} out of 5`}
+                      style={{ ...tileStyle(joinLikelihood === n), flex: 1, minHeight: "52px" }}
                     >
                       {n}
                     </button>
                   ))}
                 </div>
+                <p style={hintStyle}>1 = definitely not · 5 = already filling the form</p>
               </div>
 
+              {/* Q5 - suggestions (optional) */}
               <div>
-                <label htmlFor="fb-comment" style={labelStyle}>
-                  Comments (optional)
+                <label htmlFor="fb-suggestions" style={labelStyle}>
+                  5. Any suggestions?
                 </label>
                 <textarea
-                  id="fb-comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  maxLength={2000}
-                  rows={4}
+                  id="fb-suggestions"
+                  value={suggestions}
+                  onChange={(e) => setSuggestions(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="What could we do better next year?"
                   style={{
                     width: "100%",
                     padding: "12px 14px",
@@ -222,7 +295,7 @@ export default function BootstrapFeedback({
 
             <button
               type="submit"
-              disabled={busy || !rating}
+              disabled={busy || !overall}
               style={{
                 marginTop: "1.5rem",
                 minHeight: "56px",
@@ -236,8 +309,8 @@ export default function BootstrapFeedback({
                 fontSize: "1rem",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                cursor: busy ? "wait" : rating ? "pointer" : "default",
-                opacity: busy || !rating ? 0.6 : 1,
+                cursor: busy ? "wait" : overall ? "pointer" : "default",
+                opacity: busy || !overall ? 0.6 : 1,
               }}
             >
               {busy ? "Submitting…" : "Submit feedback"}

@@ -53,6 +53,7 @@ export default async function SponsorsPage() {
                         width={200}
                         height={64}
                         className="sponsor-logo"
+                        unoptimized // small logo, no WebP/multi-size benefit
                       />
                       <h2 className="heading" style={{ marginTop: "1.5rem", fontSize: "1.15rem", fontWeight: 600 }}>
                         {sponsor.name}
@@ -98,6 +99,7 @@ export default async function SponsorsPage() {
                         height={48}
                         className="sponsor-logo"
                         style={{ height: "48px", maxWidth: "160px" }}
+                        unoptimized // small logo, no WebP/multi-size benefit
                       />
                       <h2 className="heading" style={{ marginTop: "1.1rem", fontSize: "0.98rem", fontWeight: 600 }}>
                         {sponsor.name}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createApplication } from "@/lib/services/applications";
 import { getSetting } from "@/lib/services/settings";
 import { isValidEmail, isValidUrl } from "@/lib/utils";
+import { normalisePhone } from "@/lib/utils/phone";
 import type { ApplicationDomain } from "@/types/settings";
 
 // FY26 domains — must stay in sync with JoinClient DOMAINS and the CHECK
@@ -45,7 +46,9 @@ export async function POST(req: NextRequest) {
     const domain_interest = typeof body.domain_interest === "string" ? body.domain_interest : "";
     const domain_interest_2 = optionalString(body.domain_interest_2);
     const domain_interest_3 = optionalString(body.domain_interest_3);
-    const mobile_number = optionalString(body.mobile_number);
+    const mobile_raw = optionalString(body.mobile_number);
+    // normalise when present (strips +91 / spaces); null stays null (optional field)
+    const mobile_number = mobile_raw === null ? null : normalisePhone(mobile_raw);
     const srn_prn = optionalString(body.srn_prn);
     const semester = optionalString(body.semester);
     const why_join = optionalString(body.why_join);
@@ -83,9 +86,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (mobile_number !== null && !/^[0-9]{10}$/.test(mobile_number)) {
+    // mobile_raw present but normalisePhone rejected it → not 10 digits
+    if (mobile_raw !== null && mobile_number === null) {
       return NextResponse.json(
-        { error: "Mobile number must be exactly 10 digits" },
+        { error: "Mobile number must be 10 digits (optionally prefixed with +91)" },
         { status: 400 }
       );
     }

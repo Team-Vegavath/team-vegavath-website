@@ -149,6 +149,12 @@ Service exports never include password hashes or session tokens.
 3. UI work needs a human's visual OK in the dev server before it is
    "finished".
 
+## Writing style
+
+- NEVER use em dashes. Use double hyphens (--) instead.
+- No emoji in JSX or source code files unless explicitly asked.
+- Straight quotes only in code and prose.
+
 ## More context
 
 Full architecture and workflow docs (Handoff.md, docs/revamp-log.md,

@@ -209,6 +209,72 @@ export default function BootstrapLogin() {
             </p>
           )}
         </form>
+
+        {/* S36 - first-time volunteers reach registration straight from login */}
+        <div
+          style={{
+            marginTop: "2rem",
+            paddingTop: "1.5rem",
+            borderTop: `1px solid ${BS.border}`,
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "11px",
+              letterSpacing: "0.1em",
+              color: BS.muted,
+              textAlign: "center",
+              textTransform: "uppercase",
+              marginBottom: "4px",
+            }}
+          >
+            First time? Register below.
+          </p>
+          <a
+            href="/bootstrap/register/stall"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "14px",
+              fontFamily: "var(--font-chakra), sans-serif",
+              fontSize: "14px",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              textDecoration: "none",
+              background: "transparent",
+              border: `1px solid ${BS.border}`,
+              borderRadius: "10px",
+              color: BS.text,
+            }}
+          >
+            Register as Stall Volunteer
+          </a>
+          <a
+            href="/bootstrap/register/group"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "14px",
+              fontFamily: "var(--font-chakra), sans-serif",
+              fontSize: "14px",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              textDecoration: "none",
+              background: "transparent",
+              border: `1px solid ${BS.border}`,
+              borderRadius: "10px",
+              color: BS.text,
+            }}
+          >
+            Register as Group Volunteer
+          </a>
+        </div>
       </div>
     </div>
   );

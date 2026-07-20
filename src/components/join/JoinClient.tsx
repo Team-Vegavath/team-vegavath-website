@@ -392,11 +392,22 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     value={form.mobile_number}
                     onChange={handleChange}
                     required
-                    pattern="[0-9]{10}"
-                    title="10-digit mobile number"
-                    placeholder="10-digit mobile number"
+                    pattern="[+0-9\s-]{10,16}"
+                    title="10-digit number (a +91 prefix is fine)"
+                    placeholder="10-digit number"
                     className="join-input"
                   />
+                  <p
+                    style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.68rem",
+                      letterSpacing: "0.04em",
+                      color: "var(--text-muted)",
+                      marginTop: "0.4rem",
+                    }}
+                  >
+                    +91 prefix is fine — it will be removed
+                  </p>
                 </div>
 
                 <div>

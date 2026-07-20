@@ -9,12 +9,29 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const rating = Number(body?.rating);
+    // S36 multi-question form: overall_rating (1-10) is required; the rest optional.
+    const overallRating = Number(body?.overall_rating);
     const stallId = body?.stall_id ? String(body.stall_id) : null;
-    const comment = body?.comment ? String(body.comment).slice(0, 2000).trim() : null;
+    const stallRating = body?.stall_rating ? Number(body.stall_rating) : null;
+    const joinLikelihood = body?.join_likelihood ? Number(body.join_likelihood) : null;
+    const memorableStall = body?.memorable_stall
+      ? String(body.memorable_stall).slice(0, 200).trim()
+      : null;
+    const suggestions = body?.suggestions
+      ? String(body.suggestions).slice(0, 1000).trim()
+      : null;
 
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return NextResponse.json({ error: "Rating must be 1-5" }, { status: 400 });
+    if (!Number.isInteger(overallRating) || overallRating < 1 || overallRating > 10) {
+      return NextResponse.json({ error: "Overall rating must be 1-10" }, { status: 400 });
+    }
+    if (stallRating !== null && (!Number.isInteger(stallRating) || stallRating < 1 || stallRating > 5)) {
+      return NextResponse.json({ error: "Stall rating must be 1-5" }, { status: 400 });
+    }
+    if (
+      joinLikelihood !== null &&
+      (!Number.isInteger(joinLikelihood) || joinLikelihood < 1 || joinLikelihood > 5)
+    ) {
+      return NextResponse.json({ error: "Join likelihood must be 1-5" }, { status: 400 });
     }
 
     const session = await getActiveBootstrapSession();
@@ -30,7 +47,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await submitBootstrapFeedback(session.id, rating, stallId, comment || null);
+    await submitBootstrapFeedback(session.id, {
+      overallRating,
+      stallId,
+      // a per-stall rating only makes sense when a stall was named
+      stallRating: stallId ? stallRating : null,
+      joinLikelihood,
+      memorableStall,
+      suggestions: suggestions || null,
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[POST /api/bootstrap/feedback]", error);

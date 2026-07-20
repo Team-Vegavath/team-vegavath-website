@@ -32,6 +32,10 @@ const spaceMono = Space_Mono({
   display: "swap",
 });
 
+const R2 =
+  process.env.NEXT_PUBLIC_R2_PUBLIC_URL ??
+  "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev";
+
 export const metadata: Metadata = {
   title: {
     default: "Team Vegavath",
@@ -46,7 +50,24 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Team Vegavath",
     description: "Student innovation club at PES University ECC",
+    url: "https://vegavath.live",
+    siteName: "Team Vegavath",
+    images: [
+      {
+        url: `${R2}/icons/logo.png`,
+        width: 1197,
+        height: 1050,
+        alt: "Team Vegavath",
+      },
+    ],
+    locale: "en_IN",
     type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Team Vegavath",
+    description: "Student innovation club at PES University ECC",
+    images: [`${R2}/icons/logo.png`],
   },
 };
 

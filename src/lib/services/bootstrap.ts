@@ -30,6 +30,8 @@ export interface BootstrapStall {
 }
 
 // password_hash and current_session_token never leave this file.
+// login_code is the deliberate exception (S35): it IS the volunteer's password,
+// kept plaintext so the admin tables can show it - /bootstrap is low-stakes.
 export interface BootstrapVolunteer {
   id: string;
   session_id: string;
@@ -40,6 +42,11 @@ export interface BootstrapVolunteer {
   suggested_stall_name: string | null;
   role: "stall" | "lead"; // migration 014 - which dashboard the volunteer gets
   checkin_token?: string | null; // migration 015 - stable QR token (leads only)
+  login_code?: string | null; // migration 016 - plaintext, admin-visible
+  phone?: string | null; // migration 016 - self-registration contact
+  srn?: string | null; // migration 016 - username is the lowercased SRN
+  group_number?: number | null; // migration 016 - assigned FCFS on activation
+  in_classroom?: boolean; // migration 016 - classroom-mode flag (leads)
 }
 
 // migration 014 - visitor groups walked by a lead volunteer
@@ -67,19 +74,10 @@ export interface BootstrapVisitor {
 
 export interface BootstrapFeedbackSummary {
   total: number;
+  avgOverall: number | null; // S36 - out of 10
+  avgJoinLikelihood: number | null; // S36 - out of 5
   perStall: { stall_name: string; avg_rating: number; count: number }[];
   recentComments: { comment: string; rating: number | null; stall_name: string | null; submitted_at: string }[];
-}
-
-export interface VolunteerCredential {
-  username: string;
-  password: string;
-  display_name: string;
-}
-
-// stall-lead accounts carry their stall so the CSV can be split by stall
-export interface StallLeadCredential extends VolunteerCredential {
-  stall: string;
 }
 
 // 8 chars, no ambiguous characters (0/O, 1/l/I)
@@ -135,6 +133,9 @@ export async function setSessionActive(id: string, isActive: boolean): Promise<v
   if (isActive) {
     // single statement: activates this one, deactivates every other
     await sql`UPDATE bootstrap_sessions SET is_active = (id = ${id})`;
+    // S35: group volunteers registered before the day starts; hand out group
+    // numbers FCFS the moment the session goes live
+    await assignGroupNumbers(id);
   } else {
     await sql`UPDATE bootstrap_sessions SET is_active = false WHERE id = ${id}`;
   }
@@ -321,127 +322,121 @@ export async function setSessionMapImage(sessionId: string, imageUrl: string): P
 
 // -------------------------------------------------------------- volunteers
 
-// "Sharanya N" -> "sharanyan", "Kethan K B" -> "kethankb",
-// "Abhigyan Dutta" -> "abhigyandu"; collisions get a numeric suffix.
-function generateUsername(fullName: string, existing: Set<string>): string {
-  const parts = fullName.trim().toLowerCase().split(/\s+/);
-  const first = (parts[0] ?? "").replace(/[^a-z]/g, "");
-  // concatenate all remaining parts (handles initials like "K B")
-  const rest = parts.slice(1).join("").replace(/[^a-z]/g, "");
-  const base = first + rest.slice(0, 2);
-  let candidate = base;
-  let n = 2;
-  while (existing.has(candidate)) {
-    candidate = base + n;
-    n++;
-  }
-  existing.add(candidate);
-  return candidate;
+// S35 self-registration: username IS the SRN (lowercase, trimmed) - memorable
+// and unique per person; password is the auto-generated login_code, stored
+// plaintext alongside the hash so the admin tables can display it.
+
+export async function registerStallVolunteer(
+  sessionId: string,
+  name: string,
+  phone: string,
+  srn: string,
+  stallId: string
+): Promise<{ username: string; loginCode: string }> {
+  const username = srn.toLowerCase().trim();
+  const loginCode = generatePassword(8);
+  const hash = await bcrypt.hash(loginCode, 10);
+
+  // suggested_stall_id is the existing volunteer→stall link (S28/S33): it
+  // drives the admin STALL column and the volunteer's own dashboard highlight
+  await sql`
+    INSERT INTO bootstrap_volunteers
+      (session_id, username, display_name, password_hash,
+       login_code, phone, srn, role, suggested_stall_id)
+    VALUES
+      (${sessionId}, ${username}, ${name}, ${hash},
+       ${loginCode}, ${phone}, ${srn}, 'stall', ${stallId})`;
+
+  // S36: the stall is NOT claimed at registration - the volunteer hasn't
+  // arrived yet. suggested_stall_id (set above) is enough for the admin STALL
+  // column and the volunteer's dashboard highlight. The stall stays FREE until
+  // the volunteer logs in and taps OCCUPIED when the first group arrives.
+
+  return { username, loginCode };
 }
 
-// S33: stall leads are real accounts (role='stall') named after the people
-// the admin typed into the stall builder; suggested_stall_id ties each one
-// to their stall (reuses the S28 suggestion mechanism, no new column).
-export async function createStallLeadVolunteers(
+// Group volunteers get a stable checkin_token at registration so their QR URL
+// never changes (migration 015); the group number comes later, on activation.
+export async function registerGroupVolunteer(
   sessionId: string,
-  stalls: { id: string; stall_name: string; lead_names: string[] }[]
-): Promise<StallLeadCredential[]> {
-  const existing = new Set<string>();
-  const credentials: StallLeadCredential[] = [];
-  for (const stall of stalls) {
-    for (const name of stall.lead_names) {
-      const username = generateUsername(name, existing);
-      const password = generatePassword();
-      const hash = await bcrypt.hash(password, 10);
+  name: string,
+  phone: string,
+  srn: string
+): Promise<{ username: string; loginCode: string }> {
+  const username = srn.toLowerCase().trim();
+  const loginCode = generatePassword(8);
+  const hash = await bcrypt.hash(loginCode, 10);
+  const token = randomBytes(20).toString("hex");
+
+  await sql`
+    INSERT INTO bootstrap_volunteers
+      (session_id, username, display_name, password_hash,
+       login_code, phone, srn, role, checkin_token)
+    VALUES
+      (${sessionId}, ${username}, ${name}, ${hash},
+       ${loginCode}, ${phone}, ${srn}, 'lead', ${token})`;
+
+  return { username, loginCode };
+}
+
+// FCFS group numbers, handed out when the session activates. Round-robin over
+// the session's groups (Group A = 1, Group B = 2, ... in name order) so late
+// registrations spread evenly. Idempotent: only fills NULL group_numbers, so
+// re-activating a session never reshuffles anyone.
+export async function assignGroupNumbers(sessionId: string): Promise<void> {
+  const groups = await sql`
+    SELECT id, team_lead_id FROM bootstrap_groups
+    WHERE session_id = ${sessionId}
+    ORDER BY name ASC LIMIT 50`;
+  const groupCount = groups.length;
+  if (groupCount === 0) return;
+
+  const leads = await sql`
+    SELECT id FROM bootstrap_volunteers
+    WHERE session_id = ${sessionId}
+      AND role = 'lead'
+      AND group_number IS NULL
+    ORDER BY created_at ASC, id ASC`;
+
+  // offset past already-assigned leads so a second activation continues the
+  // round-robin instead of restarting at group 1
+  const assignedRows = await sql`
+    SELECT count(*)::int AS n FROM bootstrap_volunteers
+    WHERE session_id = ${sessionId} AND role = 'lead' AND group_number IS NOT NULL`;
+  const offset = (assignedRows[0] as { n: number }).n;
+
+  for (let i = 0; i < leads.length; i++) {
+    const leadId = (leads[i] as { id: string }).id;
+    const groupIdx = (offset + i) % groupCount;
+    await sql`
+      UPDATE bootstrap_volunteers
+      SET group_number = ${groupIdx + 1}
+      WHERE id = ${leadId}`;
+    // first lead into a group becomes its team_lead_id, which is what the
+    // QR check-in flow (getCheckinContext) resolves the group through
+    const group = groups[groupIdx] as { id: string; team_lead_id: string | null };
+    if (!group.team_lead_id) {
       await sql`
-        INSERT INTO bootstrap_volunteers
-          (session_id, username, password_hash, display_name, role, suggested_stall_id)
-        VALUES (${sessionId}, ${username}, ${hash}, ${name}, 'stall', ${stall.id})`;
-      credentials.push({ stall: stall.stall_name, display_name: name, username, password });
+        UPDATE bootstrap_groups SET team_lead_id = ${leadId}
+        WHERE id = ${group.id} AND team_lead_id IS NULL`;
+      group.team_lead_id = leadId;
     }
   }
-  return credentials; // plain passwords - returned ONCE, only hashes are stored
-}
-
-// Group leads walk with visitor groups; each gets a stable checkin_token at
-// creation so their QR URL never changes (migration 015).
-export async function createGroupLeadVolunteers(
-  sessionId: string,
-  count: number
-): Promise<{ credentials: VolunteerCredential[]; ids: string[] }> {
-  const credentials: VolunteerCredential[] = Array.from({ length: count }, (_, i) => ({
-    username: `lead-${i + 1}`,
-    password: generatePassword(),
-    display_name: `Group Lead ${i + 1}`,
-  }));
-  const ids: string[] = [];
-  for (const c of credentials) {
-    const hash = await bcrypt.hash(c.password, 10);
-    const token = randomBytes(20).toString("hex");
-    const rows = await sql`
-      INSERT INTO bootstrap_volunteers
-        (session_id, username, password_hash, display_name, role, checkin_token)
-      VALUES (${sessionId}, ${c.username}, ${hash}, ${c.display_name}, 'lead', ${token})
-      RETURNING id`;
-    ids.push((rows[0] as { id: string }).id);
-  }
-  return { credentials, ids }; // plain passwords - returned ONCE
-}
-
-// S33 carry-forward: Bootstrap runs 5 days with (mostly) the same stall leads.
-// Copies role='stall' accounts with IDENTICAL usernames AND password hashes so
-// the Day 1 CSV keeps working; checkin_token is NOT copied (globally UNIQUE,
-// and stall leads don't run QR check-in). Stall association re-links by name.
-export async function copyStallLeadVolunteers(
-  fromSessionId: string,
-  toSessionId: string
-): Promise<number> {
-  const copied = await sql`
-    INSERT INTO bootstrap_volunteers
-      (session_id, username, password_hash, display_name, role, suggested_stall_id)
-    SELECT ${toSessionId}, v.username, v.password_hash, v.display_name, 'stall',
-           (SELECT ns.id FROM bootstrap_stalls ns
-            WHERE ns.session_id = ${toSessionId}
-              AND lower(ns.stall_name) = lower(os.stall_name)
-            LIMIT 1)
-    FROM bootstrap_volunteers v
-    LEFT JOIN bootstrap_stalls os ON os.id = v.suggested_stall_id
-    WHERE v.session_id = ${fromSessionId} AND v.role = 'stall'
-    RETURNING id`;
-  // carry the informational lead names shown on stall cards too
-  await sql`
-    UPDATE bootstrap_stalls ns
-    SET lead_names = os.lead_names
-    FROM bootstrap_stalls os
-    WHERE ns.session_id = ${toSessionId}
-      AND os.session_id = ${fromSessionId}
-      AND lower(ns.stall_name) = lower(os.stall_name)
-      AND os.lead_names IS NOT NULL`;
-  return copied.length;
-}
-
-// carry-forward preview: who would be copied from a source session
-export async function getStallLeadVolunteers(
-  sessionId: string
-): Promise<{ id: string; username: string; display_name: string; stall_name: string | null }[]> {
-  const rows = await sql`
-    SELECT v.id, v.username, v.display_name, s.stall_name
-    FROM bootstrap_volunteers v
-    LEFT JOIN bootstrap_stalls s ON s.id = v.suggested_stall_id
-    WHERE v.session_id = ${sessionId} AND v.role = 'stall'
-    ORDER BY s.stall_name ASC NULLS LAST, v.display_name ASC LIMIT 100`;
-  return rows as { id: string; username: string; display_name: string; stall_name: string | null }[];
 }
 
 export async function getBootstrapVolunteers(sessionId: string): Promise<BootstrapVolunteer[]> {
+  // login_code is plaintext by design (S35) - this function is only called
+  // from admin-authenticated routes; never expose it on a public endpoint
   const rows = await sql`
     SELECT v.id, v.session_id, v.username, v.display_name, v.role,
            (v.current_session_token IS NOT NULL) AS is_active,
-           v.suggested_stall_id, s.stall_name AS suggested_stall_name
+           v.suggested_stall_id, s.stall_name AS suggested_stall_name,
+           v.login_code, v.phone, v.srn, v.group_number, v.in_classroom
     FROM bootstrap_volunteers v
     LEFT JOIN bootstrap_stalls s ON s.id = v.suggested_stall_id
     WHERE v.session_id = ${sessionId}
-    ORDER BY v.username ASC LIMIT 100`;
+      AND v.login_code IS NOT NULL  -- S36: only self-registered volunteers; hides legacy CSV accounts
+    ORDER BY v.display_name ASC LIMIT 200`;
   return rows as BootstrapVolunteer[];
 }
 
@@ -499,7 +494,8 @@ export async function getVolunteerByToken(token: string): Promise<BootstrapVolun
   const rows = await sql`
     SELECT v.id, v.session_id, v.username, v.display_name, v.role, v.checkin_token,
            (v.current_session_token IS NOT NULL) AS is_active,
-           v.suggested_stall_id, st.stall_name AS suggested_stall_name
+           v.suggested_stall_id, st.stall_name AS suggested_stall_name,
+           v.group_number, v.in_classroom
     FROM bootstrap_volunteers v
     JOIN bootstrap_sessions s ON s.id = v.session_id
     LEFT JOIN bootstrap_stalls st ON st.id = v.suggested_stall_id
@@ -513,6 +509,12 @@ export async function setVolunteerRole(
   role: "stall" | "lead"
 ): Promise<void> {
   await sql`UPDATE bootstrap_volunteers SET role = ${role} WHERE id = ${volunteerId}`;
+}
+
+// S36: leads flip themselves into classroom mode from the dashboard, which
+// suppresses redirect suggestions and queue actions while they run a session
+export async function setClassroomMode(id: string, val: boolean): Promise<void> {
+  await sql`UPDATE bootstrap_volunteers SET in_classroom = ${val} WHERE id = ${id}`;
 }
 
 // admin points a volunteer at a stall; null clears the suggestion
@@ -585,7 +587,10 @@ export async function getCheckinContext(token: string): Promise<CheckinContext |
            (SELECT count(*) FROM bootstrap_visitors WHERE group_id = g.id)::int AS visitor_count
     FROM bootstrap_volunteers v
     JOIN bootstrap_sessions s ON s.id = v.session_id
-    LEFT JOIN bootstrap_groups g ON g.team_lead_id = v.id
+    LEFT JOIN bootstrap_groups g
+      ON g.session_id = v.session_id
+     AND (g.team_lead_id = v.id
+          OR g.name = 'Group ' || chr(64 + v.group_number))
     WHERE v.checkin_token = ${token} AND s.is_active = true
     LIMIT 1`;
   return (rows[0] as CheckinContext) ?? null;
@@ -648,22 +653,39 @@ export async function assignUnassignedVisitors(sessionId: string): Promise<numbe
 
 // ------------------------------------------------- feedback (S32, mig 014)
 
+// S36: multi-question form. overall_rating (1-10) is the primary metric and is
+// required; the old `rating` column now holds the optional per-stall 1-5 score.
+// suggestions is the free-text field (the legacy `comment` column is left as-is
+// for older rows and is unioned into the admin summary).
 export async function submitBootstrapFeedback(
   sessionId: string,
-  rating: number,
-  stallId: string | null,
-  comment: string | null
+  data: {
+    overallRating: number;
+    stallId: string | null;
+    stallRating: number | null;
+    joinLikelihood: number | null;
+    memorableStall: string | null;
+    suggestions: string | null;
+  }
 ): Promise<void> {
   await sql`
-    INSERT INTO bootstrap_feedback (session_id, stall_id, rating, comment)
-    VALUES (${sessionId}, ${stallId}, ${rating}, ${comment})`;
+    INSERT INTO bootstrap_feedback
+      (session_id, stall_id, rating, overall_rating,
+       join_likelihood, memorable_stall, suggestions)
+    VALUES
+      (${sessionId}, ${data.stallId}, ${data.stallRating}, ${data.overallRating},
+       ${data.joinLikelihood}, ${data.memorableStall}, ${data.suggestions})`;
 }
 
 export async function getBootstrapFeedbackSummary(
   sessionId: string
 ): Promise<BootstrapFeedbackSummary> {
   const [totals, perStall, recent] = await Promise.all([
-    sql`SELECT count(*)::int AS total FROM bootstrap_feedback WHERE session_id = ${sessionId}`,
+    sql`
+      SELECT count(*)::int AS total,
+             round(avg(overall_rating)::numeric, 2)::float AS avg_overall,
+             round(avg(join_likelihood)::numeric, 2)::float AS avg_join
+      FROM bootstrap_feedback WHERE session_id = ${sessionId}`,
     sql`
       SELECT coalesce(s.stall_name, '(no stall)') AS stall_name,
              round(avg(f.rating)::numeric, 2)::float AS avg_rating,
@@ -674,33 +696,54 @@ export async function getBootstrapFeedbackSummary(
       GROUP BY s.stall_name
       ORDER BY avg_rating DESC LIMIT 50`,
     sql`
-      SELECT f.comment, f.rating, s.stall_name, f.submitted_at
+      SELECT coalesce(f.suggestions, f.comment) AS comment,
+             f.rating, s.stall_name, f.submitted_at
       FROM bootstrap_feedback f
       LEFT JOIN bootstrap_stalls s ON s.id = f.stall_id
       WHERE f.session_id = ${sessionId}
-        AND f.comment IS NOT NULL AND f.comment <> ''
+        AND coalesce(f.suggestions, f.comment) IS NOT NULL
+        AND coalesce(f.suggestions, f.comment) <> ''
       ORDER BY f.submitted_at DESC LIMIT 20`,
   ]);
+  const t = totals[0] as { total: number; avg_overall: number | null; avg_join: number | null };
   return {
-    total: (totals[0] as { total: number }).total,
+    total: t.total,
+    avgOverall: t.avg_overall,
+    avgJoinLikelihood: t.avg_join,
     perStall: perStall as BootstrapFeedbackSummary["perStall"],
     recentComments: recent as BootstrapFeedbackSummary["recentComments"],
   };
 }
 
-export async function regenerateVolunteerCredentials(
+// S38: raw feedback rows for the Gemini admin summary. Kept in the service
+// layer (not inline in the route) per the architecture contract - the route
+// only shapes the text and calls Gemini.
+export interface BootstrapFeedbackRow {
+  overall_rating: number | null;
+  join_likelihood: number | null;
+  memorable_stall: string | null;
+  suggestions: string | null;
+  stall_rating: number | null;
+  comment: string | null;
+  stall_name: string | null;
+}
+
+export async function getBootstrapFeedbackRaw(
   sessionId: string
-): Promise<VolunteerCredential[]> {
-  const volunteers = await getBootstrapVolunteers(sessionId);
-  const credentials: VolunteerCredential[] = [];
-  for (const v of volunteers) {
-    const password = generatePassword();
-    const hash = await bcrypt.hash(password, 10);
-    await sql`
-      UPDATE bootstrap_volunteers
-      SET password_hash = ${hash}, current_session_token = NULL
-      WHERE id = ${v.id}`;
-    credentials.push({ username: v.username, password, display_name: v.display_name });
-  }
-  return credentials;
+): Promise<BootstrapFeedbackRow[]> {
+  const rows = await sql`
+    SELECT
+      f.overall_rating,
+      f.join_likelihood,
+      f.memorable_stall,
+      f.suggestions,
+      f.rating        AS stall_rating,
+      f.comment,
+      s.stall_name
+    FROM bootstrap_feedback f
+    LEFT JOIN bootstrap_stalls s ON s.id = f.stall_id
+    WHERE f.session_id = ${sessionId}
+    ORDER BY f.submitted_at DESC
+    LIMIT 500`;
+  return rows as BootstrapFeedbackRow[];
 }

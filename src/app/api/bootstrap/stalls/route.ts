@@ -21,6 +21,8 @@ export async function GET() {
       mySuggestion: volunteer.suggested_stall_name ?? null,
       volunteerRole: volunteer.role ?? "stall", // S32 - picks the dashboard view
       checkinToken: volunteer.checkin_token ?? null, // S33 - lead's stable QR token
+      groupNumber: volunteer.group_number ?? null, // S35 - assigned FCFS on activation
+      inClassroom: volunteer.in_classroom ?? false, // S36 - lead classroom-mode flag
     });
   } catch (error) {
     console.error("[GET /api/bootstrap/stalls]", error);
