@@ -41,8 +41,12 @@ export const metadata: Metadata = {
     default: "Team Vegavath",
     template: "%s | Team Vegavath",
   },
+  metadataBase: new URL("https://vegavath.live"),
   description:
     "Team Vegavath is the official student innovation club of PES University, Electronic City Campus, racing toward innovation in automotive, robotics, design, media, and marketing.",
+  alternates: {
+    canonical: "/",
+  },
   keywords: ["Vegavath", "PESU ECC", "student club", "robotics", "automotive", "kart"],
   icons: {
     icon: "/icon",
