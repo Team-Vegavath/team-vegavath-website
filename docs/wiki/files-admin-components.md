@@ -337,7 +337,7 @@ API.
 - **Gemini summary modal** (when `summaryOpen`): a backdrop plus a centered
   panel with a header (title + meta line), a body that shows "GENERATING
   SUMMARY...", the error, or the summary (with `**bold**` markdown rendered as
-  styled spans), and a footer crediting "Gemini 1.5 Flash".
+  styled spans), and a footer crediting "Gemini 3.5 Flash".
 
 **Why it exists.** It is the single operational surface for a running Bootstrap
 day. The visibility-aware polling, on-demand (non-polled) feedback loads, and

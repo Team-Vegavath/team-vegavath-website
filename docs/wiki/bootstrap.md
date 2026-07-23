@@ -550,7 +550,7 @@ a SUMMARISE FEEDBACK button. It:
    layer, per the architecture contract; the route only shapes text and calls
    the API).
 2. Computes average overall and join scores and builds a compact text prompt.
-3. Calls Google's Gemini 1.5 Flash
+3. Calls Google's Gemini 3.5 Flash
    (`generativelanguage.googleapis.com/.../gemini-1.5-flash:generateContent`),
    requiring `GEMINI_API_KEY` (503 if unset), asking for a ~250-350 word
    leadership summary with fixed sections (Overall Experience, What Worked, What
