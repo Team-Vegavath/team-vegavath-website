@@ -190,7 +190,7 @@ export default function BootstrapFeedback({
               {/* Q2 - which stall (optional) */}
               <div>
                 <label htmlFor="fb-stall" style={labelStyle}>
-                  2. Which stall did you visit?
+                  2. Which stall stood out most?
                 </label>
                 <select
                   id="fb-stall"

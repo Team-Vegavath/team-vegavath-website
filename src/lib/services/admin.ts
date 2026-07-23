@@ -1,5 +1,3 @@
-import crypto from "crypto";
-
 import bcrypt from "bcryptjs";
 
 import { sql } from "@/lib/db";
@@ -150,7 +148,8 @@ export type PendingRequest = {
 export async function createInviteToken(
   inviteeName: string
 ): Promise<{ token: string; slug: string }> {
-  const token = crypto.randomBytes(32).toString("hex");
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(32).toString("hex");
   const slug = toSlug(inviteeName);
   await sql`
     INSERT INTO admin_invite_tokens (token, invitee_name, invitee_slug)
@@ -175,7 +174,8 @@ export async function getInviteToken(token: string, slug: string) {
 
 /** Godfather-initiated. Replaces any outstanding reset token for the account. */
 export async function createPasswordResetToken(accountId: string): Promise<string> {
-  const token = crypto.randomBytes(32).toString("hex");
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(32).toString("hex");
   await sql`DELETE FROM admin_password_reset_tokens WHERE account_id = ${accountId}`;
   await sql`
     INSERT INTO admin_password_reset_tokens (account_id, token)
