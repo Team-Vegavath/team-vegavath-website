@@ -5,6 +5,23 @@ const HEADING_FONT = "var(--font-chakra)";
 const BODY_FONT = "var(--font-space)";
 const MONO_FONT = "var(--font-mono)";
 
+// react-markdown passes heading children as a ReactNode (string, array, or
+// elements). We only slugify the plain-text parts so [links](#anchor) can
+// target the id we stamp on each heading; non-text children collapse to "".
+function slugify(text: React.ReactNode): string {
+  const str = Array.isArray(text)
+    ? text.map((c) => (typeof c === "string" ? c : "")).join("")
+    : typeof text === "string"
+      ? text
+      : "";
+  return str
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]/g, "")
+    .replace(/--+/g, "-")
+    .trim();
+}
+
 export default function DocsContent({ markdown }: { markdown: string }) {
   return (
     <div>
@@ -13,6 +30,7 @@ export default function DocsContent({ markdown }: { markdown: string }) {
         components={{
           h1: ({ children }) => (
             <h1
+              id={slugify(children)}
               style={{
                 fontFamily: HEADING_FONT,
                 fontSize: "clamp(1.6rem, 3vw, 2rem)",
@@ -29,6 +47,7 @@ export default function DocsContent({ markdown }: { markdown: string }) {
           ),
           h2: ({ children }) => (
             <h2
+              id={slugify(children)}
               style={{
                 fontFamily: HEADING_FONT,
                 fontSize: "1.2rem",
@@ -44,6 +63,7 @@ export default function DocsContent({ markdown }: { markdown: string }) {
           ),
           h3: ({ children }) => (
             <h3
+              id={slugify(children)}
               style={{
                 fontFamily: HEADING_FONT,
                 fontSize: "0.95rem",

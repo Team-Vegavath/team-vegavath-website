@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { sql } from "@/lib/db";
-import { getEvents, createEvent, updateEvent, archiveEvent } from "@/lib/services/events";
+import { getEvents, createEvent, updateEvent, archiveEvent, deleteEvent } from "@/lib/services/events";
 import { slugify } from "@/lib/utils";
 
 export async function GET() {
@@ -70,7 +69,7 @@ export async function DELETE(req: NextRequest) {
     const permanent = new URL(req.url).searchParams.get("permanent");
 
     if (permanent === "true") {
-      await sql`DELETE FROM events WHERE id = ${id}`;
+      await deleteEvent(id);
     } else {
       await archiveEvent(id);
     }

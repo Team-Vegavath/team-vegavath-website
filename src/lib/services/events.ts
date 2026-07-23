@@ -30,6 +30,11 @@ export async function getEventBySlug(slug: string): Promise<Event | null> {
   return (rows[0] as Event) ?? null;
 }
 
+export async function getEventById(id: string): Promise<Event | null> {
+  const rows = await sql`SELECT * FROM events WHERE id = ${id} LIMIT 1`;
+  return (rows[0] as Event) ?? null;
+}
+
 export async function getUpcomingEvents(limit = 3): Promise<Event[]> {
   const rows = await sql`
     SELECT * FROM events
@@ -89,4 +94,8 @@ export async function archiveEvent(id: string): Promise<void> {
   await sql`
     UPDATE events SET status = 'archived', updated_at = now()
     WHERE id = ${id}`;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  await sql`DELETE FROM events WHERE id = ${id}`;
 }

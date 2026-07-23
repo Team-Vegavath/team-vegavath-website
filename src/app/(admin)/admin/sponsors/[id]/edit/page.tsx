@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import DeleteSponsorButton from "@/components/admin/DeleteSponsorButton";
 import SponsorForm from "@/components/admin/SponsorForm";
 import { auth } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { getSponsorById } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
   title: "Edit Sponsor",
@@ -25,13 +25,11 @@ export default async function EditSponsorPage({
   }
 
   const { id } = await params;
-  const rows = await sql`SELECT * FROM sponsors WHERE id = ${id} LIMIT 1`;
+  const sponsor = await getSponsorById(id);
 
-  if (rows.length === 0) {
+  if (!sponsor) {
     notFound();
   }
-
-  const sponsor = rows[0]!;
 
   return (
     <div style={{ maxWidth: "52rem" }}>
@@ -49,8 +47,8 @@ export default async function EditSponsorPage({
           id: sponsor.id,
           name: sponsor.name,
           tier: sponsor.tier,
-          website_url: sponsor.website_url,
-          description: sponsor.description,
+          website_url: sponsor.website_url ?? undefined,
+          description: sponsor.description ?? undefined,
           display_order: sponsor.display_order,
           is_active: sponsor.is_active,
           logo_url: sponsor.logo_url,

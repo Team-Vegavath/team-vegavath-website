@@ -155,6 +155,17 @@ Service exports never include password hashes or session tokens.
 - No emoji in JSX or source code files unless explicitly asked.
 - Straight quotes only in code and prose.
 
+## Agent behaviour
+
+- Do not parallelize work across multiple subagents or parallel tool-call
+  batches. Work through files sequentially, one at a time, and re-check each
+  file before moving to the next.
+- Task/todo-tracking tools and installed skills/MCP tools are fine to use
+  normally.
+- If a session is too large to complete reliably in a single sequential
+  pass, stop and ask the user to split it into smaller sessions rather than
+  parallelising or rushing through it.
+
 ## More context
 
 Full architecture and workflow docs (Handoff.md, docs/revamp-log.md,

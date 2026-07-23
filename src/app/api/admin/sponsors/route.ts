@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { sql } from "@/lib/db";
-import { getSponsors, createSponsor, updateSponsor, toggleSponsorActive } from "@/lib/services/sponsors";
+import { getSponsors, createSponsor, updateSponsor, toggleSponsorActive, deleteSponsor } from "@/lib/services/sponsors";
 
 export async function GET() {
   const session = await auth();
@@ -69,7 +68,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    await sql`DELETE FROM sponsors WHERE id = ${id}`;
+    await deleteSponsor(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/admin/sponsors]", error);

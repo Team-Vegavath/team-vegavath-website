@@ -17,8 +17,9 @@ async function getMaintenanceMode(): Promise<boolean> {
   }
   try {
     const sql = neon(process.env.DATABASE_URL!);
-    const rows = await sql`
-      SELECT value FROM site_settings WHERE key = 'maintenance_mode' LIMIT 1`;
+    const rows = await sql.query(
+      "SELECT value FROM site_settings WHERE key = 'maintenance_mode' LIMIT 1"
+    );
     const value = (rows[0] as { value: string } | undefined)?.value === "true";
     maintenanceCache = { value, at: Date.now() };
     return value;

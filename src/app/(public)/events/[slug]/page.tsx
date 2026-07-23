@@ -15,11 +15,6 @@ type EventPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const events = await getEvents({ limit: 50 });
-  return events.map((event) => ({ slug: event.slug }));
-}
-
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { slug } = await params;
   const event = await getEventBySlug(slug);

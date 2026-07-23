@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
-import { sql } from "@/lib/db";
+import { getAdminAccountForAuth, getAdminTokenVersionById } from "@/lib/services/admin";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -19,15 +19,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Try DB accounts first (multi-admin, S27)
         try {
-          const rows = await sql`
-            SELECT id, username, display_name, password_hash, role
-            FROM admin_accounts WHERE username = ${username}
-          `;
-          if (rows.length > 0) {
-            const account = rows[0] as {
-              id: string; username: string; display_name: string;
-              password_hash: string; role: string;
-            };
+          const account = await getAdminAccountForAuth(username);
+          if (account) {
             const valid = await bcrypt.compare(password, account.password_hash)
               .catch(() => false);
             if (!valid) return null;
@@ -35,11 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // adds the token_version column.
             let tokenVersion = 0;
             try {
-              const tv = await sql`
-                SELECT token_version FROM admin_accounts WHERE id = ${account.id}
-              `;
-              tokenVersion = (tv[0] as { token_version: number } | undefined)
-                ?.token_version ?? 0;
+              tokenVersion = (await getAdminTokenVersionById(account.id)) ?? 0;
             } catch {
               // Column missing - default 0 matches the migration default
             }
@@ -97,12 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // reset bumps it, killing every live JWT for that account.
       if (!user && token.isAdmin && token.accountId && token.accountId !== "godfather") {
         try {
-          const rows = await sql`
-            SELECT token_version FROM admin_accounts
-            WHERE id = ${token.accountId as string}
-          `;
-          const current = (rows[0] as { token_version: number } | undefined)
-            ?.token_version;
+          const current = await getAdminTokenVersionById(token.accountId as string);
           if (current === undefined || current !== (token.tokenVersion as number)) {
             return null; // Force re-login - password was reset or account deleted
           }

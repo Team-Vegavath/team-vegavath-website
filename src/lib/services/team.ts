@@ -19,6 +19,11 @@ export async function getMembersByTier(
   return rows as TeamMember[];
 }
 
+export async function getTeamMemberById(id: string): Promise<TeamMember | null> {
+  const rows = await sql`SELECT * FROM team_members WHERE id = ${id} LIMIT 1`;
+  return (rows[0] as TeamMember) ?? null;
+}
+
 export async function createMember(input: CreateMemberInput): Promise<TeamMember> {
   const rows = await sql`
     INSERT INTO team_members (

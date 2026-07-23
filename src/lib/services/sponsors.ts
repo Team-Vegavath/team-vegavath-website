@@ -16,6 +16,11 @@ export async function getActiveSponsors(): Promise<Sponsor[]> {
   return rows as Sponsor[];
 }
 
+export async function getSponsorById(id: string): Promise<Sponsor | null> {
+  const rows = await sql`SELECT * FROM sponsors WHERE id = ${id} LIMIT 1`;
+  return (rows[0] as Sponsor) ?? null;
+}
+
 export async function createSponsor(
   input: CreateSponsorInput
 ): Promise<Sponsor> {
@@ -55,4 +60,8 @@ export async function toggleSponsorActive(
 ): Promise<void> {
   await sql`
     UPDATE sponsors SET is_active = ${is_active} WHERE id = ${id}`;
+}
+
+export async function deleteSponsor(id: string): Promise<void> {
+  await sql`DELETE FROM sponsors WHERE id = ${id}`;
 }

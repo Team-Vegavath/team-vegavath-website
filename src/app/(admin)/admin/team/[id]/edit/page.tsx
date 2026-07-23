@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import DeleteMemberButton from "@/components/admin/DeleteMemberButton";
 import MemberForm from "@/components/admin/MemberForm";
 import { auth } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { getTeamMemberById } from "@/lib/services/team";
 
 export const metadata: Metadata = {
   title: "Edit Member",
@@ -26,9 +26,7 @@ export default async function EditMemberPage({
   }
 
   const { id } = await params;
-  const rows = await sql`SELECT * FROM team_members WHERE id = ${id} LIMIT 1`;
-
-  const member = rows[0];
+  const member = await getTeamMemberById(id);
 
   if (!member) {
     notFound();
@@ -51,10 +49,10 @@ export default async function EditMemberPage({
           name: member.name,
           role: member.role,
           tier: member.tier,
-          domain: member.domain,
-          quote: member.quote,
-          linkedin_url: member.linkedin_url,
-          github_url: member.github_url,
+          domain: member.domain ?? undefined,
+          quote: member.quote ?? undefined,
+          linkedin_url: member.linkedin_url ?? undefined,
+          github_url: member.github_url ?? undefined,
           display_order: member.display_order,
           is_active: member.is_active,
           photo_url: member.photo_url,

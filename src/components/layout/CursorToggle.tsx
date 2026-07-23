@@ -32,13 +32,12 @@ export default function CursorToggle({ enabled, onToggle }: CursorToggleProps) {
         </span>
         <div
           className={`relative h-5 w-9 transition-all duration-300 ease-out ${
-            enabled
-              ? "bg-gradient-to-r from-[#EF5D08] to-[#F29C04] shadow-[0_0_12px_rgba(239,93,8,0.4)]"
-              : "bg-gray-700 hover:bg-gray-600"
+            enabled ? "" : "bg-gray-700 hover:bg-gray-600"
           }`}
+          style={enabled ? { background: "var(--accent)" } : undefined}
         >
           <div
-            className={`absolute top-0.5 h-4 w-4 bg-white shadow-lg transition-all duration-300 ease-out ${
+            className={`absolute top-0.5 h-4 w-4 bg-white transition-all duration-300 ease-out ${
               enabled ? "left-[18px]" : "left-0.5"
             }`}
           />

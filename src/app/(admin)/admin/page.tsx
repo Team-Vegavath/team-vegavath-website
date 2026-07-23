@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 
 import { auth, signIn } from "@/lib/auth";
-import { logAdminLogin } from "@/lib/services/admin";
+import { countRecentFailedLogins, logAdminLogin } from "@/lib/services/admin";
 
 export const metadata: Metadata = {
   title: "Admin Login",
@@ -38,15 +38,8 @@ export default async function AdminLoginPage({
     let locked = false;
     if (ip) {
       try {
-        const { sql } = await import("@/lib/db");
-        const rows = await sql`
-          SELECT count(*)::int AS n
-          FROM admin_login_log
-          WHERE ip_address = ${ip}
-            AND success = false
-            AND attempted_at > now() - INTERVAL '15 minutes'
-        `;
-        locked = (rows[0] as { n: number }).n >= 5;
+        const failedCount = await countRecentFailedLogins(ip);
+        locked = failedCount >= 5;
       } catch {
         // DB unavailable - allow through rather than locking everyone out
       }

@@ -6,7 +6,7 @@ import DeleteEventButton from "@/components/admin/DeleteEventButton";
 import EventForm from "@/components/admin/EventForm";
 import ToggleEventStatusButton from "@/components/admin/ToggleEventStatusButton";
 import { auth } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { getEventById } from "@/lib/services/events";
 
 export const metadata: Metadata = {
   title: "Edit Event",
@@ -26,13 +26,11 @@ export default async function EditEventPage({
   }
 
   const { id } = await params;
-  const rows = await sql`SELECT * FROM events WHERE id = ${id} LIMIT 1`;
+  const event = await getEventById(id);
 
-  if (rows.length === 0) {
+  if (!event) {
     notFound();
   }
-
-  const event = rows[0]!;
   const formattedDate = event.event_date
     ? new Date(event.event_date as string).toISOString().slice(0, 10)
     : "";
@@ -56,10 +54,10 @@ export default async function EditEventPage({
           slug: event.slug,
           category: event.category,
           status: event.status,
-          description: event.description,
+          description: event.description ?? undefined,
           event_date: formattedDate,
           registration_open: event.registration_open,
-          registration_form_url: event.registration_form_url,
+          registration_form_url: event.registration_form_url ?? undefined,
           logo_url: event.logo_url,
           cover_image_url: event.cover_image_url,
         }}

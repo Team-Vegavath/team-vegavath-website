@@ -48,6 +48,17 @@ export async function getRecentLogins(limit = 10): Promise<AdminLoginEntry[]> {
   return rows as AdminLoginEntry[];
 }
 
+export async function countRecentFailedLogins(ip: string): Promise<number> {
+  const rows = await sql`
+    SELECT count(*)::int AS n
+    FROM admin_login_log
+    WHERE ip_address = ${ip}
+      AND success = false
+      AND attempted_at > now() - INTERVAL '15 minutes'
+  `;
+  return (rows[0] as { n: number }).n;
+}
+
 // ------------------------------------------------------- admin accounts (S27)
 
 export type AdminAccount = {
@@ -58,6 +69,36 @@ export type AdminAccount = {
   role: "admin" | "godfather";
   created_at: string;
 };
+
+export type AdminAccountAuthRow = {
+  id: string;
+  username: string;
+  display_name: string;
+  password_hash: string;
+  role: string;
+};
+
+export async function getAdminAccountForAuth(
+  username: string
+): Promise<AdminAccountAuthRow | null> {
+  const rows = await sql`
+    SELECT id, username, display_name, password_hash, role
+    FROM admin_accounts
+    WHERE username = ${username}
+    LIMIT 1`;
+  return (rows[0] as AdminAccountAuthRow | undefined) ?? null;
+}
+
+export async function getAdminTokenVersionById(
+  id: string
+): Promise<number | null> {
+  const rows = await sql`
+    SELECT token_version
+    FROM admin_accounts
+    WHERE id = ${id}
+    LIMIT 1`;
+  return (rows[0] as { token_version: number } | undefined)?.token_version ?? null;
+}
 
 export async function getAdminAccounts(): Promise<AdminAccount[]> {
   const rows = await sql`

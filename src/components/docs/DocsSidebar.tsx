@@ -39,7 +39,12 @@ export default function DocsSidebar() {
           </div>
           {section.pages.map((page) => {
             const href = page.slug === "" ? "/docs" : `/docs/${page.slug}`;
-            const active = pathname === href;
+            // startsWith (not ===) so an in-page anchor URL like
+            // /docs/bootstrap#session-lifecycle still highlights Bootstrap.
+            const active =
+              href === "/docs"
+                ? pathname === "/docs"
+                : pathname.startsWith(href);
             return (
               <Link
                 key={page.slug}
