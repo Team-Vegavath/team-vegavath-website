@@ -4,7 +4,7 @@ import ResetPasswordForm from "@/components/admin/ResetPasswordForm";
 import { getPasswordResetToken } from "@/lib/services/admin";
 
 export const metadata: Metadata = {
-  title: "Password Reset | Team Vegavath",
+  title: "Password Reset",
   robots: { index: false, follow: false },
 };
 

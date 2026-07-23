@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import KartGameWrapper from "@/components/home/KartGameWrapper";
 
 export const metadata: Metadata = {
-  title: "404 | Team Vegavath",
+  title: "404",
 };
 
 export default function NotFound() {

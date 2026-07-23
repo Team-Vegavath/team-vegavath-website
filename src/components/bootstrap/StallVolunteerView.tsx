@@ -36,6 +36,7 @@ export default function StallVolunteerView({
 
   // re-sync after a reload while the stall was occupied by me
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local selection with server-derived claim
     if (claimedStall) setMyStallId(claimedStall.id);
   }, [claimedStall]);
 

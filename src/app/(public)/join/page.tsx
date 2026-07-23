@@ -5,7 +5,7 @@ import JoinClient from "@/components/join/JoinClient";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Join Us | Team Vegavath",
+  title: "Join Us",
 };
 
 export default async function JoinPage() {

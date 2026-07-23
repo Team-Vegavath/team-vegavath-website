@@ -30,6 +30,7 @@ export default function KartModelSection() {
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time mount detection for touch capability
     setIsTouch("ontouchstart" in window || navigator.maxTouchPoints > 0);
     return () => {
       if (resetTimer.current) clearTimeout(resetTimer.current);

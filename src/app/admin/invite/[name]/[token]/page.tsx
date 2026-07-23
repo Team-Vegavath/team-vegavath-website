@@ -4,7 +4,7 @@ import AdminRegisterForm from "@/components/admin/AdminRegisterForm";
 import { getInviteToken } from "@/lib/services/admin";
 
 export const metadata: Metadata = {
-  title: "Admin Registration | Team Vegavath",
+  title: "Admin Registration",
   robots: { index: false, follow: false },
 };
 

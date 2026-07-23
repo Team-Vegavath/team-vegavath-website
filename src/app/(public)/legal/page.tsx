@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Legal | Team Vegavath",
+  title: "Legal",
 };
 
 export const revalidate = 120;

@@ -108,6 +108,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   useEffect(() => {
     const cookies = document.cookie.split(";").map((c) => c.trim());
     if (cookies.some((c) => c.startsWith("vg_applied="))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time cookie check, browser-only
       setAlreadyApplied(true);
     }
   }, []);

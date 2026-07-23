@@ -14,6 +14,10 @@ export async function setSetting(key: string, value: string): Promise<void> {
     ON CONFLICT (key) DO UPDATE SET value = ${value}, updated_at = now()`;
 }
 
+export async function getMaintenanceMode(): Promise<string | null> {
+  return getSetting("maintenance_mode");
+}
+
 export async function getAllSettings(): Promise<SiteSettings> {
   const rows = await sql`SELECT key, value FROM site_settings`;
   const map = Object.fromEntries(

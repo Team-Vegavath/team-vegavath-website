@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { usePasswordResetToken } from "@/lib/services/admin";
+import { consumePasswordResetToken } from "@/lib/services/admin";
 
 // PUBLIC route (exempted in middleware) - the one-time reset token is the gate.
 export async function POST(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
-    await usePasswordResetToken(token, password);
+    await consumePasswordResetToken(token, password);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof Error && error.message === "Invalid or expired token") {

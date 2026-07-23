@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
+import { isNoRegistrationEvent } from "@/lib/utils";
 
 interface EventFormProps {
   mode: "create" | "edit";
@@ -253,6 +254,17 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
         </span>
         <ToggleSwitch value={registration_open} onChange={setRegistrationOpen} ariaLabel="Registration open" />
       </div>
+
+      {isNoRegistrationEvent(slug) && (
+        <p style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.72rem",
+          color: "var(--text-muted)",
+          marginTop: "0.5rem",
+        }}>
+          Registration fields are hidden on the public event page for this event type.
+        </p>
+      )}
 
       <span className="admin-section-label">Media</span>
 

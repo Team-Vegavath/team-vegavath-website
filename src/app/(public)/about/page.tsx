@@ -8,7 +8,7 @@ import { getMilestones, type Milestone } from "@/lib/services/about";
 import { getActiveSponsors } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
-  title: "About | Team Vegavath",
+  title: "About",
 };
 
 export const revalidate = 120;

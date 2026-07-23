@@ -147,6 +147,7 @@ export default function AdminShell({ children, signOutSlot, hasPendingAccounts =
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close mobile nav on route change
     setMenuOpen(false);
   }, [pathname]);
 

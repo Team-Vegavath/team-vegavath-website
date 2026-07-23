@@ -10,7 +10,9 @@ import { Reveal } from "@/components/ui/Reveal";
 import KartModelWrapper from "@/components/home/KartModelWrapper";
 
 export const metadata: Metadata = {
-  title: "Team Vegavath | Karts, Code & Innovation at PESU ECC",
+  title: {
+    absolute: "Team Vegavath | Karts, Code & Innovation at PESU ECC",
+  },
 };
 
 export const revalidate = 60;

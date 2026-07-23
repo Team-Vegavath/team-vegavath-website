@@ -195,7 +195,7 @@ export async function getPasswordResetToken(token: string) {
 }
 
 /** Sets the new password and bumps token_version, killing all live JWTs. */
-export async function usePasswordResetToken(
+export async function consumePasswordResetToken(
   token: string,
   newPassword: string
 ): Promise<void> {

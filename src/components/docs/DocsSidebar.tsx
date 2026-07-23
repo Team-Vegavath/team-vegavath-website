@@ -3,7 +3,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DOC_SECTIONS } from "@/lib/docs-config";
 
-export default function DocsSidebar() {
+interface DocsSidebarProps {
+  onNavigate?: () => void;
+}
+
+export default function DocsSidebar({ onNavigate }: DocsSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -49,6 +53,7 @@ export default function DocsSidebar() {
               <Link
                 key={page.slug}
                 href={href}
+                onClick={onNavigate}
                 style={{
                   display: "block",
                   padding: "0.4rem 0.75rem",

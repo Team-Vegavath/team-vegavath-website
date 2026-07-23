@@ -55,6 +55,7 @@ export function useCursorPreference() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time localStorage restore
         setEnabled(JSON.parse(stored));
       }
     } catch {}

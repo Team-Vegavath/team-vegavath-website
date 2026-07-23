@@ -1,30 +1,20 @@
-import { neon } from "@neondatabase/serverless";
 import { auth } from "@/lib/auth";
+import { getMaintenanceMode } from "@/lib/services/settings";
 import { NextResponse } from "next/server";
 
-// Maintenance mode - driven by the admin settings toggle (site_settings).
-// Local neon() instance, NOT lib/db.ts: middleware runs on the Edge and must
-// stay pinned to the HTTP driver even if db.ts changes (pending dev-TCP fix).
-// Cached in-memory per Edge isolate for 60s so it isn't a DB query on every
-// request; a toggle flip takes effect within a minute.
-// NEXT_PUBLIC_MAINTENANCE_MODE stays as an emergency override (DB down).
 let maintenanceCache: { value: boolean; at: number } | null = null;
 
-async function getMaintenanceMode(): Promise<boolean> {
+async function isMaintenanceEnabled(): Promise<boolean> {
   if (process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true") return true;
   if (maintenanceCache && Date.now() - maintenanceCache.at < 60_000) {
     return maintenanceCache.value;
   }
   try {
-    const sql = neon(process.env.DATABASE_URL!);
-    const rows = await sql.query(
-      "SELECT value FROM site_settings WHERE key = 'maintenance_mode' LIMIT 1"
-    );
-    const value = (rows[0] as { value: string } | undefined)?.value === "true";
+    const value = (await getMaintenanceMode()) === "true";
     maintenanceCache = { value, at: Date.now() };
     return value;
   } catch {
-    return false; // DB unreachable - fail open, keep the site up
+    return false;
   }
 }
 
@@ -37,7 +27,7 @@ export default auth(async (req) => {
     !pathname.startsWith("/admin") &&
     !pathname.startsWith("/api") &&
     pathname !== "/maintenance" &&
-    (await getMaintenanceMode())
+    (await isMaintenanceEnabled())
   ) {
     const url = req.nextUrl.clone();
     url.pathname = "/maintenance";

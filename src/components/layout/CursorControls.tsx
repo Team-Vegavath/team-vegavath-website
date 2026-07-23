@@ -11,6 +11,7 @@ export function CursorControls() {
   // Touch devices are handled in CSS (@media (pointer: coarse) in globals.css)
   // to avoid the one-frame hydration flash JS detection had.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard + localStorage read, mount-only
     setMounted(true);
     try {
       const stored = localStorage.getItem("racing-cursor");

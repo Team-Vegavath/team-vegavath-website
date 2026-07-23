@@ -7,7 +7,7 @@ import GalleryClient from "@/components/gallery/GalleryClient";
 import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
-  title: "Gallery | Team Vegavath",
+  title: "Gallery",
 };
 
 export const revalidate = 120;

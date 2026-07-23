@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { Container } from "@/components/ui/Container";
 import { getEventBySlug, getEvents } from "@/lib/services/events";
 import { getGalleryByEvent } from "@/lib/services/gallery";
+import { isNoRegistrationEvent } from "@/lib/utils";
 import EventMediaClient from "@/components/events/EventMediaClient";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: EventPageProps): Promise<Meta
   const { slug } = await params;
   const event = await getEventBySlug(slug);
   return {
-    title: event ? `${event.title} | Team Vegavath` : "Event | Team Vegavath",
+    title: event ? event.title : "Event",
   };
 }
 
@@ -103,7 +104,8 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 {/* No registration block at all when there is nothing to register
                     for: the absence IS the signal. The closed message only shows
                     when a form URL exists but registration is switched off. */}
-                {event.registration_open || event.registration_form_url ? (
+                {!isNoRegistrationEvent(event.slug) &&
+                  (event.registration_open || event.registration_form_url) ? (
                   <div style={{ marginTop: "2rem" }}>
                     {event.registration_open ? (
                       <a

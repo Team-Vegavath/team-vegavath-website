@@ -59,3 +59,11 @@ export function isValidUrl(url: string): boolean {
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+
+const NO_REGISTRATION_PREFIXES = ["bootstrap-", "freshers-day-"];
+const NO_REGISTRATION_EXACT = new Set<string>([]);
+
+export function isNoRegistrationEvent(slug: string): boolean {
+  if (NO_REGISTRATION_EXACT.has(slug)) return true;
+  return NO_REGISTRATION_PREFIXES.some(prefix => slug.startsWith(prefix));
+}

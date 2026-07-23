@@ -5,7 +5,7 @@ import EventsClient from "@/components/events/EventsClient";
 import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
-  title: "Events | Team Vegavath",
+  title: "Events",
 };
 
 export const revalidate = 60;

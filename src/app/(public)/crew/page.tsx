@@ -5,7 +5,7 @@ import { getMembers } from "@/lib/services/team";
 import type { TeamMember } from "@/types/member";
 
 export const metadata: Metadata = {
-  title: "The Crew | Team Vegavath",
+  title: "The Crew",
 };
 
 export const revalidate = 120;

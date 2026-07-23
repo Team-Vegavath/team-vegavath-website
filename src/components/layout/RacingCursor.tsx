@@ -9,6 +9,7 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
   const [isTouch, setIsTouch] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard, mount-only
     setMounted(true);
     // Any touch capability counts: Samsung/One UI devices with S Pen or DeX
     // support can report a fine primary pointer, and hiding the cursor there

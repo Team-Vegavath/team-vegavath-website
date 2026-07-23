@@ -4,7 +4,7 @@ import { getActiveSponsors } from "@/lib/services/sponsors";
 import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
-  title: "Sponsors | Team Vegavath",
+  title: "Sponsors",
 };
 
 export const revalidate = 120;

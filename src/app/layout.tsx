@@ -38,7 +38,7 @@ const R2 =
 
 export const metadata: Metadata = {
   title: {
-    default: "Team Vegavath",
+    default: "Team Vegavath | PESU ECC",
     template: "%s | Team Vegavath",
   },
   metadataBase: new URL("https://vegavath.live"),
