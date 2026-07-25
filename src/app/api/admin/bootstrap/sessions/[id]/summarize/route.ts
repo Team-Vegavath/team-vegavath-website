@@ -98,7 +98,7 @@ Use prose inside each section -- no bullet symbols or bold emphasis except the n
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             // 1024 truncated the 5-section summary mid-sentence
-            maxOutputTokens: 2048,
+            maxOutputTokens: 8192,
           },
         }),
       }
