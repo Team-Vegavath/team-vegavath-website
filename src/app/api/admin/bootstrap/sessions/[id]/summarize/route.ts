@@ -48,22 +48,34 @@ export async function POST(
     })
     .join("\n");
 
-  const prompt = `You are analyzing Bootstrap feedback from ${rows.length} students who visited Team Vegavath's club showcase at PESU ECC Electronic City. Bootstrap is a 5-day open event where clubs showcase their projects and vehicles.
+  const prompt = `You are summarizing visitor feedback from a student club showcase event called Bootstrap at PESU ECC, run by Team Vegavath. Visitors (mostly freshers) walked through stalls run by club members.
 
-Stats: Average overall experience: ${avgOverall}/10, Average likelihood to join Vegavath: ${avgJoin}/5
+DATA:
+- Total responses: ${rows.length}
+- Average overall experience: ${avgOverall}/10
+- Average likelihood to join the club: ${avgJoin}/5
+- Individual responses (overall rating / join likelihood / memorable stall / suggestions):
 
-Raw feedback (${rows.length} responses):
 ${feedbackText}
 
-Write a concise admin summary (250-350 words) covering:
-1. **Overall Experience** — what the numbers say and the general mood
-2. **What Worked** — recurring positive themes from the feedback
-3. **What Needs Improvement** — recurring pain points or suggestions
-4. **Stall Insights** — which stalls got the most love and which had issues
-5. **Recruitment Signal** — likelihood-to-join data and what it means
-6. **Top 3 Actionable Suggestions** — specific things to act on for next year
+Write a concise leadership summary using exactly these five sections, each introduced by a level-3 markdown heading with the label in capitals:
 
-Be direct and useful. This is for the club leadership to read after the event.`;
+### OVERALL EXPERIENCE
+2-3 sentences on the general mood and the rating spread.
+
+### WHAT WORKED
+2-3 sentences on positive patterns across stalls and logistics.
+
+### WHAT NEEDS IMPROVEMENT
+2-3 sentences on recurring complaints. Ignore one-off or incoherent feedback.
+
+### RECRUITMENT SIGNAL
+1-2 sentences on the join-likelihood score and what it means for next recruitment.
+
+### TOP ACTIONS
+A numbered list of 3 specific, actionable items the team can act on before the next Bootstrap.
+
+Use prose inside each section -- no bullet symbols or bold emphasis except the numbered list under TOP ACTIONS. Keep the entire response under 400 words. Ignore feedback that is clearly nonsensical or contains only random characters.`;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -85,7 +97,8 @@ Be direct and useful. This is for the club leadership to read after the event.`;
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 1024,
+            // 1024 truncated the 5-section summary mid-sentence
+            maxOutputTokens: 2048,
           },
         }),
       }
@@ -112,6 +125,14 @@ Be direct and useful. This is for the club leadership to read after the event.`;
       responseCount: rows.length,
       avgOverall,
       avgJoin,
+      // the raw rows travel back with the summary so the admin can see what
+      // Gemini normalized away (typos, broken English, junk submissions)
+      feedbackRows: rows.map((r) => ({
+        overall: r.overall_rating ?? null,
+        join: r.join_likelihood ?? null,
+        stall: r.memorable_stall ?? r.stall_name ?? null,
+        text: r.suggestions ?? r.comment ?? null,
+      })),
     });
   } catch (error) {
     console.error("[POST /api/admin/bootstrap/sessions/[id]/summarize]", error);

@@ -88,13 +88,13 @@ async function seedGallery() {
             continue;
           }
 
-          // Extract folder name and file name
+          // Extract the folder name (the file segment is unused -- the public
+          // URL is built from obj.Key directly)
           const parts = obj.Key!.split("/");
           if (parts.length < 3) continue; // Must be at least gallery/folder/file
 
           const folderName = parts[1];
           if (!folderName) continue;
-          const fileName = parts.slice(2).join("/");
 
           // Build the R2 public URL
           const url = `${R2_PUBLIC_URL}/${obj.Key}`;

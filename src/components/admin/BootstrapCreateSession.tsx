@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import type { BootstrapSession } from "@/lib/services/bootstrap";
-
 interface StallDraft {
   stall_name: string;
   max_occupancy: number;

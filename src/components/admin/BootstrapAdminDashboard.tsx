@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 import BootstrapMapSVG from "@/components/bootstrap/BootstrapMapSVG";
 import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootstrap/StallCard";
@@ -40,9 +41,18 @@ export default function BootstrapAdminDashboard({
     responseCount: number;
     avgOverall: string;
     avgJoin: string;
+    feedbackRows: {
+      overall: number | null;
+      join: number | null;
+      stall: string | null;
+      text: string | null;
+    }[];
   } | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  // S46: how long the Gemini round-trip took, shown in the modal footer
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
+  const summarizeStartRef = useRef<number>(0);
   // window.location only exists client-side; set after mount to avoid a
   // hydration mismatch on the feedback URL line
   const [origin, setOrigin] = useState("");
@@ -257,6 +267,8 @@ export default function BootstrapAdminDashboard({
     setSummaryError(null);
     setSummaryOpen(true);
     setSummary(null);
+    setElapsedMs(null);
+    summarizeStartRef.current = Date.now();
     try {
       const res = await fetch(
         `/api/admin/bootstrap/sessions/${session.id}/summarize`,
@@ -269,10 +281,12 @@ export default function BootstrapAdminDashboard({
         responseCount: data.responseCount,
         avgOverall: data.avgOverall,
         avgJoin: data.avgJoin,
+        feedbackRows: data.feedbackRows ?? [],
       });
     } catch (e) {
       setSummaryError(e instanceof Error ? e.message : "Failed");
     } finally {
+      setElapsedMs(Date.now() - summarizeStartRef.current);
       setSummarizing(false);
     }
   }
@@ -1011,45 +1025,217 @@ export default function BootstrapAdminDashboard({
                   style={{
                     fontFamily: "var(--font-space), sans-serif",
                     fontSize: "0.9rem",
-                    color: "var(--text-secondary)",
                     lineHeight: 1.7,
-                    whiteSpace: "pre-wrap",
+                    color: "var(--text-secondary)",
                   }}
                 >
-                  {/* Render markdown bold (**text**) as styled spans */}
-                  {summary.split(/(\*\*[^*]+\*\*)/).map((chunk, i) =>
-                    chunk.startsWith("**") ? (
-                      <strong key={i} style={{ color: "var(--text-primary)" }}>
-                        {chunk.slice(2, -2)}
-                      </strong>
-                    ) : (
-                      <span key={i}>{chunk}</span>
-                    )
-                  )}
+                  {/* S46: react-markdown replaces the old **bold**-only span
+                      renderer, which left ### headings and lists as raw text */}
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <p style={{ marginBottom: "0.75rem" }}>{children}</p>
+                      ),
+                      strong: ({ children }) => (
+                        <strong
+                          style={{
+                            color: "var(--text-primary)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {children}
+                        </strong>
+                      ),
+                      h3: ({ children }) => (
+                        <h3
+                          style={{
+                            fontFamily: "var(--font-chakra), sans-serif",
+                            fontSize: "0.85rem",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            color: "var(--accent)",
+                            marginTop: "1.25rem",
+                            marginBottom: "0.4rem",
+                          }}
+                        >
+                          {children}
+                        </h3>
+                      ),
+                      h4: ({ children }) => (
+                        <h4
+                          style={{
+                            fontFamily: "var(--font-chakra), sans-serif",
+                            fontSize: "0.8rem",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: "var(--text-secondary)",
+                            marginTop: "1rem",
+                            marginBottom: "0.35rem",
+                          }}
+                        >
+                          {children}
+                        </h4>
+                      ),
+                      ol: ({ children }) => (
+                        <ol
+                          style={{
+                            paddingLeft: "1.25rem",
+                            marginBottom: "0.75rem",
+                            listStyle: "decimal",
+                          }}
+                        >
+                          {children}
+                        </ol>
+                      ),
+                      ul: ({ children }) => (
+                        <ul
+                          style={{
+                            paddingLeft: "1.25rem",
+                            marginBottom: "0.75rem",
+                            listStyle: "square",
+                          }}
+                        >
+                          {children}
+                        </ul>
+                      ),
+                      li: ({ children }) => (
+                        <li style={{ marginBottom: "0.35rem" }}>{children}</li>
+                      ),
+                    }}
+                  >
+                    {summary}
+                  </ReactMarkdown>
                 </div>
               )}
+
+              {/* S46: the rows Gemini worked from, so typos and junk
+                  submissions stay visible after summarization */}
+              {summary && summaryMeta?.feedbackRows?.length ? (
+                <details style={{ marginTop: "1.25rem" }}>
+                  <summary
+                    style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.7rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    Raw responses ({summaryMeta.feedbackRows.length})
+                  </summary>
+                  <div style={{ marginTop: "0.75rem", overflowX: "auto" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "0.78rem",
+                        fontFamily: "var(--font-space), sans-serif",
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border-strong)" }}>
+                          {["Overall", "Join", "Stall", "Feedback"].map((h) => (
+                            <th
+                              key={h}
+                              style={{
+                                textAlign: "left",
+                                padding: "0.4rem 0.5rem",
+                                fontFamily: "var(--font-mono), monospace",
+                                fontSize: "0.65rem",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {summaryMeta.feedbackRows.map((row, i) => (
+                          <tr
+                            key={i}
+                            style={{
+                              borderBottom: "1px solid var(--border)",
+                              verticalAlign: "top",
+                            }}
+                          >
+                            <td style={{ padding: "0.4rem 0.5rem", whiteSpace: "nowrap" }}>
+                              {row.overall ?? "--"}/10
+                            </td>
+                            <td style={{ padding: "0.4rem 0.5rem", whiteSpace: "nowrap" }}>
+                              {row.join ?? "--"}/5
+                            </td>
+                            <td
+                              style={{
+                                padding: "0.4rem 0.5rem",
+                                maxWidth: "120px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {row.stall ?? "--"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "0.4rem 0.5rem",
+                                color: "var(--text-secondary)",
+                              }}
+                            >
+                              {row.text ?? (
+                                <span style={{ color: "var(--text-muted)" }}>--</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              ) : null}
             </div>
 
-            {/* Footer */}
-            {summary && (
+            {/* Footer -- also shown on failure so a slow call's timing is visible */}
+            {(summary || elapsedMs !== null) && (
               <div
                 style={{
                   padding: "0.75rem 1.5rem",
                   borderTop: "1px solid var(--border)",
                   flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
                 }}
               >
-                <p
-                  style={{
-                    fontFamily: "var(--font-mono), monospace",
-                    fontSize: "0.65rem",
-                    color: "var(--text-muted)",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  GENERATED BY Gemini 3.5 FLASH · BASED ON{" "}
-                  {summaryMeta?.responseCount} STUDENT RESPONSES
-                </p>
+                {elapsedMs !== null && (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.65rem",
+                      color: "var(--text-muted)",
+                      marginRight: "auto",
+                    }}
+                  >
+                    {(elapsedMs / 1000).toFixed(1)}s
+                  </span>
+                )}
+                {summary && (
+                  <p
+                    style={{
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.65rem",
+                      color: "var(--text-muted)",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    AI Generated · BASED ON{" "}
+                    {summaryMeta?.responseCount} STUDENT RESPONSES
+                  </p>
+                )}
               </div>
             )}
           </div>

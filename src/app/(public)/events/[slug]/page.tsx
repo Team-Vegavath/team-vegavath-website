@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 
 import { Container } from "@/components/ui/Container";
-import { getEventBySlug, getEvents } from "@/lib/services/events";
+import { getEventBySlug } from "@/lib/services/events";
 import { getGalleryByEvent } from "@/lib/services/gallery";
 import { isNoRegistrationEvent } from "@/lib/utils";
 import EventMediaClient from "@/components/events/EventMediaClient";
