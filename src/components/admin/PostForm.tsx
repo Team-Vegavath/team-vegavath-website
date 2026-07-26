@@ -29,6 +29,7 @@ interface PostFormProps {
     source_label?: string | null;
     thumbnail_url?: string | null;
     published?: boolean;
+    published_at?: Date | string | null;
   };
 }
 
@@ -50,6 +51,15 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
   const [sourceUrl, setSourceUrl] = useState(initialData?.source_url ?? "");
   const [sourceLabel, setSourceLabel] = useState(initialData?.source_label ?? "");
   const [published, setPublished] = useState(initialData?.published ?? false);
+  // Date-only string, which is what <input type="date"> wants. Read and written
+  // in UTC on both sides: a local-timezone format here would show a post
+  // stamped 00:00Z as the previous day for any admin west of UTC, and saving
+  // that back would walk the date one day earlier on every edit.
+  const [publishedAt, setPublishedAt] = useState(
+    initialData?.published_at
+      ? new Date(initialData.published_at).toISOString().slice(0, 10)
+      : ""
+  );
   const [thumbFiles, setThumbFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +113,9 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
         source_url: sourceUrl.trim() || null,
         source_label: sourceLabel.trim() || null,
         published,
+        // Blank means "no opinion": createPost/updatePost fall back to stamping
+        // now() when the post is published, which is the old behaviour.
+        published_at: publishedAt ? new Date(publishedAt).toISOString() : null,
         ...thumbField,
       };
 
@@ -322,6 +335,22 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
           onChange={setPublished}
           ariaLabel="Post published"
         />
+      </div>
+
+      <div>
+        <label htmlFor="published_at" className="admin-label">
+          Published Date
+        </label>
+        <input
+          id="published_at"
+          type="date"
+          value={publishedAt}
+          onChange={(event) => setPublishedAt(event.target.value)}
+          className="admin-input"
+        />
+        <p className="admin-hint">
+          Backdate an older post · leave blank to stamp today on publish
+        </p>
       </div>
 
       {error ? <p className="admin-error">{error}</p> : null}

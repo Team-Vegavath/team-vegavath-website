@@ -73,7 +73,13 @@ export async function POST(req: NextRequest) {
       thumbnail_url:
         typeof body?.thumbnail_url === "string" ? body.thumbnail_url : null,
       published: Boolean(body?.published),
-      published_at: null,
+      // Backdating an older post. Null (blank field, or an unparseable value)
+      // leaves createPost to stamp now() if the post is published.
+      published_at:
+        typeof body?.published_at === "string" &&
+        !Number.isNaN(Date.parse(body.published_at))
+          ? new Date(body.published_at)
+          : null,
     };
 
     const post = await createPost(input);

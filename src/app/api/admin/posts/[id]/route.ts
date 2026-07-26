@@ -64,6 +64,13 @@ export async function PATCH(
         : null;
     }
     if (body?.published !== undefined) input.published = Boolean(body.published);
+    if (body?.published_at !== undefined) {
+      input.published_at =
+        typeof body.published_at === "string" &&
+        !Number.isNaN(Date.parse(body.published_at))
+          ? new Date(body.published_at)
+          : null;
+    }
 
     const post = await updatePost(id, input);
     return NextResponse.json(post);

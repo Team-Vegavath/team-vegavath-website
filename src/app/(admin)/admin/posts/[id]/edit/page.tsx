@@ -60,6 +60,10 @@ export default async function EditPostPage({
           source_label: post.source_label,
           thumbnail_url: post.thumbnail_url,
           published: post.published,
+          // Required, not cosmetic: the form always sends published_at, so
+          // without the current value every edit would submit null and the
+          // auto-stamp in updatePost would reset the date to today.
+          published_at: post.published_at,
         }}
       />
     </div>
