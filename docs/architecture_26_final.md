@@ -355,9 +355,15 @@ White (`#FFFFFF`) banned on public site. No light mode.
 
 Primary cards/buttons: `0` (sharp). Secondary buttons: `2px`. Form inputs: `4px`. Avatars/sponsor logos: `0`. **Banned:** `rounded-full`, `rounded-xl`, `rounded-2xl` on any interactive element.
 
-### Known Tailwind v4 bug
+### The Tailwind v4 "bug" - CORRECTED S53
 
-`mx-auto` and some responsive-prefix classes don't generate CSS in this project's Tailwind v4 setup. Use `style={{ margin: "0 auto" }}` for centering instead. This is documented, reproducible behavior - not something to "fix" by downgrading Tailwind or hunting for a CSS bug elsewhere.
+This section used to read: "`mx-auto` and some responsive-prefix classes don't generate CSS in this project's Tailwind v4 setup. Use `style={{ margin: "0 auto" }}` for centering instead." **That was wrong**, and it shaped styling decisions for 51 sessions.
+
+The utilities always generated and shipped. `.mx-auto { margin-inline: auto }` lost the cascade to globals.css's own **unlayered** `* { margin: 0 }` - unlayered CSS beats every `@layer`, including `@layer utilities`. S52B moved that reset into `@layer base`; S53 converted all 24 inline centering workarounds to `className="mx-auto"` and verified the class in the built HTML.
+
+Use `className="mx-auto"` for horizontal centering. Inline styles remain correct for values that reference design tokens or computed sizes. A lone `marginRight: "auto"` on a flex child is a spacer, not centering - `mx-auto` would break it.
+
+Roughly 447 rules in globals.css are still unlayered and still beat utilities. When a Tailwind class silently does nothing, that is the first place to look: a cascade-layer loss, not a missing class.
 
 **Full per-page design spec (hero copy, component-by-component layout, animation rules, sponsor carousel fix, per-route breakdown for `/`, `/about`, `/events`, `/events/[slug]`, `/gallery`, `/crew`, `/join`, `/admin`) lives in `context_for_revamp.md` Sections 5–9. Read it in full - it is not duplicated here to avoid the two docs drifting out of sync.**
 
@@ -365,7 +371,7 @@ Primary cards/buttons: `0` (sharp). Secondary buttons: `2px`. Form inputs: `4px`
 
 ## 10. Known Landmines - Consolidated (statuses updated 2026-07-15)
 
-1. **Tailwind v4 centering bug** - STILL TRUE. See Section 9. Not a bug to fix; a documented workaround to follow.
+1. **Tailwind v4 centering bug** - **FALSE, retired in S52B/S53.** There was never a generation bug; `.mx-auto` lost the cascade to an unlayered `* { margin: 0 }`. Use `mx-auto`. See Section 9.
 2. **R2 bucket structure mismatch** - STILL TRUE. See Section 5.2. Trust the live bucket listing, not the PDF.
 3. **`/events` images not rendering from R2** - RESOLVED during the revamp (admin upload flow wired; event covers upload and render).
 4. **Admin CRUD incomplete** - RESOLVED. Upload is wired throughout the admin panel (events, team incl. per-row quick photo upload, multi-file gallery).
@@ -392,7 +398,7 @@ The original 8-session plan below grew to **29 sessions**, all logged in `docs/r
 5. **Session 4** - About page.
 6. **Sessions 5–8** - Events → Crew → Join → Gallery/Sponsors → Admin fixes (auth crash, events/team image upload wiring, diagnose `/events` image-loading bug).
 
-Gate after every session: `npm run build` passes with 0 TypeScript errors, no emoji in JSX, no `rounded-full`/`rounded-xl` on interactive elements, correct font usage per Section 9, mobile layout correct at 375px, no `mx-auto`.
+Gate after every session: `npm run build` passes with 0 TypeScript errors, no emoji in JSX, no `rounded-full`/`rounded-xl` on interactive elements, correct font usage per Section 9, mobile layout correct at 375px.
 
 ---
 

@@ -209,14 +209,21 @@ above. There is a `LEGACY ALIASES` block at the top of `globals.css`
 (`--background`, `--accent-secondary`, etc.) kept for pages not yet rebuilt --
 it is removable once nothing references the old names.
 
-**The Tailwind v4 inline-style workaround.** In this project's Tailwind v4
-setup, some utilities do not generate CSS -- notably `mx-auto` and certain
-responsive prefixes. So:
+**The Tailwind v4 "utilities don't generate" belief was wrong** (corrected
+S52B/S53). `.mx-auto { margin-inline: auto }` always generated and shipped; it
+lost the cascade to globals.css's own **unlayered** `* { margin: 0 }`, because
+unlayered CSS beats every `@layer`. S52B moved that reset into `@layer base`
+and S53 retired the 24 inline centering workarounds. So:
 
-- Use Tailwind utility classes first.
-- Where a utility silently produces no CSS, fall back to an inline
-  `style={{}}`. Centering in particular is always inline: `margin: "0 auto"`,
-  never `mx-auto`.
+- Use Tailwind utility classes first, including `mx-auto` for horizontal
+  centering.
+- Inline `style={{}}` is for values that reference design tokens or computed
+  sizes -- not a workaround for utilities that "don't work".
+- Not centering: a lone `marginRight: "auto"` on a flex child is a spacer.
+  `mx-auto` would add margin-left and break it.
+- Roughly 447 rules in `globals.css` are still unlayered and still beat
+  utilities. A Tailwind class that silently does nothing is a cascade-layer
+  loss -- look there first.
 
 **Aesthetic rules** (a design gate greps for violations on touched `.tsx`):
 sharp corners only (no `rounded-full` / `rounded-xl` / `rounded-2xl` /

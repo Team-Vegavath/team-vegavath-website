@@ -246,7 +246,7 @@ Features:
 
 ## Known Issues & Notes
 
-- Tailwind v4 `mx-auto` and some responsive prefix classes do not generate CSS in this setup - centering always uses inline `style={{ margin: "0 auto" }}`
+- Tailwind v4 utilities DO generate here. The long-standing "`mx-auto` doesn't work in this setup" note was wrong: the class shipped but lost the cascade to globals.css's unlayered `* { margin: 0 }`, since unlayered CSS beats every `@layer`. S52B moved that reset into `@layer base` and S53 converted the 24 inline centering workarounds. Use `className="mx-auto"`. Around 447 globals.css rules are still unlayered, so a utility that silently does nothing is a cascade-layer loss, not a missing class
 - Neon free tier suspends after 5 min inactivity - first request after suspension takes 2-5 seconds to wake
 - The Neon DB and R2 bucket are live production - there is no staging environment
 - Migrations go through numbered files in `migrations/`, applied to Neon manually before the code that depends on them is deployed. `021` and `022` are outstanding, and `018`-`020` are unconfirmed

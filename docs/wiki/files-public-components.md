@@ -850,13 +850,16 @@ container.
 
 **Key functions.** None.
 
-**Render logic.** A `<div>` at `max-width: 80rem`, centred with inline
-`margin: "0 auto"` and 1.5rem horizontal padding. Always renders its children.
+**Render logic.** A `<div>` at `max-width: 80rem`, centred with
+`className="mx-auto"` and 1.5rem horizontal padding. Always renders its
+children.
 
 **Why it exists.** One reusable content-width wrapper so pages share consistent
-margins. Centring is inline (`margin: "0 auto"`) rather than `mx-auto` because,
-per the project styling rules, Tailwind v4 in this setup does not generate
-`mx-auto` -- centring is always done inline.
+margins. Centring used to be inline `margin: "0 auto"` on the belief that
+Tailwind v4 did not generate `mx-auto` here. That belief was wrong -- the
+utility lost the cascade to an unlayered `* { margin: 0 }`, fixed in S52B and
+converted in S53. This component is the highest-leverage instance: eight pages
+import it.
 
 ---
 
