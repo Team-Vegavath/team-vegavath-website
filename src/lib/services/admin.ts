@@ -6,6 +6,18 @@ function toSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+/** Hex token from the Web Crypto API (S48). Same entropy as node's
+ *  randomBytes(n), but with no "crypto" module import -- Next's static tracer
+ *  flags that import on every route it can reach, even ones that never run at
+ *  the edge. globalThis.crypto exists in Node 19+ and all edge runtimes. */
+function generateSecureToken(byteLength: number): string {
+  const bytes = new Uint8Array(byteLength);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export type AdminLoginEntry = {
   id: string;
   attempted_at: string;
@@ -64,7 +76,7 @@ export type AdminAccount = {
   username: string;
   display_name: string;
   mobile_number: string | null;
-  role: "admin" | "godfather";
+  role: "admin" | "godfather" | "viewer";
   created_at: string;
 };
 
@@ -142,18 +154,22 @@ export type PendingRequest = {
   pending_display_name: string;
   pending_email: string | null;
   pending_mobile: string | null;
+  pending_role: "admin" | "viewer" | null;
   created_at: string;
 };
 
+/** pendingRole is the role the account gets on approval (S47): 'admin' or
+ *  the read-only 'viewer' tier. Stored on the token so the invitee cannot
+ *  choose their own privilege level during registration. */
 export async function createInviteToken(
-  inviteeName: string
+  inviteeName: string,
+  pendingRole: "admin" | "viewer" = "admin"
 ): Promise<{ token: string; slug: string }> {
-  const { randomBytes } = await import("crypto");
-  const token = randomBytes(32).toString("hex");
+  const token = generateSecureToken(32);
   const slug = toSlug(inviteeName);
   await sql`
-    INSERT INTO admin_invite_tokens (token, invitee_name, invitee_slug)
-    VALUES (${token}, ${inviteeName}, ${slug})`;
+    INSERT INTO admin_invite_tokens (token, invitee_name, invitee_slug, pending_role)
+    VALUES (${token}, ${inviteeName}, ${slug}, ${pendingRole})`;
   return { token, slug };
 }
 
@@ -170,12 +186,125 @@ export async function getInviteToken(token: string, slug: string) {
   return rows[0] ?? null;
 }
 
+// ------------------------------------------------- open viewer tokens (S48)
+
+export type OpenViewerToken = {
+  id: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+};
+
+/** One reusable link that anyone can register through as a viewer. Named
+ *  invites don't scale past a handful of people; this replaces 30 of them.
+ *  Longer-lived than a named invite (30d vs 48h) because it stays posted in a
+ *  group chat rather than being handed to one person. */
+export async function createOpenViewerToken(): Promise<{ token: string }> {
+  const token = generateSecureToken(32);
+  await sql`
+    INSERT INTO admin_invite_tokens
+      (token, expires_at, status, pending_role, is_open)
+    VALUES
+      (${token}, now() + INTERVAL '30 days', 'generated', 'viewer', true)`;
+  return { token };
+}
+
+/** Soft-delete: 'rejected' takes the token out of every 'generated' lookup,
+ *  so existing links stop working without losing the audit row. */
+export async function revokeOpenToken(tokenId: string): Promise<void> {
+  await sql`
+    UPDATE admin_invite_tokens
+    SET status = 'rejected'
+    WHERE id = ${tokenId} AND is_open = true`;
+}
+
+export async function getOpenViewerTokens(): Promise<OpenViewerToken[]> {
+  const rows = await sql`
+    SELECT id, token, created_at, expires_at
+    FROM admin_invite_tokens
+    WHERE is_open = true
+      AND status = 'generated'
+      AND expires_at > now()
+    ORDER BY created_at DESC
+    LIMIT 20`;
+  return rows as OpenViewerToken[];
+}
+
+/** Looks an open token up by token alone -- there is no invitee slug to
+ *  match against, unlike getInviteToken. */
+export async function getOpenInviteToken(token: string): Promise<{
+  id: string;
+  token: string;
+  pending_role: "admin" | "viewer" | null;
+} | null> {
+  const rows = await sql`
+    SELECT id, token, pending_role
+    FROM admin_invite_tokens
+    WHERE token = ${token}
+      AND is_open = true
+      AND status = 'generated'
+      AND expires_at > now()`;
+  return (rows[0] as { id: string; token: string; pending_role: "admin" | "viewer" | null } | undefined) ?? null;
+}
+
+/** Slug for a still-valid NAMED token, looked up by token alone. Only used to
+ *  bounce someone who pasted a named token into the flat /admin/register URL
+ *  over to its canonical /admin/invite/[slug]/[token] page. */
+export async function getNamedInviteSlug(token: string): Promise<string | null> {
+  const rows = await sql`
+    SELECT invitee_slug
+    FROM admin_invite_tokens
+    WHERE token = ${token}
+      AND is_open = false
+      AND invitee_slug IS NOT NULL
+      AND status = 'generated'
+      AND expires_at > now()`;
+  return (rows[0] as { invitee_slug: string } | undefined)?.invitee_slug ?? null;
+}
+
+/** Writes one registration made through an open link. The open token row is
+ *  left untouched (it must stay reusable), so the pending data goes into a
+ *  fresh named row -- is_open = false -- which the approval queue then treats
+ *  exactly like a named invite. */
+export async function submitOpenRegistration(
+  openToken: string,
+  fields: {
+    name: string;
+    username: string;
+    displayName: string;
+    email: string;
+    mobile: string;
+    passwordHash: string;
+  }
+): Promise<boolean> {
+  const open = await getOpenInviteToken(openToken);
+  if (!open) return false;
+
+  const role = open.pending_role === "admin" ? "admin" : "viewer";
+  const rows = await sql`
+    INSERT INTO admin_invite_tokens
+      (token, expires_at, status, pending_role, is_open,
+       invitee_name, invitee_slug,
+       pending_username, pending_display_name,
+       pending_email, pending_mobile, pending_password_hash)
+    VALUES
+      (${generateSecureToken(16)},
+       now() + INTERVAL '48 hours',
+       'pending_approval',
+       ${role},
+       false,
+       ${fields.name}, ${toSlug(fields.name)},
+       ${fields.username.toLowerCase()}, ${fields.displayName},
+       ${fields.email}, ${fields.mobile}, ${fields.passwordHash})
+    RETURNING id`;
+  return rows.length > 0;
+}
+
 // ---------------------------------------------------- password resets (S29)
 
 /** Godfather-initiated. Replaces any outstanding reset token for the account. */
 export async function createPasswordResetToken(accountId: string): Promise<string> {
-  const { randomBytes } = await import("crypto");
-  const token = randomBytes(32).toString("hex");
+  const token = generateSecureToken(32);
   await sql`DELETE FROM admin_password_reset_tokens WHERE account_id = ${accountId}`;
   await sql`
     INSERT INTO admin_password_reset_tokens (account_id, token)
@@ -237,7 +366,7 @@ export async function submitRegistration(
 export async function getPendingRequests(): Promise<PendingRequest[]> {
   const rows = await sql`
     SELECT id, pending_username, pending_display_name, pending_email,
-           pending_mobile, created_at
+           pending_mobile, pending_role, created_at
     FROM admin_invite_tokens
     WHERE status = 'pending_approval'
     ORDER BY created_at ASC LIMIT 50`;

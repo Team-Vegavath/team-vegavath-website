@@ -36,6 +36,14 @@ export default async function EventDetailPage({ params }: EventPageProps) {
     month: "long",
     year: "numeric",
   });
+  // Registration is a competition-type concept only. S44 tied the block to
+  // registration_form_url, which silently dropped the "closed" message for
+  // every event without a form URL -- the category check is the real gate.
+  const isCompetitionType =
+    event.category === "hackathons" || event.category === "competitions";
+  const showRegistration =
+    !isNoRegistrationEvent(event.slug) && isCompetitionType;
+
   const titleInitials = event.title
     .split(/\s+/)
     .map((word) => word.charAt(0))
@@ -101,21 +109,16 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                   </div>
                 ) : null}
 
-                {/* No registration block at all when there is nothing to register
-                    for: the absence IS the signal. The closed message only shows
-                    when a form URL exists but registration is switched off. */}
-                {!isNoRegistrationEvent(event.slug) &&
-                  (event.registration_open || event.registration_form_url) ? (
+                {/* Only competition-type events register at all. Workshops,
+                    talks and other categories show nothing, and the
+                    no-registration slugs (Bootstrap, Freshers Day) are
+                    suppressed even if the flags are set in admin. */}
+                {showRegistration ? (
                   <div style={{ marginTop: "2rem" }}>
                     {event.registration_open ? (
-                      <a
-                        href={event.registration_form_url || "/join"}
-                        target={event.registration_form_url ? "_blank" : undefined}
-                        rel={event.registration_form_url ? "noreferrer" : undefined}
-                        className="btn-primary"
-                      >
-                        REGISTER NOW
-                      </a>
+                      <Link href={`/events/${event.slug}/register`} className="btn-primary">
+                        REGISTER
+                      </Link>
                     ) : (
                       <p className="mono" style={{ fontSize: "0.8rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-muted)" }}>
                         Registration is closed for this event.
@@ -155,6 +158,39 @@ export default async function EventDetailPage({ params }: EventPageProps) {
           </div>
         </Container>
       </section>
+
+      {/* S49 LLM/AI SEO: Event schema for hackathons and competitions only -
+          showcases and open-house days are not "events with a start date" that
+          answer engines should surface as attendable. */}
+      {isCompetitionType && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Event",
+              name: event.title,
+              startDate: event.event_date,
+              organizer: {
+                "@type": "Organization",
+                name: "Team Vegavath",
+                url: "https://vegavath.live",
+              },
+              location: {
+                "@type": "Place",
+                name: "PES University Electronic City Campus",
+                address: {
+                  "@type": "PostalAddress",
+                  addressLocality: "Bangalore",
+                  addressCountry: "IN",
+                },
+              },
+              url: `https://vegavath.live/events/${event.slug}`,
+              ...(event.description ? { description: event.description } : {}),
+            }),
+          }}
+        />
+      )}
     </main>
   );
 }

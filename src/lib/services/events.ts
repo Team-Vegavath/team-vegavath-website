@@ -99,3 +99,76 @@ export async function archiveEvent(id: string): Promise<void> {
 export async function deleteEvent(id: string): Promise<void> {
   await sql`DELETE FROM events WHERE id = ${id}`;
 }
+
+// ------------------------------------------- native event registration (S47)
+
+export type EventRegistrationStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "waitlisted";
+
+export type EventRegistration = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  srn: string | null;
+  message: string | null;
+  status: EventRegistrationStatus;
+  registered_at: string;
+};
+
+export async function createEventRegistration(
+  eventId: string,
+  data: {
+    name: string;
+    email: string;
+    phone: string;
+    srn?: string;
+    message?: string;
+  }
+): Promise<void> {
+  await sql`
+    INSERT INTO event_registrations
+      (event_id, name, email, phone, srn, message)
+    VALUES
+      (${eventId}, ${data.name}, ${data.email}, ${data.phone},
+       ${data.srn ?? null}, ${data.message ?? null})
+  `;
+}
+
+/** Case-insensitive so "A@x.com" cannot double-register as "a@x.com". */
+export async function findEventRegistrationByEmail(
+  eventId: string,
+  email: string
+): Promise<{ id: string } | null> {
+  const rows = await sql`
+    SELECT id FROM event_registrations
+    WHERE event_id = ${eventId} AND lower(email) = lower(${email})
+    LIMIT 1`;
+  return (rows[0] as { id: string } | undefined) ?? null;
+}
+
+export async function getEventRegistrations(
+  eventId: string,
+  limit = 200
+): Promise<EventRegistration[]> {
+  const rows = await sql`
+    SELECT id, name, email, phone, srn, message, status, registered_at
+    FROM event_registrations
+    WHERE event_id = ${eventId}
+    ORDER BY registered_at DESC
+    LIMIT ${limit}`;
+  return rows as EventRegistration[];
+}
+
+export async function updateEventRegistrationStatus(
+  registrationId: string,
+  status: EventRegistrationStatus
+): Promise<void> {
+  await sql`
+    UPDATE event_registrations
+    SET status = ${status}
+    WHERE id = ${registrationId}`;
+}

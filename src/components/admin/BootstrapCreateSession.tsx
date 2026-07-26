@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import type { BootstrapSession } from "@/lib/services/bootstrap";
+
 interface StallDraft {
   stall_name: string;
   max_occupancy: number;
@@ -13,8 +15,11 @@ interface StallDraft {
 // the two registration links to share instead.
 export default function BootstrapCreateSession({
   onDone,
+  sessions = [],
 }: {
   onDone: () => void;
+  /** S49: past sessions, so step 2 can import their stall list as a starting point. */
+  sessions?: BootstrapSession[];
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
@@ -28,6 +33,52 @@ export default function BootstrapCreateSession({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState(false);
+  // S49: how many pool members the server auto-matched to these stalls
+  const [autoAssigned, setAutoAssigned] = useState(0);
+  // S49 stall import from a previous session
+  const [importId, setImportId] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+
+  // only sessions that actually have stalls are worth importing from
+  const importable = sessions.filter((s) => (s.stall_count ?? 0) > 0);
+
+  // Reuses the admin session GET (stalls + volunteers + groups) rather than
+  // adding a route just for stall names. The drafts are fully editable after
+  // import - nothing is written until CREATE SESSION.
+  async function importStalls(sessionId: string) {
+    setImportId(sessionId);
+    setImportError("");
+    if (!sessionId) return;
+    setImporting(true);
+    try {
+      const res = await fetch(`/api/admin/bootstrap/sessions/${sessionId}`);
+      if (!res.ok) {
+        setImportError("Could not load that session's stalls.");
+        return;
+      }
+      const data = await res.json();
+      const imported: StallDraft[] = (data.stalls ?? []).map(
+        (s: { stall_name: string; max_occupancy: number; lead_names: string | null }) => ({
+          stall_name: s.stall_name,
+          // occupancy is constrained to 1-3 in this form; clamp legacy values
+          max_occupancy: Math.min(3, Math.max(1, Number(s.max_occupancy) || 1)),
+          lead_names: s.lead_names
+            ? s.lead_names.split(",").map((n) => n.trim()).filter(Boolean).slice(0, 3)
+            : [],
+        })
+      );
+      if (imported.length === 0) {
+        setImportError("That session has no stalls.");
+        return;
+      }
+      setStalls(imported);
+    } catch {
+      setImportError("Could not load that session's stalls.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   // window.location only exists client-side; set after mount so the links
   // render without a hydration mismatch
@@ -85,6 +136,7 @@ export default function BootstrapCreateSession({
         setError(data?.error ?? "Failed to create session");
         return;
       }
+      setAutoAssigned(Number(data?.autoAssigned) || 0);
       setCreated(true);
     } catch {
       setError("Request failed — check your connection");
@@ -140,6 +192,24 @@ export default function BootstrapCreateSession({
           themselves and get a username (their SRN) plus a login code — both
           visible in the dashboard tables, so nothing to download or lose.
         </p>
+
+        {/* S49: pool members whose typed stall preference matched a stall name
+            were pulled into this session automatically (migration 021). */}
+        {autoAssigned > 0 && (
+          <p
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.75rem",
+              color: "var(--success)",
+              lineHeight: 1.7,
+              marginBottom: "1.5rem",
+            }}
+          >
+            {autoAssigned} pre-registered volunteer
+            {autoAssigned === 1 ? "" : "s"} auto-assigned from the pool. The rest
+            stay in PRE-REGISTERED VOLUNTEERS for manual assignment.
+          </p>
+        )}
 
         {linkBox("Stall volunteers", "/bootstrap/register/stall")}
         {linkBox("Group volunteers", "/bootstrap/register/group")}
@@ -262,6 +332,42 @@ export default function BootstrapCreateSession({
 
       {step === 2 && (
         <div>
+          {/* S49: most Bootstrap days reuse last year's stall list - import it and
+              edit from there instead of retyping every stall. */}
+          {importable.length > 0 && (
+            <div style={{ marginBottom: "1.75rem" }}>
+              <label htmlFor="bs-import-session" className="admin-label">
+                Import from previous session
+              </label>
+              <select
+                id="bs-import-session"
+                className="admin-input"
+                value={importId}
+                onChange={(e) => importStalls(e.target.value)}
+                disabled={importing}
+                style={{ maxWidth: "22rem" }}
+              >
+                <option value="">
+                  {importing ? "Loading stalls…" : "Start from scratch"}
+                </option>
+                {importable.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.stall_count} stalls)
+                  </option>
+                ))}
+              </select>
+              <p className="admin-hint" style={{ marginTop: "0.5rem" }}>
+                Replaces the list below with that session&apos;s stalls. Edit them
+                freely -- nothing is saved until you create the session.
+              </p>
+              {importError && (
+                <p className="admin-error" style={{ marginTop: "0.5rem" }}>
+                  {importError}
+                </p>
+              )}
+            </div>
+          )}
+
           <label htmlFor="bs-stall-name" className="admin-label">
             Stall name
           </label>

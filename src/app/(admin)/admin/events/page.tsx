@@ -39,7 +39,8 @@ export default async function AdminEventsPage({
 
   const events = await getEvents({ limit: 100 }).catch(() => [] as Event[]);
   const resolvedSearchParams = await searchParams;
-  const showNewForm = resolvedSearchParams.new === "true";
+  const isViewer = session.user.isViewer;
+  const showNewForm = resolvedSearchParams.new === "true" && !isViewer;
 
   if (showNewForm) {
     return (
@@ -61,9 +62,11 @@ export default async function AdminEventsPage({
     <>
       <header className="admin-page-header">
         <h1 className="admin-page-title">Events</h1>
-        <Link href="/admin/events?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-          ADD EVENT
-        </Link>
+        {!isViewer ? (
+          <Link href="/admin/events?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+            ADD EVENT
+          </Link>
+        ) : null}
       </header>
 
       <section className="admin-table-wrap">
@@ -105,18 +108,26 @@ export default async function AdminEventsPage({
                   </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{event.slug}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    {isViewer ? (
+                      // Viewers land on the same page, which renders the
+                      // registrations list without the edit form.
                       <Link href={`/admin/events/${event.id}/edit`} className="admin-row-action">
-                        EDIT
+                        REGISTRATIONS
                       </Link>
-                      {/* Plain DELETE here soft-deletes (archives): the API's non-permanent
-                          path. Permanent delete lives in the edit page's danger zone. */}
-                      <InlineDelete
-                        endpoint={`/api/admin/events?id=${event.id}`}
-                        confirmMessage={`Archive "${event.title}"? It will be hidden from the public site but can be restored.`}
-                        label="ARCHIVE"
-                      />
-                    </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <Link href={`/admin/events/${event.id}/edit`} className="admin-row-action">
+                          EDIT
+                        </Link>
+                        {/* Plain DELETE here soft-deletes (archives): the API's non-permanent
+                            path. Permanent delete lives in the edit page's danger zone. */}
+                        <InlineDelete
+                          endpoint={`/api/admin/events?id=${event.id}`}
+                          confirmMessage={`Archive "${event.title}"? It will be hidden from the public site but can be restored.`}
+                          label="ARCHIVE"
+                        />
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

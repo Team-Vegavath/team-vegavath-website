@@ -4,9 +4,14 @@ import { notFound, redirect } from "next/navigation";
 
 import DeleteEventButton from "@/components/admin/DeleteEventButton";
 import EventForm from "@/components/admin/EventForm";
+import EventRegistrationsTable from "@/components/admin/EventRegistrationsTable";
 import ToggleEventStatusButton from "@/components/admin/ToggleEventStatusButton";
 import { auth } from "@/lib/auth";
-import { getEventById } from "@/lib/services/events";
+import {
+  getEventById,
+  getEventRegistrations,
+  type EventRegistration,
+} from "@/lib/services/events";
 
 export const metadata: Metadata = {
   title: "Edit Event",
@@ -25,12 +30,20 @@ export default async function EditEventPage({
     redirect("/admin");
   }
 
+  // Viewers stay on this page: they may read the registrations list, but the
+  // edit form, status toggle and danger zone are hidden below.
+  const isViewer = session.user.isViewer;
+
   const { id } = await params;
   const event = await getEventById(id);
 
   if (!event) {
     notFound();
   }
+
+  const registrations = await getEventRegistrations(event.id as string).catch(
+    () => [] as EventRegistration[]
+  );
   const formattedDate = event.event_date
     ? new Date(event.event_date as string).toISOString().slice(0, 10)
     : "";
@@ -42,35 +55,47 @@ export default async function EditEventPage({
       </Link>
 
       <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">Edit Event</h1>
-        <ToggleEventStatusButton id={event.id as string} currentStatus={event.status as string} />
+        <h1 className="admin-page-title">{isViewer ? event.title as string : "Edit Event"}</h1>
+        {!isViewer ? (
+          <ToggleEventStatusButton id={event.id as string} currentStatus={event.status as string} />
+        ) : null}
       </header>
 
-      <EventForm
-        mode="edit"
-        initialData={{
-          id: event.id,
-          title: event.title,
-          slug: event.slug,
-          category: event.category,
-          status: event.status,
-          description: event.description ?? undefined,
-          event_date: formattedDate,
-          registration_open: event.registration_open,
-          registration_form_url: event.registration_form_url ?? undefined,
-          logo_url: event.logo_url,
-          cover_image_url: event.cover_image_url,
-        }}
+      {!isViewer ? (
+        <EventForm
+          mode="edit"
+          initialData={{
+            id: event.id,
+            title: event.title,
+            slug: event.slug,
+            category: event.category,
+            status: event.status,
+            description: event.description ?? undefined,
+            event_date: formattedDate,
+            registration_open: event.registration_open,
+            registration_form_url: event.registration_form_url ?? undefined,
+            logo_url: event.logo_url,
+            cover_image_url: event.cover_image_url,
+          }}
+        />
+      ) : null}
+
+      <EventRegistrationsTable
+        eventId={event.id as string}
+        initialData={registrations}
+        isViewer={isViewer}
       />
 
-      <section className="admin-danger-zone">
-        <p className="admin-danger-title">Danger Zone</p>
-        <p className="admin-danger-text">
-          Archiving hides the event from the public site but keeps its data. Permanent
-          deletion removes it forever and cannot be undone.
-        </p>
-        <DeleteEventButton id={event.id as string} title={event.title as string} />
-      </section>
+      {!isViewer ? (
+        <section className="admin-danger-zone">
+          <p className="admin-danger-title">Danger Zone</p>
+          <p className="admin-danger-text">
+            Archiving hides the event from the public site but keeps its data. Permanent
+            deletion removes it forever and cannot be undone.
+          </p>
+          <DeleteEventButton id={event.id as string} title={event.title as string} />
+        </section>
+      ) : null}
     </div>
   );
 }

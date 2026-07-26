@@ -1,11 +1,28 @@
 import { sql } from "@/lib/db";
 import type { TeamMember, CreateMemberInput, UpdateMemberInput } from "@/types/member";
 
-export async function getMembers(): Promise<TeamMember[]> {
+/** Public callers get active members only. The admin team page passes
+ *  includeInactive so a deactivated member is still listed and can be
+ *  switched back on -- without it, deactivating hides the row forever. */
+export async function getMembers(options?: {
+  includeInactive?: boolean;
+  limit?: number;
+}): Promise<TeamMember[]> {
+  const limit = options?.limit ?? 200;
+
+  if (options?.includeInactive) {
+    const rows = await sql`
+      SELECT * FROM team_members
+      ORDER BY tier, display_order ASC
+      LIMIT ${limit}`;
+    return rows as TeamMember[];
+  }
+
   const rows = await sql`
     SELECT * FROM team_members
     WHERE is_active = true
-    ORDER BY tier, display_order ASC`;
+    ORDER BY tier, display_order ASC
+    LIMIT ${limit}`;
   return rows as TeamMember[];
 }
 
@@ -99,7 +116,8 @@ export async function updateMember(
       linkedin_url = COALESCE(${input.linkedin_url ?? null}, linkedin_url),
       github_url = COALESCE(${input.github_url ?? null}, github_url),
       photo_url = COALESCE(${input.photo_url ?? null}, photo_url),
-      display_order = COALESCE(${input.display_order ?? null}, display_order)
+      display_order = COALESCE(${input.display_order ?? null}, display_order),
+      is_active = COALESCE(${input.is_active ?? null}, is_active)
     WHERE id = ${id}
     RETURNING *`;
   return (rows[0] as TeamMember) ?? null;
@@ -111,6 +129,21 @@ export async function toggleMemberActive(
 ): Promise<void> {
   await sql`
     UPDATE team_members SET is_active = ${is_active} WHERE id = ${id}`;
+}
+
+/** Rewrites display_order for one tier from the given id order (1-based).
+ *  The `tier = ${tier}` guard means an id from another tier in the payload
+ *  is a no-op rather than a silent cross-tier move. */
+export async function reorderTeamMembers(
+  tier: string,
+  ids: string[]
+): Promise<void> {
+  for (const [index, id] of ids.entries()) {
+    await sql`
+      UPDATE team_members
+      SET display_order = ${index + 1}
+      WHERE id = ${id} AND tier = ${tier}`;
+  }
 }
 
 export async function deleteMember(id: string): Promise<void> {

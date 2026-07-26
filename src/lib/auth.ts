@@ -36,8 +36,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               id: account.id,
               name: account.display_name,
               email: account.username,
+              // isAdmin means "may enter the admin panel" -- viewers can read
+              // everything, so it stays true for them. isViewer is the write
+              // gate, checked in every mutating admin route (S47).
               isAdmin: true,
               isGodfather: account.role === "godfather",
+              isViewer: account.role === "viewer",
               tokenVersion,
             };
           }
@@ -62,6 +66,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: envUser,
           isAdmin: true,
           isGodfather: true,
+          isViewer: false,
         };
       },
     }),
@@ -78,6 +83,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.isAdmin = true;
         token.isGodfather = user.isGodfather ?? false;
+        token.isViewer = user.isViewer ?? false;
         token.accountId = user.id;
         token.tokenVersion =
           (user as { tokenVersion?: number }).tokenVersion ?? 0;
@@ -100,6 +106,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       session.user.isAdmin = token.isAdmin as boolean;
       session.user.isGodfather = (token.isGodfather as boolean | undefined) ?? false;
+      session.user.isViewer = (token.isViewer as boolean | undefined) ?? false;
       return session;
     },
   },

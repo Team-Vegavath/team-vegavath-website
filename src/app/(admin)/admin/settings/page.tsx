@@ -63,9 +63,11 @@ export default async function AdminSettingsPage() {
         <h1 className="admin-page-title">Settings</h1>
       </header>
 
-      <div style={{ maxWidth: "52rem", marginBottom: "2rem" }}>
-        <SettingsForm settings={settings} />
-      </div>
+      {!session.user.isViewer ? (
+        <div style={{ maxWidth: "52rem", marginBottom: "2rem" }}>
+          <SettingsForm settings={settings} />
+        </div>
+      ) : null}
 
       <section className="admin-table-wrap">
         <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: "1px solid var(--border-strong)" }}>

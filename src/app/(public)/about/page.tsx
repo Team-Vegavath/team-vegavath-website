@@ -238,6 +238,61 @@ export default async function AboutPage() {
           </div>
         </section>
       ) : null}
+
+      {/* S49 LLM/AI SEO: FAQPage schema. Not rendered for users - it exists so
+          answer engines can quote the club's own wording on the five questions
+          they get asked about it. Keep the copy in sync with public/llms.txt. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: [
+              {
+                "@type": "Question",
+                name: "What is Team Vegavath?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Team Vegavath is the motorsport and innovation student club at PES University Electronic City Campus (PESU ECC) in Bangalore, India. The club designs and builds custom go-karts, develops robotics and embedded systems, and organizes technical events including hackathons and open-house showcases.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "How can I join Team Vegavath?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Applications open annually at vegavath.live/join. The club recruits across six domains: Coding, Automotives, Robotics, Operations, Sponsorship, and Social Media.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "What events does Team Vegavath run?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Team Vegavath organizes EmbedX (an embedded systems and IoT hackathon with Xylem), Ignition (an overnight IoT hackathon), Bootstrap (an annual open-house for PESU ECC freshers), and participates in karting competitions.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "Who sponsors Team Vegavath?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Current partners include Xylem, Ather Energy, Paper Boat, Mahindra, BMW Motorrad, and SOLIDWORKS.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "Where is Team Vegavath based?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Team Vegavath is based at PES University Electronic City Campus (PESU ECC), Bangalore, Karnataka, India.",
+                },
+              },
+            ],
+          }),
+        }}
+      />
     </main>
   );
 }

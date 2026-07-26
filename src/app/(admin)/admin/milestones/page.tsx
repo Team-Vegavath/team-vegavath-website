@@ -26,7 +26,7 @@ export default async function AdminMilestonesPage() {
         <h1 className="admin-page-title">Road So Far</h1>
       </header>
 
-      <MilestonesTable initialData={milestones} />
+      <MilestonesTable initialData={milestones} isViewer={session.user.isViewer} />
     </>
   );
 }

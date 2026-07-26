@@ -15,6 +15,9 @@ export async function POST(
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
 
   try {
     const { id } = await params;

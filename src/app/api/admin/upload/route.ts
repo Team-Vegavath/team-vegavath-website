@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (session.user.isViewer) {
+      return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+    }
 
     const formData = await req.formData();
     const file = formData.get("file") as File;

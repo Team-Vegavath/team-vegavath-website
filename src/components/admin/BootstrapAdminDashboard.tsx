@@ -19,10 +19,13 @@ export default function BootstrapAdminDashboard({
   session,
   initialStalls,
   initialVolunteers,
+  isViewer = false,
 }: {
   session: BootstrapSession;
   initialStalls: BootstrapStall[];
   initialVolunteers: BootstrapVolunteer[];
+  /** Read-only admin tier: hides every write control (S47). */
+  isViewer?: boolean;
 }) {
   const router = useRouter();
   const [stalls, setStalls] = useState(initialStalls);
@@ -33,6 +36,12 @@ export default function BootstrapAdminDashboard({
   const [busy, setBusy] = useState(false);
   // S33 pin-drop: which stall the next map click positions
   const [editingStall, setEditingStall] = useState<string | null>(null);
+  // S49 stall add/remove: "add" while the new stall posts, else the stall id
+  const [stallFormOpen, setStallFormOpen] = useState(false);
+  const [newStallName, setNewStallName] = useState("");
+  const [newStallOcc, setNewStallOcc] = useState(1);
+  const [stallBusy, setStallBusy] = useState<string | null>(null);
+  const [stallError, setStallError] = useState("");
   const [feedback, setFeedback] = useState<BootstrapFeedbackSummary | null>(null);
   // S38: Gemini feedback summary modal
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -154,6 +163,59 @@ export default function BootstrapAdminDashboard({
     );
   }
 
+  // S49: stalls are no longer frozen at session creation. Add one when a sponsor
+  // turns up late; delete one that never happened (blocked while occupied).
+  async function addStall() {
+    const name = newStallName.trim();
+    if (!name) return;
+    setStallBusy("add");
+    setStallError("");
+    try {
+      const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/stalls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stallName: name, maxOccupancy: newStallOcc }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStallError(data?.error ?? "Failed to add stall");
+        return;
+      }
+      setStalls((prev) => [...prev, data.stall as BootstrapStall]);
+      setNewStallName("");
+      setNewStallOcc(1);
+      setStallFormOpen(false);
+    } finally {
+      setStallBusy(null);
+    }
+  }
+
+  async function removeStall(stall: BootstrapStall) {
+    if (
+      !window.confirm(
+        `Delete stall "${stall.stall_name}"? Volunteers pointed at it lose their stall assignment.`
+      )
+    )
+      return;
+    setStallBusy(stall.id);
+    setStallError("");
+    try {
+      const res = await fetch(
+        `/api/admin/bootstrap/sessions/${session.id}/stalls?stallId=${encodeURIComponent(stall.id)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStallError(data?.error ?? "Failed to delete stall");
+        return;
+      }
+      setStalls((prev) => prev.filter((s) => s.id !== stall.id));
+      poll();
+    } finally {
+      setStallBusy(null);
+    }
+  }
+
   async function unlock(volunteerId: string) {
     await fetch(`/api/admin/bootstrap/volunteers/${volunteerId}/unlock`, {
       method: "PATCH",
@@ -239,7 +301,7 @@ export default function BootstrapAdminDashboard({
   );
 
   const unlockButton = (v: BootstrapVolunteer) =>
-    v.is_active ? (
+    v.is_active && !isViewer ? (
       <button
         className="btn-outline"
         style={{ minHeight: "44px", padding: "0.5rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
@@ -319,15 +381,17 @@ export default function BootstrapAdminDashboard({
     <>
       <header className="admin-page-header">
         <h1 className="admin-page-title">{session.name}</h1>
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button
-            className="admin-btn-danger-outline"
-            style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
-            onClick={deactivate}
-          >
-            DEACTIVATE SESSION
-          </button>
-        </div>
+        {!isViewer ? (
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              className="admin-btn-danger-outline"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
+              onClick={deactivate}
+            >
+              DEACTIVATE SESSION
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {/* S33: check-in URLs are per group lead (on their own dashboards);
@@ -423,6 +487,7 @@ export default function BootstrapAdminDashboard({
             expanded={expandedId === stall.id}
             onToggle={() => expandStall(stall)}
             actions={
+              isViewer ? null : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <select
                   className="admin-input"
@@ -450,10 +515,163 @@ export default function BootstrapAdminDashboard({
                   {busy ? "Applying…" : "Apply override"}
                 </button>
               </div>
+              )
             }
           />
         ))}
       </StallGrid>
+
+      {/* S49: add / remove stalls mid-session. Occupied stalls cannot be deleted -
+          the volunteer standing there would silently lose their claim. */}
+      {!isViewer && (
+        <section style={{ marginTop: "2.5rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem",
+              flexWrap: "wrap",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Manage Stalls</h2>
+            <button
+              className="btn-outline"
+              style={{ padding: "0.4rem 0.9rem", fontSize: "0.7rem", cursor: "pointer" }}
+              onClick={() => {
+                setStallError("");
+                setStallFormOpen(!stallFormOpen);
+              }}
+            >
+              {stallFormOpen ? "CANCEL" : "ADD STALL"}
+            </button>
+          </div>
+
+          {stallFormOpen && (
+            <div
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                alignItems: "center",
+                flexWrap: "wrap",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                padding: "0.9rem 1rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <input
+                type="text"
+                className="admin-input"
+                value={newStallName}
+                onChange={(e) => setNewStallName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addStall();
+                  }
+                }}
+                placeholder="Stall name"
+                maxLength={60}
+                aria-label="New stall name"
+                style={{ flex: "1 1 12rem", fontSize: "0.8rem" }}
+              />
+              {/* same 1/2/3 segmented occupancy control as session creation */}
+              <div style={{ display: "flex" }}>
+                {[1, 2, 3].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setNewStallOcc(n)}
+                    aria-pressed={newStallOcc === n}
+                    style={{
+                      width: "2.4rem",
+                      padding: "0.5rem 0",
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
+                      background: newStallOcc === n ? "var(--accent)" : "transparent",
+                      color: newStallOcc === n ? "var(--bg-base)" : "var(--text-primary)",
+                      border: "1px solid var(--border)",
+                      borderLeft: n === 1 ? "1px solid var(--border)" : "none",
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="btn-primary"
+                style={{ padding: "0.5rem 1.1rem", fontSize: "0.7rem", cursor: "pointer" }}
+                disabled={stallBusy === "add" || !newStallName.trim()}
+                onClick={addStall}
+              >
+                {stallBusy === "add" ? "ADDING…" : "ADD"}
+              </button>
+            </div>
+          )}
+
+          {stallError && (
+            <p className="admin-error" style={{ marginBottom: "0.75rem" }}>
+              {stallError}
+            </p>
+          )}
+
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stall</th>
+                  <th>Max</th>
+                  <th>Claimed by</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stalls.length > 0 ? (
+                  stalls.map((s) => {
+                    const claimed = s.claimed_by ?? [];
+                    return (
+                      <tr key={s.id}>
+                        <td className="admin-cell-mono">{s.stall_number}</td>
+                        <td className="admin-td-primary" style={{ fontWeight: 500 }}>
+                          {s.stall_name}
+                        </td>
+                        <td className="admin-cell-mono">{s.max_occupancy}</td>
+                        <td className="admin-cell-mono">
+                          {claimed.length > 0 ? claimed.join(", ") : "-"}
+                        </td>
+                        <td>
+                          <button
+                            className="admin-row-action admin-row-action-danger"
+                            disabled={stallBusy === s.id || claimed.length > 0}
+                            title={
+                              claimed.length > 0
+                                ? "Stall is occupied - free it before deleting"
+                                : "Delete this stall"
+                            }
+                            onClick={() => removeStall(s)}
+                          >
+                            {stallBusy === s.id ? "WORKING…" : "DELETE"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td className="admin-empty" colSpan={5}>
+                      No stalls in this session yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* S35: self-registered accounts, split by role. Login codes are shown
           in plaintext on purpose - these accounts only reach /bootstrap. */}
@@ -566,6 +784,7 @@ export default function BootstrapAdminDashboard({
                           </span>
                         )}
                         {/* value pinned to "" so the select re-arms after each pick */}
+                        {isViewer ? null : (
                         <select
                           value=""
                           onChange={(e) => {
@@ -591,6 +810,7 @@ export default function BootstrapAdminDashboard({
                             </option>
                           ))}
                         </select>
+                        )}
                         {unlockButton(v)}
                       </div>
                     </td>
@@ -641,6 +861,9 @@ export default function BootstrapAdminDashboard({
           >
             REFRESH
           </button>
+          {/* Summarising spends paid Gemini quota, so it is gated with the
+              write controls even though it stores nothing. */}
+          {isViewer ? null : (
           <button
             onClick={handleSummarizeFeedback}
             disabled={summarizing || !feedback || feedback.total === 0}
@@ -659,6 +882,7 @@ export default function BootstrapAdminDashboard({
           >
             {summarizing ? "SUMMARISING..." : "SUMMARISE FEEDBACK"}
           </button>
+          )}
         </div>
 
         {feedback && feedback.total > 0 && (
@@ -832,8 +1056,8 @@ export default function BootstrapAdminDashboard({
                 stalls={stalls}
                 onClose={() => {}}
                 inline
-                editingStallId={editingStall}
-                onPositionSet={handlePositionSet}
+                editingStallId={isViewer ? null : editingStall}
+                onPositionSet={isViewer ? undefined : handlePositionSet}
               />
             </div>
             <div>
@@ -848,6 +1072,7 @@ export default function BootstrapAdminDashboard({
                     borderBottom: "1px solid var(--border)",
                   }}
                 >
+                  {isViewer ? null : (
                   <button
                     onClick={() => setEditingStall(editingStall === s.id ? null : s.id)}
                     aria-pressed={editingStall === s.id}
@@ -865,6 +1090,7 @@ export default function BootstrapAdminDashboard({
                   >
                     {editingStall === s.id ? "PLACING..." : "PLACE PIN"}
                   </button>
+                  )}
                   <span
                     style={{
                       fontFamily: "var(--font-chakra)",
@@ -885,7 +1111,7 @@ export default function BootstrapAdminDashboard({
                       ({s.map_x}%, {s.map_y}%)
                     </span>
                   )}
-                  {s.map_x != null && (
+                  {s.map_x != null && !isViewer && (
                     <button
                       onClick={() => handleClearPosition(s.id)}
                       style={{

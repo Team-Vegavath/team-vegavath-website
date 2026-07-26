@@ -26,8 +26,9 @@ export default async function AdminSponsorsPage({
   }
 
   const { new: newMode } = await searchParams;
+  const isViewer = session.user.isViewer;
 
-  if (newMode === "true") {
+  if (newMode === "true" && !isViewer) {
     return (
       <div style={{ maxWidth: "52rem" }}>
         <Link href="/admin/sponsors" className="admin-back-link">
@@ -49,9 +50,11 @@ export default async function AdminSponsorsPage({
     <>
       <header className="admin-page-header">
         <h1 className="admin-page-title">Sponsors</h1>
-        <Link href="/admin/sponsors?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-          ADD SPONSOR
-        </Link>
+        {!isViewer ? (
+          <Link href="/admin/sponsors?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+            ADD SPONSOR
+          </Link>
+        ) : null}
       </header>
 
       <section className="admin-table-wrap">
@@ -83,15 +86,19 @@ export default async function AdminSponsorsPage({
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{sponsor.display_order}</td>
                   <td className="admin-cell-mono">{truncateText(sponsor.logo_url, 40)}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                      <Link href={`/admin/sponsors/${sponsor.id}/edit`} className="admin-row-action">
-                        EDIT
-                      </Link>
-                      <InlineDelete
-                        endpoint={`/api/admin/sponsors?id=${encodeURIComponent(sponsor.id)}`}
-                        confirmMessage={`Delete sponsor "${sponsor.name}"? This cannot be undone.`}
-                      />
-                    </div>
+                    {isViewer ? (
+                      <span className="admin-cell-mono" style={{ color: "var(--text-muted)" }}>-</span>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <Link href={`/admin/sponsors/${sponsor.id}/edit`} className="admin-row-action">
+                          EDIT
+                        </Link>
+                        <InlineDelete
+                          endpoint={`/api/admin/sponsors?id=${encodeURIComponent(sponsor.id)}`}
+                          confirmMessage={`Delete sponsor "${sponsor.name}"? This cannot be undone.`}
+                        />
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

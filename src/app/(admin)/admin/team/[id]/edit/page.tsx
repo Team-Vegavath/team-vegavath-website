@@ -24,6 +24,10 @@ export default async function EditMemberPage({
   if (!session?.user?.isAdmin) {
     redirect("/admin");
   }
+  // Viewers read the list pages; the edit form is a write surface.
+  if (session.user.isViewer) {
+    redirect("/admin/team");
+  }
 
   const { id } = await params;
   const member = await getTeamMemberById(id);

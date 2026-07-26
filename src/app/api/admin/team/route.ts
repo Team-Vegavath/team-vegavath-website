@@ -23,6 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const member = await createMember(body);
@@ -39,13 +43,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
-    const { id, is_active, ...input } = body;
+    const { id, ...input } = body;
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    if (typeof is_active === "boolean" && Object.keys(input).length === 0) {
-      await toggleMemberActive(id as string, is_active);
+    // Active-only payload (the table's inline toggle) takes the cheap path.
+    // Any other payload goes through updateMember, which now writes is_active
+    // too -- previously it was stripped here and never persisted from the form.
+    if (Object.keys(input).length === 1 && typeof input.is_active === "boolean") {
+      await toggleMemberActive(id as string, input.is_active);
       return NextResponse.json({ success: true });
     }
 
@@ -61,6 +72,10 @@ export async function DELETE(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
   }
 
   try {

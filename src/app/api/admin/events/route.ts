@@ -24,6 +24,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const event = await createEvent({
@@ -43,6 +47,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
   try {
     const body = await req.json();
     const { id, ...input } = body;
@@ -60,6 +68,10 @@ export async function DELETE(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
   }
 
   try {

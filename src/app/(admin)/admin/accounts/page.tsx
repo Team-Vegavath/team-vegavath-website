@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { GenerateInviteButton, PendingRequestActions, ResetPasswordButton } from "@/components/admin/AccountsActions";
+import {
+  GenerateInviteButton,
+  OpenViewerLink,
+  PendingRequestActions,
+  ResetPasswordButton,
+} from "@/components/admin/AccountsActions";
 import InlineDelete from "@/components/admin/InlineDelete";
 import { auth } from "@/lib/auth";
 import {
   getAdminAccounts,
+  getOpenViewerTokens,
   getPendingRequests,
   type AdminAccount,
+  type OpenViewerToken,
   type PendingRequest,
 } from "@/lib/services/admin";
 
@@ -34,6 +41,9 @@ export default async function AdminAccountsPage() {
   const accounts = await getAdminAccounts().catch(() => [] as AdminAccount[]);
   const pending = isGodfather
     ? await getPendingRequests().catch(() => [] as PendingRequest[])
+    : [];
+  const openTokens = isGodfather
+    ? await getOpenViewerTokens().catch(() => [] as OpenViewerToken[])
     : [];
 
   return (
@@ -74,6 +84,7 @@ export default async function AdminAccountsPage() {
                   <th>Username</th>
                   <th>Email</th>
                   <th>Mobile</th>
+                  <th>Access</th>
                   <th>Submitted</th>
                   <th>Actions</th>
                 </tr>
@@ -87,6 +98,11 @@ export default async function AdminAccountsPage() {
                     <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{req.pending_username}</td>
                     <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{req.pending_email ?? "-"}</td>
                     <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{req.pending_mobile ?? "-"}</td>
+                    {/* Role was fixed when the invite was generated -- pre-019
+                        tokens have no value and approve as admin. */}
+                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
+                      {req.pending_role === "viewer" ? "viewer" : "admin"}
+                    </td>
                     <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{formatDate(req.created_at)}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <PendingRequestActions id={req.id} />
@@ -106,6 +122,16 @@ export default async function AdminAccountsPage() {
       {isGodfather && (
         <div style={{ marginBottom: "2rem" }}>
           <GenerateInviteButton />
+          {/* ISO-normalised here: the driver hands back Date objects for
+              timestamptz, and OpenViewerLink is a client component. */}
+          <OpenViewerLink
+            initialTokens={openTokens.map((t) => ({
+              id: t.id,
+              token: t.token,
+              created_at: new Date(t.created_at).toISOString(),
+              expires_at: new Date(t.expires_at).toISOString(),
+            }))}
+          />
         </div>
       )}
 
@@ -133,7 +159,14 @@ export default async function AdminAccountsPage() {
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
                     <span
                       className="admin-dot"
-                      style={{ background: account.role === "godfather" ? "var(--gold)" : "var(--accent)" }}
+                      style={{
+                        background:
+                          account.role === "godfather"
+                            ? "var(--gold)"
+                            : account.role === "viewer"
+                              ? "var(--text-muted)"
+                              : "var(--accent)",
+                      }}
                       aria-hidden="true"
                     />
                     {account.role}

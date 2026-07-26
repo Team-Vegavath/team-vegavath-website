@@ -6,7 +6,14 @@ import type { Milestone } from "@/lib/services/about";
 
 type Draft = Omit<Milestone, "id">;
 
-export default function MilestonesTable({ initialData }: { initialData: Milestone[] }) {
+export default function MilestonesTable({
+  initialData,
+  isViewer = false,
+}: {
+  initialData: Milestone[];
+  /** Read-only admin tier: hides add / edit / delete and the drag handle (S47). */
+  isViewer?: boolean;
+}) {
   const [items, setItems] = useState(initialData);
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -102,7 +109,7 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
   return (
     <div>
       {/* Add button */}
-      {!adding && (
+      {!adding && !isViewer && (
         <button
           onClick={() => setAdding(true)}
           className="btn-primary"
@@ -113,7 +120,7 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
       )}
 
       {/* Inline add form at top */}
-      {adding && (
+      {adding && !isViewer && (
         <MilestoneForm
           onSave={handleAdd}
           onCancel={() => setAdding(false)}
@@ -138,11 +145,11 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
         {items.map((m, i) => (
           <div
             key={m.id}
-            draggable
-            onDragStart={(e) => onDragStart(e, i)}
-            onDragOver={(e) => onDragOver(e, i)}
-            onDrop={(e) => onDrop(e, i)}
-            onDragEnd={() => {
+            draggable={!isViewer}
+            onDragStart={isViewer ? undefined : (e) => onDragStart(e, i)}
+            onDragOver={isViewer ? undefined : (e) => onDragOver(e, i)}
+            onDrop={isViewer ? undefined : (e) => onDrop(e, i)}
+            onDragEnd={isViewer ? undefined : () => {
               setDragIdx(null);
               setOverIdx(null);
             }}
@@ -164,7 +171,7 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
                 background: "var(--accent)",
                 border: "2px solid var(--bg-base)",
                 borderRadius: "50%",
-                cursor: "grab",
+                cursor: isViewer ? "default" : "grab",
                 zIndex: 1,
               }}
             />
@@ -177,7 +184,7 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
                 padding: "1rem 1.25rem",
               }}
             >
-              {editing === m.id ? (
+              {editing === m.id && !isViewer ? (
                 <MilestoneForm
                   initial={m}
                   onSave={(data) => handleSave(m.id, data)}
@@ -220,20 +227,22 @@ export default function MilestonesTable({ initialData }: { initialData: Mileston
                       {m.description}
                     </p>
                   </div>
-                  <div style={{ display: "flex", gap: "0.75rem", flexShrink: 0, marginLeft: "1rem" }}>
-                    <button
-                      onClick={() => setEditing(m.id)}
-                      className="admin-row-action"
-                    >
-                      EDIT
-                    </button>
-                    <button
-                      onClick={() => handleDelete(m.id, m.title)}
-                      className="admin-row-action admin-row-action-danger"
-                    >
-                      DELETE
-                    </button>
-                  </div>
+                  {!isViewer ? (
+                    <div style={{ display: "flex", gap: "0.75rem", flexShrink: 0, marginLeft: "1rem" }}>
+                      <button
+                        onClick={() => setEditing(m.id)}
+                        className="admin-row-action"
+                      >
+                        EDIT
+                      </button>
+                      <button
+                        onClick={() => handleDelete(m.id, m.title)}
+                        className="admin-row-action admin-row-action-danger"
+                      >
+                        DELETE
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

@@ -80,6 +80,41 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// S49 LLM/AI SEO: site-wide Organization graph. Rendered in the tree rather than
+// a <head> block - App Router has no <head> here, and Next's documented JSON-LD
+// pattern is an inline <script> in the layout body, which crawlers read fine.
+// Logo uses the same R2 constant as the OG image so one env var moves both.
+const orgSchema = {
+  "@context": "https://schema.org",
+  "@type": ["SportsClub", "Organization"],
+  name: "Team Vegavath",
+  alternateName: "Team Vegavath PESU ECC",
+  url: "https://vegavath.live",
+  logo: `${R2}/icons/logo.png`,
+  description:
+    "Motorsport and innovation student club at PES University Electronic City Campus (PESU ECC), Bangalore. Designs and builds go-karts, develops robotics systems, and organizes technical events.",
+  sport: "Motorsport",
+  memberOf: {
+    "@type": "CollegeOrUniversity",
+    name: "PES University Electronic City Campus",
+    alternateName: "PESU ECC",
+  },
+  location: {
+    "@type": "Place",
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Bangalore",
+      addressRegion: "Karnataka",
+      addressCountry: "IN",
+    },
+  },
+  sameAs: [
+    "https://www.instagram.com/teamvegavath_pesu/",
+    "https://www.linkedin.com/company/team-vegavath-pesu",
+    "https://github.com/Team-Vegavath",
+  ],
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -88,6 +123,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${orbitron.variable} ${chakraPetch.variable} ${spaceGrotesk.variable} ${spaceMono.variable}`}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+        />
         <CursorControls />
         <PageTransition>{children}</PageTransition>
       </body>

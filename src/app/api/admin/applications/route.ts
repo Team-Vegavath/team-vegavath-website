@@ -32,6 +32,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
   try {
     const id = new URL(req.url).searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });

@@ -132,12 +132,13 @@ export default async function AdminApplicationsPage({
         className="mono"
         style={{ fontSize: "0.68rem", letterSpacing: "0.08em", color: "var(--text-muted)", marginBottom: "1.5rem" }}
       >
-        Use SELECTED/REJECTED for new decisions. ACCEPTED and REVIEWED are legacy statuses.
+        Use SELECTED/REJECTED for new decisions.
       </p>
 
       <ApplicationsTable
         applications={applications}
         showPanelAssign={activeStatus === "interview" && !activeGroup}
+        isViewer={session.user.isViewer}
       />
     </>
   );

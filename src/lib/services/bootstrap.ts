@@ -47,6 +47,18 @@ export interface BootstrapVolunteer {
   srn?: string | null; // migration 016 - username is the lowercased SRN
   group_number?: number | null; // migration 016 - assigned FCFS on activation
   in_classroom?: boolean; // migration 016 - classroom-mode flag (leads)
+  preferred_stall_name?: string | null; // migration 021 - free text, pool members
+}
+
+// migration 021 - a pre-registered volunteer with no session yet (session_id NULL)
+export interface PoolVolunteer {
+  id: string;
+  display_name: string;
+  username: string;
+  srn: string | null;
+  phone: string | null;
+  preferred_stall_name: string | null;
+  created_at: string;
 }
 
 // migration 014 - visitor groups walked by a lead volunteer
@@ -99,6 +111,21 @@ export async function createBootstrapSession(
     INSERT INTO bootstrap_sessions (name, max_group_size)
     VALUES (${name}, ${maxGroupSize}) RETURNING *`;
   return rows[0] as BootstrapSession;
+}
+
+// S49: admin can rename a session and change its visitor cap after creation.
+// Only the fields present in `data` are written - the COALESCE keeps the rest.
+export async function updateBootstrapSession(
+  id: string,
+  data: { name?: string; max_group_size?: number }
+): Promise<BootstrapSession | null> {
+  const rows = await sql`
+    UPDATE bootstrap_sessions
+    SET name           = COALESCE(${data.name ?? null}, name),
+        max_group_size = COALESCE(${data.max_group_size ?? null}, max_group_size)
+    WHERE id = ${id}
+    RETURNING *`;
+  return (rows[0] as BootstrapSession) ?? null;
 }
 
 export async function getBootstrapSessions(): Promise<BootstrapSession[]> {
@@ -217,6 +244,53 @@ export async function createBootstrapStalls(
   return created;
 }
 
+// S49: add a single stall to an existing session. stall_number is display order
+// only, so it just continues past the current max (UNIQUE(session_id,
+// stall_number) from migration 007 means we cannot reuse a deleted number).
+export async function addStallToSession(
+  sessionId: string,
+  stallName: string,
+  maxOccupancy: number
+): Promise<BootstrapStall> {
+  const maxRows = await sql`
+    SELECT COALESCE(max(stall_number), 0)::int AS n
+    FROM bootstrap_stalls WHERE session_id = ${sessionId}`;
+  const nextNumber = (maxRows[0] as { n: number }).n + 1;
+  const pos = defaultPositionFor(stallName);
+  const rows = await sql`
+    INSERT INTO bootstrap_stalls
+      (session_id, stall_number, stall_name, max_occupancy, map_x, map_y)
+    VALUES
+      (${sessionId}, ${nextNumber}, ${stallName}, ${maxOccupancy},
+       ${pos?.map_x ?? null}, ${pos?.map_y ?? null})
+    RETURNING *`;
+  return rows[0] as BootstrapStall;
+}
+
+// Refuses to delete a stall someone is currently standing at - the admin has to
+// free it first, otherwise a volunteer loses their claim mid-session.
+// Returns a reason instead of throwing so the route can pick 404 vs 409.
+// sessionId scopes the lookup: the route is nested under a session, so a stall id
+// from a different session must read as not-found rather than deleting.
+export async function deleteStall(
+  stallId: string,
+  sessionId: string
+): Promise<{ ok: true } | { ok: false; reason: "not_found" | "occupied" }> {
+  const rows = await sql`
+    SELECT claimed_by FROM bootstrap_stalls
+    WHERE id = ${stallId} AND session_id = ${sessionId} LIMIT 1`;
+  if (!rows.length) return { ok: false, reason: "not_found" };
+  const claimedBy = (rows[0] as { claimed_by: string[] | null }).claimed_by ?? [];
+  if (claimedBy.length > 0) return { ok: false, reason: "occupied" };
+
+  // volunteers pointed at this stall keep their session; only the suggestion goes
+  await sql`
+    UPDATE bootstrap_volunteers SET suggested_stall_id = NULL
+    WHERE suggested_stall_id = ${stallId}`;
+  await sql`DELETE FROM bootstrap_stalls WHERE id = ${stallId}`;
+  return { ok: true };
+}
+
 export async function getBootstrapStalls(sessionId: string): Promise<BootstrapStall[]> {
   const rows = await sql`
     SELECT * FROM bootstrap_stalls
@@ -326,12 +400,16 @@ export async function setSessionMapImage(sessionId: string, imageUrl: string): P
 // and unique per person; password is the auto-generated login_code, stored
 // plaintext alongside the hash so the admin tables can display it.
 
+// S49: sessionId and stallId are nullable. With both null the volunteer lands in
+// the pre-registration pool (migration 021) and carries preferredStallName as
+// free text until an admin assigns them to a real session stall.
 export async function registerStallVolunteer(
-  sessionId: string,
+  sessionId: string | null,
   name: string,
   phone: string,
   srn: string,
-  stallId: string
+  stallId: string | null,
+  preferredStallName: string | null = null
 ): Promise<{ username: string; loginCode: string }> {
   const username = srn.toLowerCase().trim();
   const loginCode = generatePassword(8);
@@ -342,10 +420,10 @@ export async function registerStallVolunteer(
   await sql`
     INSERT INTO bootstrap_volunteers
       (session_id, username, display_name, password_hash,
-       login_code, phone, srn, role, suggested_stall_id)
+       login_code, phone, srn, role, suggested_stall_id, preferred_stall_name)
     VALUES
       (${sessionId}, ${username}, ${name}, ${hash},
-       ${loginCode}, ${phone}, ${srn}, 'stall', ${stallId})`;
+       ${loginCode}, ${phone}, ${srn}, 'stall', ${stallId}, ${preferredStallName})`;
 
   // S36: the stall is NOT claimed at registration - the volunteer hasn't
   // arrived yet. suggested_stall_id (set above) is enough for the admin STALL
@@ -526,6 +604,63 @@ export async function suggestStallToVolunteer(
     UPDATE bootstrap_volunteers
     SET suggested_stall_id = ${stallId}
     WHERE id = ${volunteerId}`;
+}
+
+// ------------------------------------- pre-registration pool (S49, mig 021)
+
+// Volunteers who registered before any session existed. They have no session_id,
+// so they cannot log in yet - an admin assigns them to a session stall first.
+export async function getUnassignedVolunteers(): Promise<PoolVolunteer[]> {
+  const rows = await sql`
+    SELECT id, display_name, username, srn, phone, preferred_stall_name, created_at
+    FROM bootstrap_volunteers
+    WHERE session_id IS NULL
+    ORDER BY created_at ASC LIMIT 200`;
+  return rows as PoolVolunteer[];
+}
+
+// UNIQUE(session_id, username) from 007 does not catch pool duplicates (Postgres
+// treats NULLs as distinct), so the pool's one-account-per-SRN rule lives here.
+export async function getPoolVolunteerBySrn(
+  username: string
+): Promise<{ id: string } | null> {
+  const rows = await sql`
+    SELECT id FROM bootstrap_volunteers
+    WHERE session_id IS NULL AND username = ${username}
+    LIMIT 1`;
+  return (rows[0] as { id: string }) ?? null;
+}
+
+// The session_id IS NULL guard makes this a one-way door: an already-assigned
+// volunteer cannot be moved by re-firing the assign route.
+export async function assignVolunteerToSession(
+  volunteerId: string,
+  sessionId: string,
+  stallId: string | null
+): Promise<boolean> {
+  const rows = await sql`
+    UPDATE bootstrap_volunteers
+    SET session_id = ${sessionId}, suggested_stall_id = ${stallId}
+    WHERE id = ${volunteerId} AND session_id IS NULL
+    RETURNING id`;
+  return rows.length === 1;
+}
+
+// Best-effort sweep run right after a session's stalls are created: pool members
+// whose typed preferred_stall_name matches a new stall name (case-insensitive)
+// get pulled in automatically. Everyone else stays in the pool for manual
+// assignment. Returns how many were assigned.
+export async function autoAssignPoolMembers(sessionId: string): Promise<number> {
+  const rows = await sql`
+    UPDATE bootstrap_volunteers v
+    SET session_id = ${sessionId},
+        suggested_stall_id = s.id
+    FROM bootstrap_stalls s
+    WHERE v.session_id IS NULL
+      AND s.session_id = ${sessionId}
+      AND lower(trim(s.stall_name)) = lower(trim(v.preferred_stall_name))
+    RETURNING v.id`;
+  return rows.length;
 }
 
 // -------------------------------------------- visitor groups (S32, mig 014)

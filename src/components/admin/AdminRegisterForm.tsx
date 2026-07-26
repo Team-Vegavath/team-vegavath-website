@@ -38,14 +38,19 @@ const FIELDS = [
 
 type FieldKey = (typeof FIELDS)[number]["key"];
 
+/** `open` = registration through the S48 reusable viewer link: no invitee
+ *  slug in the URL, nothing pre-filled, and the resulting account is always
+ *  read-only. Named invites keep their existing behaviour. */
 export default function AdminRegisterForm({
   token,
-  nameSlug,
+  nameSlug = "",
   prefilledName = "",
+  open = false,
 }: {
   token: string;
-  nameSlug: string;
+  nameSlug?: string;
   prefilledName?: string;
+  open?: boolean;
 }) {
   const [values, setValues] = useState<Record<FieldKey, string>>({
     displayName: prefilledName, username: "", email: "", mobile: "",
@@ -73,7 +78,7 @@ export default function AdminRegisterForm({
       const res = await fetch("/api/admin/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, nameSlug, ...values }),
+        body: JSON.stringify({ token, nameSlug, open, ...values }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok) {
@@ -135,9 +140,28 @@ export default function AdminRegisterForm({
               marginTop: "4px",
             }}
           >
-            Admin registration
+            {open ? "Viewer registration" : "Admin registration"}
           </div>
         </div>
+
+        {open && !done && (
+          <p
+            style={{
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "0.72rem",
+              lineHeight: 1.7,
+              color: BS.muted,
+              border: `1px solid ${BS.border}`,
+              background: BS.elevated,
+              padding: "12px 14px",
+              marginTop: "-16px",
+              marginBottom: "28px",
+            }}
+          >
+            You are registering for read-only (viewer) access. An admin
+            approves each request individually.
+          </p>
+        )}
 
         {done ? (
           <div style={{ textAlign: "center" }}>

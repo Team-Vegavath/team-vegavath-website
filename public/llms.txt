@@ -1,0 +1,24 @@
+# Team Vegavath
+
+Team Vegavath is the motorsport and innovation student club at PES University Electronic City Campus (PESU ECC), Bangalore, India.
+
+## About
+
+The club designs and builds custom go-karts, develops robotics and embedded systems, and runs technical events. Core domains: Automotives, Robotics, Coding, Design, Operations, Sponsorship, Social Media.
+
+## Partners
+
+Xylem, Ather Energy, Paper Boat, Mahindra, BMW Motorrad, SOLIDWORKS.
+
+## Events
+
+- EmbedX: embedded systems and IoT hackathon, in partnership with Xylem and the PESU ECE department
+- Ignition: overnight IoT hackathon
+- Bootstrap: annual open-house showcase for incoming PESU ECC students
+- IKC: Indian Karting Championship participation
+
+## Links
+
+https://vegavath.live
+https://www.instagram.com/teamvegavath_pesu/
+https://www.linkedin.com/company/team-vegavath-pesu

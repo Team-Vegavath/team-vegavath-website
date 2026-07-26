@@ -34,10 +34,11 @@ export default auth(async (req) => {
     return NextResponse.rewrite(url);
   }
 
-  // Public auth pages - the one-time token in the URL is the gate,
-  // not the session (S27 invites, S29 password resets).
+  // Public auth pages - the token in the URL is the gate, not the session
+  // (S27 invites, S29 password resets, S48 open viewer links).
   if (
     pathname.startsWith("/admin/invite/") ||
+    pathname === "/admin/register" ||
     pathname === "/api/admin/register" ||
     pathname === "/api/admin/credentials/reset" ||
     /^\/admin\/[^/]+\/credentials\//.test(pathname)

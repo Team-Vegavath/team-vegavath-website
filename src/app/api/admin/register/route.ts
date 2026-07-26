@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { getInviteToken, submitRegistration } from "@/lib/services/admin";
+import {
+  getInviteToken,
+  getOpenInviteToken,
+  submitOpenRegistration,
+  submitRegistration,
+} from "@/lib/services/admin";
 
-// PUBLIC route (exempted in middleware) - the one-time invite token is the gate.
+// PUBLIC route (exempted in middleware) - the invite token is the gate.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -16,7 +21,11 @@ export async function POST(req: NextRequest) {
     const password = String(body?.password ?? "");
     const confirmPassword = String(body?.confirmPassword ?? "");
 
-    if (!token || !nameSlug || !username || !displayName || !email || !mobile || !password) {
+    // Open links (S48) have no invitee slug -- the registrant's own display
+    // name stands in for the name that a named invite bakes into the URL.
+    const isOpen = body?.open === true;
+
+    if (!token || (!isOpen && !nameSlug) || !username || !displayName || !email || !mobile || !password) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
     if (password !== confirmPassword) {
@@ -26,23 +35,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
-    const invite = await getInviteToken(token, nameSlug);
-    if (!invite) {
-      return NextResponse.json(
-        { error: "Invite link is invalid, expired, or already used" },
-        { status: 400 }
-      );
-    }
+    const invalid = NextResponse.json(
+      { error: "Invite link is invalid, expired, or already used" },
+      { status: 400 }
+    );
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const ok = await submitRegistration(token, {
-      username, displayName, email, mobile, passwordHash,
-    });
-    if (!ok) {
-      return NextResponse.json(
-        { error: "Invite link is invalid, expired, or already used" },
-        { status: 400 }
-      );
+    if (isOpen) {
+      const open = await getOpenInviteToken(token);
+      if (!open) return invalid;
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      // Writes a fresh named row; the open token itself stays reusable.
+      const ok = await submitOpenRegistration(token, {
+        name: displayName, username, displayName, email, mobile, passwordHash,
+      });
+      if (!ok) return invalid;
+    } else {
+      const invite = await getInviteToken(token, nameSlug);
+      if (!invite) return invalid;
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const ok = await submitRegistration(token, {
+        username, displayName, email, mobile, passwordHash,
+      });
+      if (!ok) return invalid;
     }
 
     return NextResponse.json({

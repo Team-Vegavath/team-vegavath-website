@@ -137,6 +137,13 @@ export default function BootstrapMapSVG({
             fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
           {label(565, 368, "CLUB ROOM", 8)}
 
+          {/* KUKA - the robotics cell room off the corridor's east stretch.
+              Box centred on the KUKA stall pin (map_x 71.9, map_y 82.4 ->
+              736,345 in viewBox units); smaller than the classroom wings. */}
+          <rect x="706" y="322" width="60" height="45"
+            fill="#161616" stroke="#2a2a2a" strokeWidth="1.5" />
+          {label(736, 348, "KUKA", 8)}
+
           {/* AVIONS - separate building past the corridor's east end
               (S32: was mislabeled KUKA; the KUKA stall sits in the corridor) */}
           <polygon points="858,272 1015,247 1022,355 868,378"

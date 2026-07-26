@@ -23,6 +23,10 @@ export default async function EditSponsorPage({
   if (!session?.user?.isAdmin) {
     redirect("/admin");
   }
+  // Viewers read the list pages; the edit form is a write surface.
+  if (session.user.isViewer) {
+    redirect("/admin/sponsors");
+  }
 
   const { id } = await params;
   const sponsor = await getSponsorById(id);

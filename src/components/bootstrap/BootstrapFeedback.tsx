@@ -37,6 +37,13 @@ function tileStyle(active: boolean): React.CSSProperties {
   };
 }
 
+// Stalls excluded from the visitor feedback dropdown (S48).
+// These stalls are real -- they appear on the map, in the admin dashboard,
+// and have claim/queue/release -- but they run their own feedback collection
+// independently. Matched by name prefix, not id, so a future "Avions 2" is
+// excluded automatically.
+const FEEDBACK_EXCLUDED_STALLS = ["Avions"];
+
 // S36 visitor feedback: 5 quick questions, mostly taps. Only the overall
 // rating (1-10) is required; everything else is optional.
 export default function BootstrapFeedback({
@@ -54,6 +61,14 @@ export default function BootstrapFeedback({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+
+  // Dropdown only -- the full `stalls` array still drives everything else.
+  const feedbackStalls = stalls.filter(
+    (s) =>
+      !FEEDBACK_EXCLUDED_STALLS.some((excluded) =>
+        s.stall_name.toLowerCase().startsWith(excluded.toLowerCase())
+      )
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -213,7 +228,7 @@ export default function BootstrapFeedback({
                   }}
                 >
                   <option value="">Overall / not sure</option>
-                  {stalls.map((s) => (
+                  {feedbackStalls.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.stall_name}
                     </option>

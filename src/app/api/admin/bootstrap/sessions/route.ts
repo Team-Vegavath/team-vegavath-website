@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
+  autoAssignPoolMembers,
   createBootstrapGroups,
   createBootstrapSession,
   createBootstrapStalls,
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
   }
 
   try {
@@ -64,7 +68,18 @@ export async function POST(req: NextRequest) {
     );
     await createBootstrapGroups(bootstrapSession.id, groupCount);
 
-    return NextResponse.json({ session: bootstrapSession });
+    // S49: pool members (migration 021) who typed a stall name matching one of
+    // these stalls are pulled in automatically. Best-effort - a failure here must
+    // not lose the session that was just created, and unmatched members simply
+    // stay in the pool for manual assignment.
+    let autoAssigned = 0;
+    try {
+      autoAssigned = await autoAssignPoolMembers(bootstrapSession.id);
+    } catch (error) {
+      console.error("[POST /api/admin/bootstrap/sessions] auto-assign failed", error);
+    }
+
+    return NextResponse.json({ session: bootstrapSession, autoAssigned });
   } catch (error) {
     console.error("[POST /api/admin/bootstrap/sessions]", error);
     return NextResponse.json({ error: "Failed to create session" }, { status: 500 });

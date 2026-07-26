@@ -10,6 +10,11 @@ export async function POST(
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // No DB write here, but it spends paid Gemini quota -- gated with the other
+  // POSTs rather than treated as a read.
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
 
   const { id } = await params;
 

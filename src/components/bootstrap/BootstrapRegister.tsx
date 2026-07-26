@@ -44,9 +44,20 @@ export default function BootstrapRegister({
   const [phone, setPhone] = useState("");
   const [srn, setSrn] = useState("");
   const [stallId, setStallId] = useState("");
+  const [preferredStall, setPreferredStall] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ username: string; loginCode: string } | null>(null);
+  const [result, setResult] = useState<{
+    username: string;
+    loginCode: string;
+    pooled?: boolean;
+  } | null>(null);
+
+  // S49 pre-registration pool: stall volunteers can register before any session
+  // exists. There are no stalls to choose from, so they type a preference and an
+  // admin assigns them once the session is built. Group volunteers still wait -
+  // their flow depends on visitor groups that only exist inside a session.
+  const poolMode = variant === "stall" && !hasSession;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +68,11 @@ export default function BootstrapRegister({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          variant === "stall" ? { name, phone, srn, stall_id: stallId } : { name, phone, srn }
+          variant !== "stall"
+            ? { name, phone, srn }
+            : poolMode
+              ? { name, phone, srn, preferred_stall_name: preferredStall }
+              : { name, phone, srn, stall_id: stallId }
         ),
       });
       const data = await res.json().catch(() => null);
@@ -65,7 +80,7 @@ export default function BootstrapRegister({
         setError(String(data?.error ?? "Registration failed").toUpperCase());
         return;
       }
-      setResult(data as { username: string; loginCode: string });
+      setResult(data as { username: string; loginCode: string; pooled?: boolean });
     } catch {
       setError("CONNECTION FAILED — TRY AGAIN");
     } finally {
@@ -127,7 +142,7 @@ export default function BootstrapRegister({
           </div>
         </div>
 
-        {!hasSession ? (
+        {!hasSession && !poolMode ? (
           <p
             style={{
               fontFamily: "var(--font-chakra), sans-serif",
@@ -202,9 +217,11 @@ export default function BootstrapRegister({
                 lineHeight: 1.7,
               }}
             >
-              Save these — you&apos;ll need them to log in at /bootstrap.
+              Save these -- you&apos;ll need them to log in at /bootstrap.
               {variant === "group" &&
                 " Your group number will be shown on your dashboard after Bootstrap day starts."}
+              {result.pooled &&
+                " You're in the pre-registration pool. You'll be assigned to a stall when the next session is created, and your login starts working then."}
             </p>
             <a
               href="/bootstrap"
@@ -224,6 +241,25 @@ export default function BootstrapRegister({
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {poolMode && (
+              <p
+                style={{
+                  fontFamily: "var(--font-mono), monospace",
+                  fontSize: "12px",
+                  lineHeight: 1.7,
+                  color: BS.muted,
+                  background: BS.elevated,
+                  border: `1px solid ${BS.border}`,
+                  borderRadius: "10px",
+                  padding: "14px 16px",
+                  marginBottom: "24px",
+                }}
+              >
+                You&apos;re in the pre-registration pool. You&apos;ll be assigned
+                to a stall when the next session is created.
+              </p>
+            )}
+
             <div style={{ marginBottom: "20px" }}>
               <label htmlFor="bs-reg-name" style={labelStyle}>
                 Full name
@@ -288,7 +324,37 @@ export default function BootstrapRegister({
               />
             </div>
 
-            {variant === "stall" && (
+            {poolMode && (
+              <div style={{ marginBottom: "28px" }}>
+                <label htmlFor="bs-reg-pref-stall" style={labelStyle}>
+                  Which stall are you interested in?
+                </label>
+                <input
+                  id="bs-reg-pref-stall"
+                  className="bs-reg-input"
+                  type="text"
+                  value={preferredStall}
+                  onChange={(e) => setPreferredStall(e.target.value)}
+                  maxLength={60}
+                  placeholder="e.g. Go-Kart, Robotics"
+                  style={inputStyle}
+                />
+                <p
+                  style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "10px",
+                    letterSpacing: "0.06em",
+                    color: BS.muted,
+                    marginTop: "8px",
+                  }}
+                >
+                  Optional -- if a stall with this name exists in the next
+                  session, you&apos;ll be placed there automatically
+                </p>
+              </div>
+            )}
+
+            {variant === "stall" && !poolMode && (
               <div style={{ marginBottom: "28px" }}>
                 <label htmlFor="bs-reg-stall" style={labelStyle}>
                   Your stall
@@ -315,7 +381,7 @@ export default function BootstrapRegister({
 
             <button
               type="submit"
-              disabled={busy || (variant === "stall" && !stallId)}
+              disabled={busy || (variant === "stall" && !poolMode && !stallId)}
               style={{
                 width: "100%",
                 height: "64px",
@@ -329,7 +395,7 @@ export default function BootstrapRegister({
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 cursor: busy ? "wait" : "pointer",
-                opacity: busy || (variant === "stall" && !stallId) ? 0.6 : 1,
+                opacity: busy || (variant === "stall" && !poolMode && !stallId) ? 0.6 : 1,
                 transition: "opacity 150ms",
               }}
             >

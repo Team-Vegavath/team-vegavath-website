@@ -51,11 +51,14 @@ interface ApplicationsTableProps {
   // S32: page sets this on the plain INTERVIEW tab (no group filter) so the
   // panel auto-assign action appears exactly where it makes sense.
   showPanelAssign?: boolean;
+  /** Read-only admin tier: hides every write control (S47). */
+  isViewer?: boolean;
 }
 
 export default function ApplicationsTable({
   applications,
   showPanelAssign = false,
+  isViewer = false,
 }: ApplicationsTableProps) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -165,7 +168,7 @@ export default function ApplicationsTable({
 
   return (
     <section className="admin-table-wrap">
-      {showPanelAssign && hasUnassignedInterviewees && (
+      {showPanelAssign && hasUnassignedInterviewees && !isViewer && (
         <div
           style={{
             display: "flex",
@@ -239,20 +242,23 @@ export default function ApplicationsTable({
       <table className="admin-table">
         <thead>
           <tr>
+            {/* Column is kept for viewers so colSpan stays correct. */}
             <th>
-              <input
-                type="checkbox"
-                aria-label="Select all filtered applications"
-                checked={applications.length > 0 && selected.size === applications.length}
-                onChange={(e) =>
-                  setSelected(
-                    e.target.checked
-                      ? new Set(applications.map((a) => a.id))
-                      : new Set()
-                  )
-                }
-                style={{ cursor: "pointer" }}
-              />
+              {isViewer ? null : (
+                <input
+                  type="checkbox"
+                  aria-label="Select all filtered applications"
+                  checked={applications.length > 0 && selected.size === applications.length}
+                  onChange={(e) =>
+                    setSelected(
+                      e.target.checked
+                        ? new Set(applications.map((a) => a.id))
+                        : new Set()
+                    )
+                  }
+                  style={{ cursor: "pointer" }}
+                />
+              )}
             </th>
             <th>Name</th>
             <th>Email</th>
@@ -278,13 +284,15 @@ export default function ApplicationsTable({
                   >
                     {/* Checkbox cell swallows clicks so the row doesn't toggle. */}
                     <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${app.name}`}
-                        checked={selected.has(app.id)}
-                        onChange={() => toggleSelected(app.id)}
-                        style={{ cursor: "pointer" }}
-                      />
+                      {isViewer ? null : (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${app.name}`}
+                          checked={selected.has(app.id)}
+                          onChange={() => toggleSelected(app.id)}
+                          style={{ cursor: "pointer" }}
+                        />
+                      )}
                     </td>
                     <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
                       {app.name}
@@ -311,7 +319,9 @@ export default function ApplicationsTable({
                     </td>
                     {/* Group tiles - only meaningful once an applicant reaches interview. */}
                     <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>
-                      {status === "interview" || status === "shortlisted" ? (
+                      {isViewer ? (
+                        <span className="admin-cell-mono">{groupOf(app) ?? "-"}</span>
+                      ) : status === "interview" || status === "shortlisted" ? (
                         <div style={{ display: "flex", gap: "4px" }}>
                           {INTERVIEW_GROUPS.map((g) => {
                             const active = groupOf(app) === g;
@@ -343,6 +353,9 @@ export default function ApplicationsTable({
                     </td>
                     {/* Actions cell swallows clicks so the row doesn't toggle. */}
                     <td style={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                      {isViewer ? (
+                        <span className="admin-cell-mono" style={{ color: "var(--text-muted)" }}>-</span>
+                      ) : (
                       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                         <select
                           value={status}
@@ -373,6 +386,7 @@ export default function ApplicationsTable({
                           confirmMessage={`Permanently delete ${app.name}'s application? This cannot be undone.`}
                         />
                       </div>
+                      )}
                     </td>
                   </tr>
                   {expanded && (
@@ -432,7 +446,7 @@ export default function ApplicationsTable({
         </tbody>
       </table>
 
-      {selected.size > 0 && (
+      {selected.size > 0 && !isViewer && (
         <div
           style={{
             position: "sticky",

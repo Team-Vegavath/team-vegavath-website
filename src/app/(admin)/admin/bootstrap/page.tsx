@@ -8,7 +8,9 @@ import {
   getBootstrapSessions,
   getBootstrapStalls,
   getBootstrapVolunteers,
+  getUnassignedVolunteers,
   type BootstrapSession,
+  type PoolVolunteer,
 } from "@/lib/services/bootstrap";
 
 export const metadata: Metadata = {
@@ -37,9 +39,20 @@ export default async function AdminBootstrapPage() {
         session={active}
         initialStalls={stalls}
         initialVolunteers={volunteers}
+        isViewer={session.user.isViewer}
       />
     );
   }
 
-  return <BootstrapSessions sessions={sessions} />;
+  // S49: the pre-registration pool only matters on the sessions view - the live
+  // dashboard is for a session that already has its volunteers.
+  const pool = await getUnassignedVolunteers().catch(() => [] as PoolVolunteer[]);
+
+  return (
+    <BootstrapSessions
+      sessions={sessions}
+      pool={pool}
+      isViewer={session.user.isViewer}
+    />
+  );
 }
