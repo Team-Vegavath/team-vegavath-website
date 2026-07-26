@@ -58,6 +58,7 @@ export default async function EditPostPage({
           excerpt: post.excerpt,
           source_url: post.source_url,
           source_label: post.source_label,
+          thumbnail_url: post.thumbnail_url,
           published: post.published,
         }}
       />

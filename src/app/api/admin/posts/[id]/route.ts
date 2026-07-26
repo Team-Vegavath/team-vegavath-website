@@ -58,6 +58,11 @@ export async function PATCH(
         ? String(body.source_label).trim()
         : null;
     }
+    if (body?.thumbnail_url !== undefined) {
+      input.thumbnail_url = body.thumbnail_url
+        ? String(body.thumbnail_url)
+        : null;
+    }
     if (body?.published !== undefined) input.published = Boolean(body.published);
 
     const post = await updatePost(id, input);

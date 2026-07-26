@@ -160,14 +160,16 @@ export default async function PostPage({ params }: PostPageProps) {
               ) : null}
             </header>
 
-            <DocsContent markdown={post.body} />
-
             {/* S54: matched on the URL, not source_label. The label is a free
                 text admin field (no CHECK constraint), so "instagram",
-                "Instagram Post" and a typo would all miss an equality test. */}
+                "Instagram Post" and a typo would all miss an equality test.
+                S54B: sits above the body -- the embed is the primary artefact
+                for an Instagram-sourced post, the prose is commentary on it. */}
             {post.source_url?.includes("instagram.com") ? (
               <InstagramEmbed url={post.source_url} />
             ) : null}
+
+            <DocsContent markdown={post.body} />
           </div>
         </Container>
       </section>

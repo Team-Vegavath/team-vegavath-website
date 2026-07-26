@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "Posts",
   description:
     "Technical articles and series from Team Vegavath -- including Keeping up with Kedar on motorsport and engineering.",
-  // Category views (/posts?category=coding) all canonicalise to /posts -- they
+  // Category views (/posts?category=robotics) all canonicalise to /posts -- they
   // are filtered subsets of one list, not independently rankable pages.
   alternates: { canonical: "/posts" },
   openGraph: {
@@ -139,6 +139,34 @@ function PostCard({ post }: { post: Post }) {
 
   return (
     <Link href={`/posts/${post.slug}`} className="post-card">
+      {post.thumbnail_url ? (
+        <div style={{ width: "100%", aspectRatio: "4/5", overflow: "hidden" }}>
+          {/* Plain img: R2 URLs, and next/image adds nothing over a lazy card thumb. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.thumbnail_url}
+            alt={post.title}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            loading="lazy"
+          />
+        </div>
+      ) : (
+        // Placeholder keeps cards the same visual weight in a mixed grid.
+        <div
+          style={{
+            width: "100%",
+            aspectRatio: "4/5",
+            background:
+              post.category === "motorsport"
+                ? "var(--accent)"
+                : post.category === "automotives"
+                  ? "var(--gold)"
+                  : "var(--text-secondary)",
+            opacity: 0.12,
+          }}
+        />
+      )}
+
       <span className="label-tech" style={{ color: "var(--accent)" }}>
         {post.category}
       </span>

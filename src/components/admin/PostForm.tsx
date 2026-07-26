@@ -3,11 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import FileUploadField from "@/components/admin/FileUploadField";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 import { slugify } from "@/lib/utils";
 // From src/types/post.ts, NOT from services/posts.ts: a value import out of a
 // service would pull lib/db.ts and the Neon driver into the client bundle.
-import { POST_CATEGORIES, POST_CATEGORY_LABELS } from "@/types/post";
+import {
+  DEFAULT_POST_CATEGORY,
+  POST_CATEGORIES,
+  POST_CATEGORY_LABELS,
+} from "@/types/post";
 
 interface PostFormProps {
   mode: "create" | "edit";
@@ -22,6 +27,7 @@ interface PostFormProps {
     excerpt?: string | null;
     source_url?: string | null;
     source_label?: string | null;
+    thumbnail_url?: string | null;
     published?: boolean;
   };
 }
@@ -36,14 +42,29 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
   const [authorName, setAuthorName] = useState(initialData?.author_name ?? "");
   const [authorRole, setAuthorRole] = useState(initialData?.author_role ?? "");
-  const [category, setCategory] = useState(initialData?.category ?? "general");
+  const [category, setCategory] = useState(
+    initialData?.category ?? DEFAULT_POST_CATEGORY
+  );
   const [excerpt, setExcerpt] = useState(initialData?.excerpt ?? "");
   const [body, setBody] = useState(initialData?.body ?? "");
   const [sourceUrl, setSourceUrl] = useState(initialData?.source_url ?? "");
   const [sourceLabel, setSourceLabel] = useState(initialData?.source_label ?? "");
   const [published, setPublished] = useState(initialData?.published ?? false);
+  const [thumbFiles, setThumbFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Same helper as EventForm: the upload route takes the full R2 key as `path`
+  // and does not derive one.
+  async function uploadFile(file: File, path: string): Promise<string> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("path", path);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    return data.url;
+  }
 
   function handleTitleChange(value: string) {
     setTitle(value);
@@ -58,8 +79,21 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
     setSaving(true);
 
     try {
+      const finalSlug = slug || slugify(title);
+
+      // R2 serves immutable cache headers, so a replacement needs a new key.
+      // Omitted entirely when no new file was picked: the PATCH route treats a
+      // missing key as "leave alone", so edit mode keeps the stored thumbnail.
+      const thumbField: { thumbnail_url?: string } = {};
+      if (thumbFiles[0]) {
+        thumbField.thumbnail_url = await uploadFile(
+          thumbFiles[0],
+          `posts/${finalSlug}/thumb-${Date.now()}.jpg`
+        );
+      }
+
       const fields = {
-        slug: slug || slugify(title),
+        slug: finalSlug,
         title,
         author_name: authorName,
         author_role: authorRole.trim() || null,
@@ -69,6 +103,7 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
         source_url: sourceUrl.trim() || null,
         source_label: sourceLabel.trim() || null,
         published,
+        ...thumbField,
       };
 
       const isEdit = mode === "edit" && Boolean(initialData?.id);
@@ -202,6 +237,18 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
         <p className="admin-hint">
           Shown in post list · {excerpt.length}/200
         </p>
+      </div>
+
+      <div>
+        <span className="admin-label">Thumbnail (4:5 recommended)</span>
+        <FileUploadField
+          id="thumbnail"
+          accept="image/*"
+          files={thumbFiles}
+          onFilesChange={setThumbFiles}
+          currentUrl={initialData?.thumbnail_url}
+          hint="Shown on the /posts card · optional"
+        />
       </div>
 
       <div>

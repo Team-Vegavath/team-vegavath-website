@@ -6,7 +6,7 @@ import {
   type CreatePostInput,
 } from "@/lib/services/posts";
 import { slugify } from "@/lib/utils";
-import { isPostCategory } from "@/types/post";
+import { DEFAULT_POST_CATEGORY, isPostCategory } from "@/types/post";
 
 export async function GET() {
   const session = await auth();
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const category =
       typeof body?.category === "string" && isPostCategory(body.category)
         ? body.category
-        : "general";
+        : DEFAULT_POST_CATEGORY;
 
     const input: CreatePostInput = {
       slug,
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
       excerpt: body?.excerpt ? String(body.excerpt).trim().slice(0, 200) : null,
       source_url: body?.source_url ? String(body.source_url).trim() : null,
       source_label: body?.source_label ? String(body.source_label).trim() : null,
+      thumbnail_url:
+        typeof body?.thumbnail_url === "string" ? body.thumbnail_url : null,
       published: Boolean(body?.published),
       published_at: null,
     };

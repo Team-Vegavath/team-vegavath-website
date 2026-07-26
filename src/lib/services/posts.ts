@@ -19,6 +19,7 @@ export interface Post {
   excerpt: string | null;
   source_url: string | null;
   source_label: string | null;
+  thumbnail_url: string | null;
   published: boolean;
   published_at: Date | null;
   created_at: Date;
@@ -80,12 +81,13 @@ export async function createPost(data: CreatePostInput): Promise<Post> {
   const rows = await sql`
     INSERT INTO posts (
       slug, title, author_name, author_role, category, body,
-      excerpt, source_url, source_label, published, published_at
+      excerpt, source_url, source_label, thumbnail_url, published, published_at
     ) VALUES (
       ${data.slug}, ${data.title}, ${data.author_name},
       ${data.author_role ?? null}, ${data.category}, ${data.body},
       ${data.excerpt ?? null}, ${data.source_url ?? null},
-      ${data.source_label ?? null}, ${data.published},
+      ${data.source_label ?? null}, ${data.thumbnail_url ?? null},
+      ${data.published},
       ${publishedAt ? publishedAt.toISOString() : null}
     ) RETURNING *`;
   return rows[0] as Post;
@@ -96,7 +98,8 @@ export async function updatePost(
   data: UpdatePostInput
 ): Promise<Post> {
   // Read-then-write rather than COALESCE-per-column: the nullable fields
-  // (author_role, excerpt, source_url, source_label) have to be clearable, and
+  // (author_role, excerpt, source_url, source_label, thumbnail_url) have to be
+  // clearable, and
   // COALESCE(${x ?? null}, col) can never write a NULL back. Admin CRUD is
   // low-volume, so the extra SELECT is cheap.
   const current = await getPostByIdAdmin(id);
@@ -117,6 +120,10 @@ export async function updatePost(
       data.source_label !== undefined
         ? data.source_label
         : current.source_label,
+    thumbnail_url:
+      data.thumbnail_url !== undefined
+        ? data.thumbnail_url
+        : current.thumbnail_url,
     published: data.published ?? current.published,
     published_at:
       data.published_at !== undefined ? data.published_at : current.published_at,
@@ -141,6 +148,7 @@ export async function updatePost(
       excerpt = ${merged.excerpt},
       source_url = ${merged.source_url},
       source_label = ${merged.source_label},
+      thumbnail_url = ${merged.thumbnail_url},
       published = ${merged.published},
       published_at = ${publishedAt},
       updated_at = now()
