@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 // S52B: DPDP Act 2023 §5 notice. Sits directly under the submit button on
 // every form that collects personal data. One component rather than four
 // inlined copies so the legal wording only ever exists in one place.
@@ -9,6 +7,11 @@ import Link from "next/link";
 // the site's --text-muted (#555) is too dark to read. The link needs no
 // override: .legal-link resolves to --accent (#EF5D08), which is the same value
 // as BS.accent.
+// S54: plain <a target="_blank">, not <Link>. Reading the policy must not throw
+// away a half-filled form, and next/link's prefetch + client navigation are both
+// dead weight when the destination opens in a new tab. This is the pattern the
+// official App Router template uses for target="_blank" (confirmed via
+// Context7 /vercel/next.js). One component, so all four forms are fixed here.
 export function ConsentNotice({ color = "var(--text-muted)" }: { color?: string }) {
   return (
     <p
@@ -21,9 +24,14 @@ export function ConsentNotice({ color = "var(--text-muted)" }: { color?: string 
       }}
     >
       By submitting, you agree to our{" "}
-      <Link href="/legal" className="legal-link">
+      <a
+        href="/legal"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="legal-link"
+      >
         Privacy Policy
-      </Link>
+      </a>
       .
     </p>
   );

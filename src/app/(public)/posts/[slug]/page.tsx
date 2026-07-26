@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import DocsContent from "@/components/docs/DocsContent";
+import { InstagramEmbed } from "@/components/posts/InstagramEmbed";
 import { Container } from "@/components/ui/Container";
 import { getPostBySlug } from "@/lib/services/posts";
 import { formatDate, stripMarkdown } from "@/lib/utils";
@@ -160,6 +161,13 @@ export default async function PostPage({ params }: PostPageProps) {
             </header>
 
             <DocsContent markdown={post.body} />
+
+            {/* S54: matched on the URL, not source_label. The label is a free
+                text admin field (no CHECK constraint), so "instagram",
+                "Instagram Post" and a typo would all miss an equality test. */}
+            {post.source_url?.includes("instagram.com") ? (
+              <InstagramEmbed url={post.source_url} />
+            ) : null}
           </div>
         </Container>
       </section>

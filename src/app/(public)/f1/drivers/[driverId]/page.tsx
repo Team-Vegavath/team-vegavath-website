@@ -5,11 +5,11 @@ import { notFound } from "next/navigation";
 import F1Paused from "@/components/f1/F1Paused";
 import { F1Section } from "@/components/f1/F1Table";
 import {
+  constructorColor,
   getF1DriverConstructors,
   getF1DriverInfo,
   getF1DriverSeasonStanding,
   getF1DriverSeasons,
-  getF1DriverStandings,
 } from "@/lib/services/f1";
 import { getF1Enabled } from "@/lib/services/settings";
 
@@ -19,14 +19,19 @@ type DriverPageProps = {
   params: Promise<{ driverId: string }>;
 };
 
-// Only the current grid is pre-rendered. The full archive is ~880 drivers, which
-// would dominate build time; everything else renders on first request.
-export async function generateStaticParams() {
-  const standings = await getF1DriverStandings().catch(() => null);
-  return (standings?.standings ?? []).map((row) => ({
-    driverId: row.Driver.driverId,
-  }));
-}
+// S54: generateStaticParams REMOVED, and its removal is the fix for the empty
+// calendar on prod. It prerendered the 22-driver grid at build, and each of those
+// pages costs ~5 Jolpica calls (metadata + info + seasons + constructors +
+// standing) -- ~110 requests inside a few seconds, on top of the ~70 the other
+// /f1 pages fire. Measured: 14 concurrent requests to api.jolpi.ca returns 429
+// on 9 of them. Whichever call loses that race returns null, and Next caches the
+// failed response under its fetch revalidate window, so a 429 on
+// /f1/current/races.json left the calendar empty for a full day while
+// page-level revalidate=60 happily re-rendered against the poisoned entry.
+// Driver pages now render on first request and are ISR-cached from there, which
+// spreads the same requests across real traffic instead of one build burst.
+// ponytail: /f1/seasons still fans out 60 concurrent calls in one Promise.all
+// (SEASON_CAP 30 x 2) -- the next-largest burst, not touched this session.
 
 export async function generateMetadata({
   params,
@@ -103,24 +108,59 @@ export default async function F1DriverPage({ params }: DriverPageProps) {
         ← Drivers
       </Link>
 
-      <header style={{ marginBottom: "3rem" }}>
-        {driver.code ? (
-          <p className="label-tech" style={{ color: "var(--accent)" }}>
-            {driver.code}
-            {driver.permanentNumber ? ` · No. ${driver.permanentNumber}` : ""}
-          </p>
-        ) : null}
-        <h1
-          className="heading"
+      <header
+        style={{
+          marginBottom: "3rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "1.5rem",
+          flexWrap: "wrap",
+        }}
+      >
+        {/* S54: placeholder, not a photo. Jolpica serves no headshots and R2
+            has none, so this is a flat block in the driver's team colour with an
+            inline helmet silhouette. F1Driver has no constructorId -- the team
+            comes off the standings row, and pre-1950s archive drivers with no
+            standing fall through to constructorColor's token default. Swap the
+            svg for an <Image> once R2 has headshots. */}
+        <div
+          aria-hidden="true"
           style={{
-            marginTop: "0.6rem",
-            fontSize: "clamp(1.75rem, 5vw, 2.75rem)",
-            fontWeight: 700,
-            letterSpacing: "0.02em",
+            width: "104px",
+            height: "104px",
+            flexShrink: 0,
+            background: constructorColor(standing?.Constructors[0]?.constructorId),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {driver.givenName} {driver.familyName}
-        </h1>
+          <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+            <ellipse cx="30" cy="24" rx="18" ry="16" fill="var(--bg-base)" opacity="0.55" />
+            <rect x="15" y="32" width="30" height="12" fill="var(--bg-base)" opacity="0.55" />
+            <rect x="18" y="27" width="24" height="8" fill="var(--bg-base)" opacity="0.35" />
+          </svg>
+        </div>
+
+        <div>
+          {driver.code ? (
+            <p className="label-tech" style={{ color: "var(--accent)" }}>
+              {driver.code}
+              {driver.permanentNumber ? ` · No. ${driver.permanentNumber}` : ""}
+            </p>
+          ) : null}
+          <h1
+            className="heading"
+            style={{
+              marginTop: "0.6rem",
+              fontSize: "clamp(1.75rem, 5vw, 2.75rem)",
+              fontWeight: 700,
+              letterSpacing: "0.02em",
+            }}
+          >
+            {driver.givenName} {driver.familyName}
+          </h1>
+        </div>
       </header>
 
       <F1Section title="Profile">

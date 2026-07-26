@@ -170,6 +170,29 @@ interface RaceResponse {
   RaceTable: { season?: string; round?: string; Races: F1Race[] };
 }
 
+// --------------------------------------------------------- constructor colours
+// S54: brand colours for the current grid, keyed by Jolpica's constructorId.
+// Lives here rather than in a component because three pages read it (/f1 for
+// both standings tables, /f1/drivers/[driverId] for the placeholder).
+// No logo images: F1 team logos are trademarked and R2 has none, so a colour is
+// the whole treatment. Historical constructors fall through to a token.
+const CONSTRUCTOR_COLORS: Record<string, string> = {
+  ferrari: "#E8002D",
+  mclaren: "#FF8000",
+  mercedes: "#27F4D2",
+  red_bull: "#3671C6",
+  aston_martin: "#229971",
+  alpine: "#0093CC",
+  haas: "#B6BABD",
+  rb: "#6692FF",
+  williams: "#64C4FF",
+  sauber: "#52E252",
+};
+
+export function constructorColor(id: string | undefined): string {
+  return (id && CONSTRUCTOR_COLORS[id]) || "var(--border-strong)";
+}
+
 // ------------------------------------------------------- standings and results
 // 6-hour revalidate: standings only change after a race finishes.
 
@@ -246,10 +269,15 @@ export async function getF1NextRace(): Promise<F1Race | null> {
 // -------------------------------------------------- schedule / reference data
 // 24-hour revalidate.
 
+// S54: ONE_HOUR, not ONE_DAY. The calendar itself changes maybe twice a season,
+// so 24h was right on freshness grounds -- but Next caches a FAILED response for
+// the same window, so one rate-limited fetch blanked the calendar for a full day.
+// An hour bounds that blast radius at 24 calls/day. See the note on
+// /f1/drivers/[driverId] for the burst that caused it.
 export async function getF1CurrentSchedule(): Promise<F1Race[]> {
   const data = await jolpica<RaceResponse>(
     "/f1/current/races.json?limit=40",
-    ONE_DAY
+    ONE_HOUR
   );
   return data?.RaceTable.Races ?? [];
 }

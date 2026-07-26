@@ -105,7 +105,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   const [errorMsg, setErrorMsg] = useState("");
   const [alreadyApplied, setAlreadyApplied] = useState(false);
 
-  // Casual-spam deterrent only (clearing cookies bypasses it) — the server
+  // Casual-spam deterrent only (clearing cookies bypasses it) -- the server
   // stays the source of truth via the honeypot + validation in /api/join.
   useEffect(() => {
     const cookies = document.cookie.split(";").map((c) => c.trim());
@@ -124,7 +124,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   const toggleDomain = (d: Domain) => {
     setSelectedDomains((prev) => {
       if (prev.includes(d)) return prev.filter((x) => x !== d);
-      if (prev.length >= MAX_DOMAINS) return prev; // limit reached — ignore, no error
+      if (prev.length >= MAX_DOMAINS) return prev; // limit reached -- ignore, no error
       return [...prev, d];
     });
   };
@@ -409,7 +409,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                       marginTop: "0.4rem",
                     }}
                   >
-                    +91 prefix is fine — it will be removed
+                    +91 prefix is fine -- it will be removed
                   </p>
                 </div>
 
@@ -422,7 +422,16 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     type="text"
                     name="srn_prn"
                     value={form.srn_prn}
-                    onChange={handleChange}
+                    // S54: SRNs are uppercase by convention, so normalise into
+                    // state rather than styling with textTransform -- the state
+                    // is what gets submitted, and textTransform would also
+                    // uppercase the placeholder.
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        srn_prn: e.target.value.toUpperCase(),
+                      }))
+                    }
                     required
                     placeholder="Your SRN or PRN"
                     className="join-input"

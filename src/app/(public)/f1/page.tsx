@@ -4,6 +4,7 @@ import Link from "next/link";
 import F1Paused from "@/components/f1/F1Paused";
 import { F1Empty, F1Section, F1Table } from "@/components/f1/F1Table";
 import {
+  constructorColor,
   getF1ConstructorStandings,
   getF1CurrentSchedule,
   getF1DriverStandings,
@@ -141,6 +142,11 @@ export default async function F1Page() {
               <tr
                 key={row.Driver.driverId}
                 className={row.position === "1" ? "f1-leader" : undefined}
+                // S54: team colour as a 3px left edge. tr borders paint because
+                // .f1-table is border-collapse: collapse.
+                style={{
+                  borderLeft: `3px solid ${constructorColor(row.Constructors[0]?.constructorId)}`,
+                }}
               >
                 <td className="f1-pos">{row.positionText}</td>
                 <td className="f1-name">
@@ -171,6 +177,9 @@ export default async function F1Page() {
               <tr
                 key={row.Constructor.constructorId}
                 className={row.position === "1" ? "f1-leader" : undefined}
+                style={{
+                  borderLeft: `3px solid ${constructorColor(row.Constructor.constructorId)}`,
+                }}
               >
                 <td className="f1-pos">{row.positionText}</td>
                 <td className="f1-name">{row.Constructor.name}</td>
@@ -202,6 +211,9 @@ export default async function F1Page() {
               <tr
                 key={row.Driver.driverId}
                 className={Number(row.position) <= 3 ? "f1-leader" : undefined}
+                style={{
+                  borderLeft: `3px solid ${constructorColor(row.Constructor.constructorId)}`,
+                }}
               >
                 <td className="f1-pos">{row.positionText}</td>
                 <td className="f1-name">
