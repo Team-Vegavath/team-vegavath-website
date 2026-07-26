@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { ConsentNotice } from "@/components/ui/ConsentNotice";
+
 import { BS } from "./StallCard";
 
 const labelStyle: React.CSSProperties = {
@@ -401,6 +403,8 @@ export default function BootstrapRegister({
             >
               {busy ? "Registering…" : "Register"}
             </button>
+
+            <ConsentNotice color={BS.muted} />
 
             {error && (
               <p

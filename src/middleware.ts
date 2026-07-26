@@ -46,6 +46,22 @@ export default auth(async (req) => {
     return NextResponse.next();
   }
 
+  // S52B: /docs password gate. These pages publish internal architecture docs
+  // (auth flow, env var names, DB schema, every API route and its guards), so
+  // they are no longer public. Shared secret, not per-user auth - threat model
+  // in docs/superpowers/plans/2026-07-26-docs-password-gate.md. Fails OPEN when
+  // DOCS_PASSWORD is unset so local dev needs no setup; robots.ts disallows
+  // /docs as an independent second layer for exactly that reason.
+  // /api/docs/auth is not caught here - it starts with /api, not /docs.
+  if (pathname.startsWith("/docs")) {
+    if (pathname === "/docs/login") return NextResponse.next();
+
+    const docsPassword = process.env.DOCS_PASSWORD;
+    if (docsPassword && req.cookies.get("docs_session")?.value !== docsPassword) {
+      return NextResponse.redirect(new URL("/docs/login", req.url));
+    }
+  }
+
   // Auth only gates /admin and /api/admin below. Everything else - including
   // the public visitor routes /bootstrap/checkin/[token] (S33, per-lead QR),
   // /bootstrap/feedback, /bootstrap/register/{stall,group} (S35 volunteer

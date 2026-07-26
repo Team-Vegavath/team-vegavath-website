@@ -122,9 +122,14 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 - Error boundaries / .catch fallbacks on every async server component.
 - Mobile-first CSS - 375px first, scale up.
 - Colors/fonts from the design tokens in src/app/globals.css only.
-- Tailwind classes first; inline style={{}} where Tailwind v4 utilities
-  don't generate in this setup (mx-auto, some responsive prefixes -
-  centering is always inline `margin: "0 auto"`).
+- Tailwind classes first; inline style={{}} elsewhere. S52B: the
+  "Tailwind v4 doesn't generate utilities here" belief was WRONG.
+  `.mx-auto` always generated - it lost to globals.css's own unlayered
+  `*{margin:0}`, because unlayered CSS beats `@layer utilities`. That
+  reset is now in `@layer base`. Keep centering inline anyway for
+  consistency with ~180 existing call sites; migrating is its own
+  session. If a Tailwind class silently does nothing, suspect one of the
+  ~447 still-unlayered globals.css rules, not a missing class.
 - Upload R2 objects under NEW timestamped filenames. R2 serves immutable
   cache headers - overwriting a key serves stale content forever.
 - Reuse before inventing: Reveal, Container, DomainGrid, SponsorMarquee,
@@ -144,9 +149,15 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 - Admin API routes without an in-route session check.
 - A mutating admin route without a viewer guard.
 - A value import from src/lib/services/* inside a "use client" file.
-- New outbound network calls. src/lib/services/f1.ts (Jolpica) is a
-  deliberate, documented, self-contained exception with a kill switch -
-  it is not a precedent. Adding a second one needs approval.
+- New outbound network calls. TWO deliberate egress points already exist
+  and a THIRD needs approval:
+  (1) src/lib/services/f1.ts -> Jolpica (api.jolpi.ca): one jolpica()
+      helper, null on failure, long revalidate windows, DB kill switch.
+      Copy this shape if a new one is ever approved.
+  (2) src/app/api/admin/bootstrap/sessions/[id]/summarize/route.ts ->
+      Google Gemini (generativelanguage.googleapis.com). Predates f1.ts,
+      lives in a route rather than a service, so it has no kill switch
+      and returns 502 rather than null. Exception, not a pattern.
 - Unbounded SELECT queries without LIMIT.
 - `<img>` tags - always next/image.
 - Emoji in UI text.
@@ -181,6 +192,12 @@ migrations/           # Numbered SQL, applied manually (gitignored)
   guard. Adding a page that unauthenticated people must reach means
   adding it to that exemption list AND placing it outside the (admin)
   route group, or it inherits AdminShell and the auth gate.
+- S52B: /docs is behind a shared-password cookie gate (DOCS_PASSWORD) in
+  the same middleware, checked before the admin gate. It FAILS OPEN when
+  the env var is unset. Its login page is at src/app/docs/login/ -
+  outside the (docs) route group on purpose, because a nested layout.tsx
+  nests inside DocsLayout rather than replacing it, so a page under
+  (docs)/docs/ cannot escape the sidebar. Do not move it.
 
 ## Services Layer Contract
 
@@ -224,6 +241,22 @@ Two service-layer patterns worth knowing before you write a new one:
 - If a session is too large to complete reliably in a single sequential
   pass, stop and ask the user to split it into smaller sessions rather than
   parallelising or rushing through it.
+
+## MCP servers and skills
+
+- Context7: use before implementing anything touching Next.js App Router,
+  NextAuth, Tailwind v4, or any fast-moving library API
+- LegalZoom: use when touching /legal, privacy policy, ToS, or license text
+- claude-md-management: use when editing CLAUDE.md or AGENTS.md
+- superpowers: /brainstorm /write-plan /execute-plan -- invoke explicitly
+  for complex planning tasks
+- caveman, ponytail, morph-compact, security-guidance: passive, auto-fire
+- frontend-design, feature-dev, code-to-prd, markdown-html-skills: auto-trigger
+
+### MCP calls are not subagents
+
+A single MCP tool call is a sequential tool invocation, not a subagent.
+The no-parallel-subagents rule above is about parallel dispatch only.
 
 ## More context
 

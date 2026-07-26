@@ -44,9 +44,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://vegavath.live"),
   description:
     "Team Vegavath is the official student innovation club of PES University, Electronic City Campus, racing toward innovation in automotive, robotics, design, media, and marketing.",
-  alternates: {
-    canonical: "/",
-  },
+  // S52B: no root `alternates`. A root canonical is inherited whole by every
+  // child page, so `canonical: "/"` told crawlers all 19 public pages were
+  // duplicates of the homepage. Canonicals are now set per page.
   keywords: ["Vegavath", "PESU ECC", "student club", "robotics", "automotive", "kart"],
   icons: {
     icon: "/icon",
@@ -97,6 +97,9 @@ const orgSchema = {
   description:
     "Motorsport and innovation student club at PES University Electronic City Campus (PESU ECC), Bangalore. Designs and builds go-karts, develops robotics systems, and organizes technical events.",
   sport: "Motorsport",
+  // S52B: "when was X founded" is one of the highest-frequency entity
+  // questions an LLM gets asked, and the site could not answer it anywhere.
+  foundingDate: "2019",
   memberOf: {
     "@type": "CollegeOrUniversity",
     name: "PES University Electronic City Campus",

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 const STATS = [
   { value: "2", label: "MAJOR EVENTS" },
-  { value: "85", label: "MEMBERS" },
+  { value: "47", label: "MEMBERS" },
   { value: "6", label: "DOMAINS" },
 ] as const;
 

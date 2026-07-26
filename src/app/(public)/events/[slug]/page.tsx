@@ -19,8 +19,23 @@ type EventPageProps = {
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { slug } = await params;
   const event = await getEventBySlug(slug);
+  if (!event) return { title: "Event" };
+
+  // Descriptions are markdown in the DB, so strip it before it lands in a
+  // meta tag -- same reason the Event JSON-LD below does.
+  const description = event.description
+    ? stripMarkdown(event.description).slice(0, 160)
+    : undefined;
+
   return {
-    title: event ? event.title : "Event",
+    title: event.title,
+    ...(description ? { description } : {}),
+    alternates: { canonical: `/events/${slug}` },
+    openGraph: {
+      title: `${event.title} | Team Vegavath`,
+      ...(description ? { description } : {}),
+      ...(event.cover_image_url ? { images: [event.cover_image_url] } : {}),
+    },
   };
 }
 

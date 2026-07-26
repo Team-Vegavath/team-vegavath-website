@@ -7,6 +7,8 @@ import { getF1Enabled } from "@/lib/services/settings";
 
 export const metadata: Metadata = {
   title: "F1 Circuits",
+  description: "Formula 1 circuits on the current calendar, with location and country.",
+  alternates: { canonical: "/f1/circuits" },
 };
 
 export const revalidate = 60;

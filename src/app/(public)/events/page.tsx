@@ -6,6 +6,14 @@ import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
   title: "Events",
+  description:
+    "Hackathons, competitions and showcases organized by Team Vegavath at PESU ECC -- including EmbedX, Ignition, and Bootstrap.",
+  alternates: { canonical: "/events" },
+  openGraph: {
+    title: "Events | Team Vegavath",
+    description:
+      "EmbedX, Ignition, Bootstrap and more -- technical events by Team Vegavath at PESU ECC.",
+  },
 };
 
 export const revalidate = 60;

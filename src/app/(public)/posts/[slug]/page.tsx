@@ -19,9 +19,16 @@ export async function generateMetadata({
   const { slug } = await params;
   const post = await getPostBySlug(slug).catch(() => null);
   if (!post) return { title: "Post" };
+  const description = post.excerpt ?? stripMarkdown(post.body).slice(0, 160);
   return {
     title: post.title,
-    description: post.excerpt ?? stripMarkdown(post.body).slice(0, 160),
+    description,
+    alternates: { canonical: `/posts/${slug}` },
+    openGraph: {
+      title: `${post.title} | Team Vegavath`,
+      description,
+      type: "article",
+    },
   };
 }
 

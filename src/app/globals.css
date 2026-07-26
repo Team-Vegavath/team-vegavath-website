@@ -12,7 +12,7 @@ html, body {
   --bg-card:       #161616;
   --bg-elevated:   #1d1d1d;
 
-  /* Accent — from club logo */
+  /* Accent -- from club logo */
   --accent:        #EF5D08;   /* Cayenne orange */
   --accent-hover:  #d44f06;
   --accent-dim:    rgba(239, 93, 8, 0.12);
@@ -32,23 +32,23 @@ html, body {
   --success:        #22c55e;
   --error:          #ef4444;
   --warning:        #F29C04;
-
-  /* ── LEGACY ALIASES ─────────────────────────────────────────
-     Old token names still referenced by pages not yet rebuilt.
-     Remove this block in the final polish session once no file
-     references them. */
-  --background:          var(--bg-base);
-  --background-card:     var(--bg-card);
-  --background-elevated: var(--bg-elevated);
-  --accent-secondary:    var(--gold);
-  --accent-info:         #07C5F0;
-  --border-accent:       var(--accent);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+/* S52B: this reset MUST stay inside @layer base. Unlayered CSS beats every
+   cascade layer regardless of specificity, so while this block was unlayered
+   its `margin: 0` silently defeated Tailwind's own `.mx-auto`
+   (@layer utilities) -- which was generating and shipping the whole time.
+   That is the real cause of the "Tailwind v4 is broken in this setup"
+   landmine that drove 51 sessions of inline `margin: "0 auto"` workarounds.
+   Tailwind's preflight already sets these same three properties in @layer
+   base, so this block is arguably deletable; it is kept and layered because
+   that is the smaller, safer change. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
 }
 
 html {
@@ -63,7 +63,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography roles — see context_for_revamp.md §5 */
+/* Typography roles -- see context_for_revamp.md §5 */
 h1 {
   font-family: var(--font-orbitron), sans-serif;
 }
@@ -110,7 +110,7 @@ p, label, input, textarea, select, button {
 
 /* ── Section background patterns (CSS-only, zero weight) ── */
 
-/* Speed Lines — hero and join CTA backgrounds */
+/* Speed Lines -- hero and join CTA backgrounds */
 .pattern-speed-lines {
   background-color: var(--bg-base);
   background-image: repeating-linear-gradient(
@@ -143,7 +143,7 @@ p, label, input, textarea, select, button {
   }
 }
 
-/* Dot grid — about / stats sections */
+/* Dot grid -- about / stats sections */
 .pattern-dots {
   background-color: var(--bg-surface);
   background-image: radial-gradient(
@@ -152,7 +152,7 @@ p, label, input, textarea, select, button {
   background-size: 28px 28px;
 }
 
-/* ── Buttons — sharp rectangles per border-radius policy ── */
+/* ── Buttons -- sharp rectangles per border-radius policy ── */
 
 .btn-primary {
   background-color: var(--accent);
@@ -202,7 +202,7 @@ p, label, input, textarea, select, button {
   color: var(--accent);
 }
 
-/* ── Cards — sharp, border-accent, no shadow ── */
+/* ── Cards -- sharp, border-accent, no shadow ── */
 
 .card {
   background-color: var(--bg-card);
@@ -210,14 +210,7 @@ p, label, input, textarea, select, button {
   border-radius: 0;
 }
 
-.card-accent {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--accent);
-  border-radius: 0;
-}
-
-/* ── Labels — sharp uppercase text labels, replaces pill badges ── */
+/* ── Labels -- sharp uppercase text labels, replaces pill badges ── */
 
 .label-tech {
   font-family: var(--font-space), sans-serif;
@@ -1004,7 +997,7 @@ p, label, input, textarea, select, button {
   background: var(--bg-elevated);
 }
 
-/* ── Event detail — 2-col desktop, cover stacks on top at mobile ── */
+/* ── Event detail -- 2-col desktop, cover stacks on top at mobile ── */
 
 .event-detail-grid {
   display: flex;
@@ -1082,7 +1075,7 @@ p, label, input, textarea, select, button {
   opacity: 1;
 }
 
-/* Sponsor grid logos — §9 consistency treatment */
+/* Sponsor grid logos -- §9 consistency treatment */
 .sponsor-logo {
   height: 64px;
   max-width: 200px;
@@ -1159,7 +1152,7 @@ p, label, input, textarea, select, button {
   page-break-inside: avoid;
 }
 
-/* Responsive breakpoints — plain CSS because Tailwind v4 responsive
+/* Responsive breakpoints -- plain CSS because Tailwind v4 responsive
    prefixes are unreliable in this project (documented landmine) */
 @media (max-width: 767px) {
   .footer-grid {

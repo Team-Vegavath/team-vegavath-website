@@ -4,6 +4,8 @@ Team Vegavath is the motorsport and innovation student club at PES University El
 
 ## About
 
+Team Vegavath was founded in 2019.
+
 The club designs and builds custom go-karts, develops robotics and embedded systems, and runs technical events. Core domains: Automotives, Robotics, Coding, Operations, Sponsorship, Social Media.
 
 ## Partners

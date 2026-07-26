@@ -14,6 +14,14 @@ import { getF1Enabled } from "@/lib/services/settings";
 
 export const metadata: Metadata = {
   title: "F1",
+  description:
+    "Formula 1 stats and data -- driver standings, constructor standings, race calendar and results.",
+  alternates: { canonical: "/f1" },
+  openGraph: {
+    title: "F1 Stats | Team Vegavath",
+    description:
+      "Current season driver and constructor standings, race calendar, and results.",
+  },
 };
 
 // Page-level revalidate is 60, not 3600, so the admin kill switch takes effect

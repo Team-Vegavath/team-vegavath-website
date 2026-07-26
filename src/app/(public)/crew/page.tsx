@@ -6,6 +6,13 @@ import type { TeamMember } from "@/types/member";
 
 export const metadata: Metadata = {
   title: "The Crew",
+  description:
+    "Meet the 47 active members of Team Vegavath across Automotives, Robotics, Coding, Operations, Sponsorship and Social Media.",
+  alternates: { canonical: "/crew" },
+  openGraph: {
+    title: "Crew | Team Vegavath",
+    description: "47 active members across six engineering and operations domains.",
+  },
 };
 
 export const revalidate = 120;

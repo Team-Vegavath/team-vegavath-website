@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getEvents } from "@/lib/services/events";
-import { getGalleryItems, getGalleryEvents } from "@/lib/services/gallery";
+import { getGalleryItemsLimited, getGalleryEvents } from "@/lib/services/gallery";
 import type { Event } from "@/types/event";
 import type { GalleryItem } from "@/types/gallery";
 import GalleryClient from "@/components/gallery/GalleryClient";
@@ -8,6 +8,13 @@ import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
   title: "Gallery",
+  description:
+    "Photos and videos from Team Vegavath events -- Bootstrap, Freshers Day, Ignition, EmbedX, and IKC.",
+  alternates: { canonical: "/gallery" },
+  openGraph: {
+    title: "Gallery | Team Vegavath",
+    description: "Photos and videos from Team Vegavath events at PESU ECC.",
+  },
 };
 
 export const revalidate = 120;
@@ -29,7 +36,9 @@ export default async function GalleryPage() {
 
   try {
     [galleryItems, galleryEvents, events] = await Promise.all([
-      getGalleryItems(),
+      // S52B: was the unbounded getGalleryItems(). 200 is a deliberate ceiling,
+      // not the documented 30 default, because this page shows the whole grid.
+      getGalleryItemsLimited(200),
       getGalleryEvents(),
       getEvents({ limit: 100 }),
     ]);

@@ -8,6 +8,16 @@ import { isPostCategory, POST_CATEGORIES } from "@/types/post";
 
 export const metadata: Metadata = {
   title: "Posts",
+  description:
+    "Technical articles and series from Team Vegavath -- including Keeping up with Kedar on motorsport and engineering.",
+  // Category views (/posts?category=coding) all canonicalise to /posts -- they
+  // are filtered subsets of one list, not independently rankable pages.
+  alternates: { canonical: "/posts" },
+  openGraph: {
+    title: "Posts | Team Vegavath",
+    description:
+      "Technical writing from Team Vegavath members on motorsport, robotics, and engineering.",
+  },
 };
 
 export const revalidate = 300;

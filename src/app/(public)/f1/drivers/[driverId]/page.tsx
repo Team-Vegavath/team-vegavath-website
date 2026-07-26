@@ -35,6 +35,12 @@ export async function generateMetadata({
   const driver = await getF1DriverInfo(driverId).catch(() => null);
   return {
     title: driver ? `${driver.givenName} ${driver.familyName}` : "F1 Driver",
+    ...(driver
+      ? {
+          description: `Formula 1 career record for ${driver.givenName} ${driver.familyName}: seasons raced, constructors and championship standings.`,
+        }
+      : {}),
+    alternates: { canonical: `/f1/drivers/${driverId}` },
   };
 }
 

@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   title: {
     absolute: "Team Vegavath | Karts, Code & Innovation at PESU ECC",
   },
+  alternates: { canonical: "/" },
 };
 
 export const revalidate = 60;

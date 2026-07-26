@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { ConsentNotice } from "@/components/ui/ConsentNotice";
+
 import { BS } from "./StallCard";
 
 const labelStyle: React.CSSProperties = {
@@ -330,6 +332,19 @@ export default function BootstrapFeedback({
             >
               {busy ? "Submitting…" : "Submit feedback"}
             </button>
+
+            {/* S52B: this form is anonymous, but the free-text answers are sent
+                to Google Gemini to generate organiser summaries. Saying so is
+                the DPDP disclosure; do NOT add identity columns to
+                getBootstrapFeedbackRaw, the anonymity is what keeps this low
+                risk. */}
+            <p
+              className="mono"
+              style={{ marginTop: "0.75rem", fontSize: "0.72rem", lineHeight: 1.6, color: BS.muted }}
+            >
+              Responses are anonymous. Summaries are generated with AI.
+            </p>
+            <ConsentNotice color={BS.muted} />
           </form>
         )}
       </div>

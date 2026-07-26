@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { ConsentNotice } from "@/components/ui/ConsentNotice";
+
 interface Props {
   slug: string;
   eventTitle: string;
@@ -242,6 +244,8 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
       >
         {status === "submitting" ? "SUBMITTING..." : "SUBMIT REGISTRATION"}
       </button>
+
+      <ConsentNotice />
     </form>
   );
 }

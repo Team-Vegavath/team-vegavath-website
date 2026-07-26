@@ -7,6 +7,8 @@ import { getF1Enabled } from "@/lib/services/settings";
 
 export const metadata: Metadata = {
   title: "F1 Season History",
+  description: "Formula 1 world champions by season, driver and constructor.",
+  alternates: { canonical: "/f1/seasons" },
 };
 
 export const revalidate = 60;

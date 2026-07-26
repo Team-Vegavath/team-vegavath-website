@@ -9,13 +9,21 @@ import { getActiveSponsors } from "@/lib/services/sponsors";
 
 export const metadata: Metadata = {
   title: "About",
+  description:
+    "Team Vegavath is PESU ECC's motorsport and innovation club, founded in 2019. We build go-karts, develop robotics systems, and run technical events.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About | Team Vegavath",
+    description:
+      "PESU ECC's motorsport and innovation club. Founded 2019. Go-karts, robotics, embedded systems.",
+  },
 };
 
 export const revalidate = 120;
 
 const STATS = [
   { number: "2", label: "Major Events" },
-  { number: "85", label: "Active Members" },
+  { number: "47", label: "Active Members" },
   { number: "6", label: "Domains" },
 ] as const;
 

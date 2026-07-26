@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import { ConsentNotice } from "@/components/ui/ConsentNotice";
+
 /* FY26 recruitment domains. These six values are what /api/join and the DB
    CHECK constraints accept (requires migrations/004_application_new_fields.sql
    applied to Neon); do not change them without a matching backend change. */
@@ -582,6 +584,8 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     ? "SUBMITTING..."
                     : "SUBMIT APPLICATION"}
               </button>
+              {/* Step 4 only - steps 1-3 advance the form, they do not submit. */}
+              {step === 4 && <ConsentNotice />}
               {step > 1 && (
                 <button
                   type="button"

@@ -5,6 +5,14 @@ import { Container } from "@/components/ui/Container";
 
 export const metadata: Metadata = {
   title: "Sponsors",
+  description:
+    "Team Vegavath's past event partners include Xylem, Ather Energy, Paper Boat, Mahindra, BMW Motorrad, and SOLIDWORKS.",
+  alternates: { canonical: "/sponsors" },
+  openGraph: {
+    title: "Sponsors | Team Vegavath",
+    description:
+      "Past event partners: Xylem, Ather Energy, Paper Boat, Mahindra, BMW Motorrad, SOLIDWORKS.",
+  },
 };
 
 export const revalidate = 120;
@@ -33,6 +41,9 @@ export default async function SponsorsPage() {
               <h1 className="heading" style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase" }}>
                 Sponsors
               </h1>
+              <p style={{ marginTop: "1rem", fontSize: "0.85rem", lineHeight: 1.7, color: "var(--text-muted)" }}>
+                Past event partners who have supported Team Vegavath activities.
+              </p>
             </header>
 
             {premium.length > 0 && (

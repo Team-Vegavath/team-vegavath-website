@@ -6,13 +6,10 @@ type GalleryEventFilter = {
   event_label: string;
 };
 
-export async function getGalleryItems(): Promise<GalleryItem[]> {
-  const rows = await sql`
-    SELECT * FROM gallery_items
-    ORDER BY display_order ASC, created_at DESC`;
-  return rows as GalleryItem[];
-}
-
+// S52B: the unbounded getGalleryItems() twin was deleted. It differed from
+// this function only by having no LIMIT, and the public /gallery page was the
+// one caller using it -- a direct violation of the every-list-query-has-a-LIMIT
+// contract on the heaviest public page. One function, always bounded.
 export async function getGalleryItemsLimited(limit = 30): Promise<GalleryItem[]> {
   const rows = await sql`
     SELECT * FROM gallery_items

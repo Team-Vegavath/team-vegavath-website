@@ -8,6 +8,8 @@ import { getF1Enabled } from "@/lib/services/settings";
 
 export const metadata: Metadata = {
   title: "F1 Drivers",
+  description: "Current Formula 1 driver line-up with nationality, number and team.",
+  alternates: { canonical: "/f1/drivers" },
 };
 
 // See the note in f1/page.tsx: 60s so the kill switch is responsive, while the
