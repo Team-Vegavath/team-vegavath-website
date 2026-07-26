@@ -647,9 +647,13 @@ export async function assignVolunteerToSession(
 }
 
 // Best-effort sweep run right after a session's stalls are created: pool members
-// whose typed preferred_stall_name matches a new stall name (case-insensitive)
-// get pulled in automatically. Everyone else stays in the pool for manual
-// assignment. Returns how many were assigned.
+// whose typed preferred_stall_name matches a new stall name get pulled in
+// automatically. Everyone else stays in the pool for manual assignment.
+// Returns how many were assigned.
+// S50: the match is normalized, not just lowercased - every non-alphanumeric
+// character is stripped from both sides, so "gokart", "go kart", "GoKart",
+// "go_kart" and "GO KART" all land on the "Go-Kart" stall. Volunteers type this
+// field free-hand, so punctuation was the main cause of missed assignments.
 export async function autoAssignPoolMembers(sessionId: string): Promise<number> {
   const rows = await sql`
     UPDATE bootstrap_volunteers v
@@ -658,7 +662,8 @@ export async function autoAssignPoolMembers(sessionId: string): Promise<number> 
     FROM bootstrap_stalls s
     WHERE v.session_id IS NULL
       AND s.session_id = ${sessionId}
-      AND lower(trim(s.stall_name)) = lower(trim(v.preferred_stall_name))
+      AND lower(regexp_replace(trim(s.stall_name), '[^a-zA-Z0-9]', '', 'g'))
+        = lower(regexp_replace(trim(v.preferred_stall_name), '[^a-zA-Z0-9]', '', 'g'))
     RETURNING v.id`;
   return rows.length;
 }

@@ -240,8 +240,9 @@ export default async function AboutPage() {
       ) : null}
 
       {/* S49 LLM/AI SEO: FAQPage schema. Not rendered for users - it exists so
-          answer engines can quote the club's own wording on the five questions
-          they get asked about it. Keep the copy in sync with public/llms.txt. */}
+          answer engines can quote the club's own wording on the questions they
+          get asked about it. Expanded to ten in S50. Keep the copy in sync with
+          public/llms.txt. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -287,6 +288,48 @@ export default async function AboutPage() {
                 acceptedAnswer: {
                   "@type": "Answer",
                   text: "Team Vegavath is based at PES University Electronic City Campus (PESU ECC), Bangalore, Karnataka, India.",
+                },
+              },
+              // S50: five more questions, targeting the named-entity queries
+              // (Bootstrap, EmbedX, go-karts, domains, faculty advisor).
+              {
+                "@type": "Question",
+                name: "What is Bootstrap at PESU ECC?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Bootstrap is Team Vegavath's annual open-house event at PESU ECC where student clubs showcase their projects to incoming freshers. Team Vegavath's Bootstrap features go-kart displays, robotics demonstrations, and hands-on exhibits across multiple engineering domains.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "What is EmbedX?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "EmbedX is an embedded systems and IoT hackathon organized by Team Vegavath in partnership with Xylem and the Department of ECE, PESU ECC. Teams build firmware and hardware solutions for real-world problem statements over 10 hours.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "Does Team Vegavath build go-karts?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Yes. Team Vegavath designs and builds custom go-karts covering chassis fabrication, suspension design, engine tuning, and electronics. The kart is the club's flagship project and is demonstrated at Bootstrap and other PESU ECC events.",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "What domains can I join in Team Vegavath?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Team Vegavath recruits across six domains: Automotives (kart design and fabrication), Robotics (autonomous systems and embedded hardware), Coding (software, web, and firmware), Operations (event management and logistics), Sponsorship (partnerships and finance), and Social Media (content and outreach).",
+                },
+              },
+              {
+                "@type": "Question",
+                name: "Who is the faculty advisor of Team Vegavath?",
+                acceptedAnswer: {
+                  "@type": "Answer",
+                  text: "Team Vegavath's faculty advisor is Dr. S. V. Satish, Professor in the Department of Mechanical Engineering at PES University Electronic City Campus. Dr. Satish holds a PhD and MTech in Manufacturing Engineering and has spoken at international IEEE robotics and automation conferences.",
                 },
               },
             ],

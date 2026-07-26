@@ -16,6 +16,7 @@ export async function updateSettings(formData: FormData) {
   const fields = [
     "recruitment_open",
     "maintenance_mode",
+    "f1_enabled",
     "maintenance_message",
     "contact_email",
     "contact_phone",
@@ -39,4 +40,7 @@ export async function updateSettings(formData: FormData) {
   revalidatePath("/crew");
   revalidatePath("/sponsors");
   revalidatePath("/events");
+  // S50: the F1 pages read the kill switch with revalidate 60, but an explicit
+  // revalidate makes the toggle take effect on the next request instead.
+  revalidatePath("/f1");
 }

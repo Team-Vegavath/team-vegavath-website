@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { Container } from "@/components/ui/Container";
 import { getEventBySlug } from "@/lib/services/events";
 import { getGalleryByEvent } from "@/lib/services/gallery";
-import { isNoRegistrationEvent } from "@/lib/utils";
+import { isNoRegistrationEvent, stripMarkdown } from "@/lib/utils";
 import EventMediaClient from "@/components/events/EventMediaClient";
 
 export const dynamic = "force-dynamic";
@@ -186,7 +186,12 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 },
               },
               url: `https://vegavath.live/events/${event.slug}`,
-              ...(event.description ? { description: event.description } : {}),
+              // S50: descriptions are markdown in the DB, and literal ## / **
+              // leaked into the schema output. Stripped for the schema only -
+              // the visible section above still renders the markdown.
+              ...(event.description
+                ? { description: stripMarkdown(event.description) }
+                : {}),
             }),
           }}
         />

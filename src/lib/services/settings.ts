@@ -18,6 +18,13 @@ export async function getMaintenanceMode(): Promise<string | null> {
   return getSetting("maintenance_mode");
 }
 
+// S50: kill switch for the /f1 pages. Defaults to OFF when the row is missing,
+// so a failed seed never silently starts hitting the external Jolpica API.
+export async function getF1Enabled(): Promise<boolean> {
+  const val = await getSetting("f1_enabled");
+  return val === "true";
+}
+
 export async function getAllSettings(): Promise<SiteSettings> {
   const rows = await sql`SELECT key, value FROM site_settings`;
   const map = Object.fromEntries(
@@ -27,6 +34,7 @@ export async function getAllSettings(): Promise<SiteSettings> {
   return {
     recruitment_open: map["recruitment_open"] === "true",
     maintenance_mode: map["maintenance_mode"] === "true",
+    f1_enabled: map["f1_enabled"] === "true",
     maintenance_message: map["maintenance_message"] ?? "",
     contact_email: map["contact_email"] ?? "",
     contact_phone: map["contact_phone"] ?? "",

@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 const DEFAULT_SETTINGS: SiteSettings = {
   recruitment_open: false,
   maintenance_mode: false,
+  f1_enabled: false,
   maintenance_message: "",
   contact_email: "",
   contact_phone: "",

@@ -13,6 +13,7 @@ interface SettingsFormProps {
 export default function SettingsForm({ settings }: SettingsFormProps) {
   const [recruitmentOpen, setRecruitmentOpen] = useState(settings.recruitment_open);
   const [maintenanceMode, setMaintenanceMode] = useState(settings.maintenance_mode);
+  const [f1Enabled, setF1Enabled] = useState(settings.f1_enabled);
   const [maintenanceMessage, setMaintenanceMessage] = useState(settings.maintenance_message);
   const [contactEmail, setContactEmail] = useState(settings.contact_email);
   const [contactPhone, setContactPhone] = useState(settings.contact_phone);
@@ -53,6 +54,18 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         </span>
         <ToggleSwitch value={maintenanceMode} onChange={setMaintenanceMode} ariaLabel="Maintenance mode" />
       </div>
+
+      <input type="hidden" name="f1_enabled" value={f1Enabled ? "true" : "false"} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <span className="admin-label" style={{ marginBottom: 0 }}>
+          F1 Stats
+        </span>
+        <ToggleSwitch value={f1Enabled} onChange={setF1Enabled} ariaLabel="F1 stats pages enabled" />
+      </div>
+      <p className="admin-hint" style={{ marginTop: "-1rem" }}>
+        Off pauses every call to the external F1 data API. Turn it off during
+        race weekends if the site is getting heavy traffic.
+      </p>
 
       <div>
         <label htmlFor="maintenance_message" className="admin-label">

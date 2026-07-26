@@ -7,6 +7,8 @@ export interface SiteSetting {
 export interface SiteSettings {
   recruitment_open: boolean;
   maintenance_mode: boolean;
+  // S50: kill switch for the /f1 pages. Off means no Jolpica calls at all.
+  f1_enabled: boolean;
   maintenance_message: string;
   contact_email: string;
   contact_phone: string;

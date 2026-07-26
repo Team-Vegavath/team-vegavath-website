@@ -86,7 +86,7 @@ export const viewport: Viewport = {
 // Logo uses the same R2 constant as the OG image so one env var moves both.
 const orgSchema = {
   "@context": "https://schema.org",
-  "@type": ["SportsClub", "Organization"],
+  "@type": "Organization",
   name: "Team Vegavath",
   alternateName: "Team Vegavath PESU ECC",
   url: "https://vegavath.live",

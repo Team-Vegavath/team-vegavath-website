@@ -6,6 +6,10 @@ const routes = [
   "/",
   "/about",
   "/events",
+  // S50: section roots only. Individual post slugs would make this file async
+  // and DB-dependent, which is a separate call.
+  "/posts",
+  "/f1",
   "/gallery",
   "/crew",
   "/sponsors",

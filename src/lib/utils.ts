@@ -60,6 +60,22 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+/**
+ * Strips markdown syntax so body copy can be reused in plain-text contexts
+ * (JSON-LD description fields, meta descriptions, list excerpts).
+ * Lives here rather than in a page because both events and posts need it.
+ */
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+    .replace(/`{1,3}[^`]*`{1,3}/g, "")
+    .replace(/\n{2,}/g, " ")
+    .trim();
+}
+
 const NO_REGISTRATION_PREFIXES = ["bootstrap-", "freshers-day-"];
 const NO_REGISTRATION_EXACT = new Set<string>([]);
 
