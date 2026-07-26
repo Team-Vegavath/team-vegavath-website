@@ -945,6 +945,31 @@ p, label, input, textarea, select, button {
   gap: 1rem;
 }
 
+/* Grid items default to min-width:auto, so a long unbroken word can push a
+   card wider than its track and clip against the neighbouring column.
+   min-width:0 lets the card shrink to its track and hand wrapping to
+   .crew-name below. text-align is pinned left so the Legacy tier (same
+   .crew-grid, muted heading) can never inherit an alignment from its section. */
+.crew-grid > article {
+  min-width: 0;
+  text-align: left;
+}
+
+/* Names are the only free-text field that can be a single long token
+   ("Hitha Shree Suresh" wraps fine; a 20-char surname does not). */
+.crew-name {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Under 400px a 2-col grid leaves ~160px cards -- too narrow for name +
+   role + a 3-line quote without everything truncating. Full-width rows. */
+@media (max-width: 400px) {
+  .crew-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (min-width: 768px) {
   .crew-grid {
     grid-template-columns: repeat(3, 1fr);

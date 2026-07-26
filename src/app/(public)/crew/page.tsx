@@ -75,7 +75,9 @@ function GitHubLink({ member }: { member: TeamMember }) {
 function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean }) {
   return (
     <div style={{ padding: compact ? "1rem" : "1.25rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
-      <h3 className="heading" style={{ fontSize: compact ? "0.95rem" : "1.35rem", fontWeight: 600, color: "var(--text-primary)" }}>
+      {/* .crew-name (globals.css) adds overflow-wrap so long names wrap
+          inside the card instead of clipping at the column edge. */}
+      <h3 className="heading crew-name" style={{ fontSize: compact ? "0.95rem" : "1.35rem", fontWeight: 600, color: "var(--text-primary)" }}>
         {member.name}
       </h3>
       <p style={{ fontSize: compact ? "0.78rem" : "0.85rem", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
@@ -90,7 +92,9 @@ function MemberInfo({ member, compact }: { member: TeamMember; compact?: boolean
             marginTop: "0.35rem",
             fontStyle: "italic",
             ...(compact
-              ? { overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }
+              // 3 lines, not 2: at the narrowest 2-col card a quote gets ~22
+              // chars per line, and 2 lines cut most quotes mid-sentence.
+              ? { overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const }
               : {}),
           }}
         >

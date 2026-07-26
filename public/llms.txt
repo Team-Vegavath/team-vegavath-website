@@ -4,7 +4,7 @@ Team Vegavath is the motorsport and innovation student club at PES University El
 
 ## About
 
-The club designs and builds custom go-karts, develops robotics and embedded systems, and runs technical events. Core domains: Automotives, Robotics, Coding, Design, Operations, Sponsorship, Social Media.
+The club designs and builds custom go-karts, develops robotics and embedded systems, and runs technical events. Core domains: Automotives, Robotics, Coding, Operations, Sponsorship, Social Media.
 
 ## Partners
 
@@ -16,6 +16,26 @@ Xylem, Ather Energy, Paper Boat, Mahindra, BMW Motorrad, SOLIDWORKS.
 - Ignition: overnight IoT hackathon
 - Bootstrap: annual open-house showcase for incoming PESU ECC students
 - IKC: Indian Karting Championship participation
+
+## Bootstrap
+
+Bootstrap is Team Vegavath's annual open-house event at PESU ECC where student clubs showcase projects to incoming freshers. Vegavath's Bootstrap features go-kart displays, robotics demonstrations, and hands-on exhibits.
+
+## EmbedX
+
+EmbedX is an embedded systems and IoT hackathon organized by Team Vegavath in partnership with Xylem and the Department of ECE, PESU ECC. Teams build firmware and hardware solutions over 10 hours.
+
+## Go-kart
+
+Team Vegavath designs and builds custom go-karts covering chassis fabrication, suspension design, engine tuning, and electronics. The kart is the club's flagship project.
+
+## Domains
+
+Six domains: Automotives, Robotics, Coding, Operations, Sponsorship, Social Media.
+
+## Faculty Advisor
+
+Faculty advisor: Dr. S. V. Satish, Professor, Department of Mechanical Engineering, PES University Electronic City Campus. PhD and MTech in Manufacturing Engineering, IEEE robotics panel speaker.
 
 ## Links
 

@@ -86,7 +86,10 @@ export const viewport: Viewport = {
 // Logo uses the same R2 constant as the OG image so one env var moves both.
 const orgSchema = {
   "@context": "https://schema.org",
-  "@type": "Organization",
+  // S51: multi-type. `sport` is a SportsOrganization property and is ignored
+  // on a plain Organization. SportsOrganization (not SportsClub, which maps to
+  // gyms/fitness venues) is schema.org's type for sport-focused clubs.
+  "@type": ["Organization", "SportsOrganization"],
   name: "Team Vegavath",
   alternateName: "Team Vegavath PESU ECC",
   url: "https://vegavath.live",
