@@ -10,6 +10,12 @@
 // which does not resolve. The live API is api.jolpi.ca; /ergast/v1/f1/... and
 // /ergast/f1/... both answer, and the versioned prefix is used here.
 //
+// S53 path note: under /ergast/v1 every request needs a trailing RESOURCE
+// segment. /f1/current.json and /f1/current/next.json 404 here (they only work
+// on the legacy /ergast/f1 prefix); /f1/current/races.json and
+// /f1/current/next/races.json are the versioned forms. jolpica() turns a 404
+// into null, so the miss showed up as an empty calendar rather than an error.
+//
 // Every response is shaped { MRData: { <table key>: ... } }. Only the fields
 // actually rendered are typed -- the API returns considerably more.
 
@@ -62,6 +68,11 @@ export interface F1Circuit {
   };
 }
 
+export interface F1RaceSession {
+  date: string;
+  time?: string;
+}
+
 export interface F1Race {
   season: string;
   round: string;
@@ -70,7 +81,15 @@ export interface F1Race {
   Circuit: F1Circuit;
   date: string;
   time?: string;
-  Qualifying?: { date: string; time?: string };
+  // Session sub-objects, present only on the schedule endpoints and only when
+  // the session exists (Sprint / SprintQualifying on sprint weekends only).
+  // Verified against a live /f1/current/races.json payload.
+  FirstPractice?: F1RaceSession;
+  SecondPractice?: F1RaceSession;
+  ThirdPractice?: F1RaceSession;
+  Qualifying?: F1RaceSession;
+  Sprint?: F1RaceSession;
+  SprintQualifying?: F1RaceSession;
   Results?: F1RaceResult[];
   QualifyingResults?: F1QualifyingResult[];
   SprintResults?: F1RaceResult[];
@@ -217,7 +236,10 @@ export async function getF1LastQualifying(): Promise<F1Race | null> {
 export async function getF1NextRace(): Promise<F1Race | null> {
   // 404s once the season is over -- jolpica() maps that to null, which the page
   // renders as "Season Complete".
-  const data = await jolpica<RaceResponse>("/f1/current/next.json", ONE_HOUR);
+  const data = await jolpica<RaceResponse>(
+    "/f1/current/next/races.json",
+    ONE_HOUR
+  );
   return data?.RaceTable.Races[0] ?? null;
 }
 
@@ -225,7 +247,10 @@ export async function getF1NextRace(): Promise<F1Race | null> {
 // 24-hour revalidate.
 
 export async function getF1CurrentSchedule(): Promise<F1Race[]> {
-  const data = await jolpica<RaceResponse>("/f1/current.json?limit=40", ONE_DAY);
+  const data = await jolpica<RaceResponse>(
+    "/f1/current/races.json?limit=40",
+    ONE_DAY
+  );
   return data?.RaceTable.Races ?? [];
 }
 
@@ -237,12 +262,19 @@ export async function getF1SeasonHistory(): Promise<F1Season[]> {
   return data?.SeasonTable.Seasons ?? [];
 }
 
-export async function getF1AllDrivers(): Promise<F1Driver[]> {
-  const data = await jolpica<{ DriverTable: { Drivers: F1Driver[] } }>(
-    "/f1/drivers.json?limit=100&offset=0",
-    ONE_DAY
-  );
-  return data?.DriverTable.Drivers ?? [];
+// 881 drivers in F1 history and Jolpica caps limit at 100, so this is paged.
+// MRData.total is a STRING in every Jolpica response -- hence the Number().
+export async function getF1AllDrivers(
+  offset = 0
+): Promise<{ drivers: F1Driver[]; total: number }> {
+  const data = await jolpica<{
+    total: string;
+    DriverTable: { Drivers: F1Driver[] };
+  }>(`/f1/drivers.json?limit=30&offset=${offset}`, ONE_DAY);
+  return {
+    drivers: data?.DriverTable.Drivers ?? [],
+    total: Number(data?.total ?? 0),
+  };
 }
 
 export async function getF1AllCircuits(): Promise<F1Circuit[]> {

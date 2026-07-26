@@ -84,7 +84,7 @@ export default function BootstrapRegister({
       }
       setResult(data as { username: string; loginCode: string; pooled?: boolean });
     } catch {
-      setError("CONNECTION FAILED — TRY AGAIN");
+      setError("CONNECTION FAILED -- TRY AGAIN");
     } finally {
       setBusy(false);
     }
@@ -304,7 +304,7 @@ export default function BootstrapRegister({
                   marginTop: "8px",
                 }}
               >
-                +91 prefix is fine — it will be removed
+                +91 prefix is fine -- it will be removed
               </p>
             </div>
 
@@ -341,6 +341,40 @@ export default function BootstrapRegister({
                   placeholder="e.g. Go-Kart, Robotics"
                   style={inputStyle}
                 />
+                {/* Tap to fill. The S50 fuzzy match strips punctuation on both
+                    sides, so "Go-Kart" still lands on a "Go Kart" stall. */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  {["Go-Kart", "Engine", "Bike", "Car 1", "Car 2", "Tyres", "Kuka", "Robotics"].map(
+                    (stallName) => (
+                      <button
+                        key={stallName}
+                        type="button"
+                        onClick={() => setPreferredStall(stallName)}
+                        style={{
+                          fontFamily: "var(--font-mono), monospace",
+                          fontSize: "10px",
+                          padding: "6px 10px",
+                          border: `1px solid ${BS.borderStrong}`,
+                          background:
+                            preferredStall === stallName ? BS.accent : "transparent",
+                          color: preferredStall === stallName ? BS.bg : BS.muted,
+                          cursor: "pointer",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {stallName}
+                      </button>
+                    )
+                  )}
+                </div>
                 <p
                   style={{
                     fontFamily: "var(--font-mono), monospace",

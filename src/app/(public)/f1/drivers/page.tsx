@@ -26,25 +26,39 @@ function formatDob(value: string): string {
   });
 }
 
-export default async function F1DriversPage() {
+const PER_PAGE = 30;
+
+export default async function F1DriversPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ offset?: string }>;
+}) {
   const f1Enabled = await getF1Enabled().catch(() => false);
   if (!f1Enabled) return <F1Paused />;
 
-  const [standings, allDrivers] = await Promise.all([
+  // Untrusted URL param feeding an outbound fetch: floor it, drop NaN, clamp
+  // negatives. Beyond the last page Jolpica returns an empty list, which the
+  // archive table already renders as an empty state.
+  const offset = Math.max(
+    0,
+    Math.floor(Number((await searchParams).offset)) || 0
+  );
+
+  const [standings, archive] = await Promise.all([
     getF1DriverStandings(),
-    getF1AllDrivers(),
+    getF1AllDrivers(offset),
   ]);
 
   const season = standings?.season ?? "";
   const current = standings?.standings ?? [];
-  const currentIds = new Set(current.map((row) => row.Driver.driverId));
 
   // Career totals are not obtainable in a bounded number of calls: the bulk
   // /f1/drivers.json rows carry no stats, and the per-driver career standings
   // endpoint requires a season. So the grid table shows this season's figures
-  // and the historical table stays reference-only. Both link to the profile,
+  // and the archive table stays reference-only. Both link to the profile,
   // which is where per-driver detail lives.
-  const historical = allDrivers.filter((d) => !currentIds.has(d.driverId));
+  const start = offset + 1;
+  const end = Math.min(offset + PER_PAGE, archive.total);
 
   return (
     <>
@@ -97,11 +111,11 @@ export default async function F1DriversPage() {
 
       <F1Section
         title="From the Archive"
-        subtitle={`First ${historical.length} of the drivers who have started a championship race`}
+        subtitle="Every driver who has started a championship race, alphabetically"
       >
         <F1Table headers={["Driver", "Nationality", "Born", "Reference"]}>
-          {historical.length > 0 ? (
-            historical.map((driver) => (
+          {archive.drivers.length > 0 ? (
+            archive.drivers.map((driver) => (
               <tr key={driver.driverId}>
                 <td className="f1-name">
                   <Link href={`/f1/drivers/${driver.driverId}`}>
@@ -117,6 +131,36 @@ export default async function F1DriversPage() {
             <F1Empty colSpan={4} message="Driver archive unavailable" />
           )}
         </F1Table>
+
+        {archive.total > 0 && (
+          <div
+            className="mono"
+            style={{
+              marginTop: "1rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem",
+              fontSize: "0.7rem",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+            }}
+          >
+            <span>
+              Showing {start}-{end} of {archive.total}
+            </span>
+            {/* Plain links, no client JS: each offset is its own cached page. */}
+            <span style={{ display: "flex", gap: "1rem" }}>
+              {offset > 0 && (
+                <Link href={`/f1/drivers?offset=${offset - PER_PAGE}`}>Prev</Link>
+              )}
+              {end < archive.total && (
+                <Link href={`/f1/drivers?offset=${offset + PER_PAGE}`}>Next</Link>
+              )}
+            </span>
+          </div>
+        )}
       </F1Section>
     </>
   );

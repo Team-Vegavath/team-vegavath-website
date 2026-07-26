@@ -90,7 +90,7 @@ export default async function AboutPage() {
 
       {/* Intro + mission pull-quote */}
       <section style={{ padding: "5rem 1.5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "56rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "56rem" }}>
           <Reveal>
             <p style={{ fontSize: "1.05rem", lineHeight: 1.8, color: "var(--text-secondary)" }}>
               Team Vegavath is the official student innovation club of PES University, Electronic City
@@ -140,7 +140,7 @@ export default async function AboutPage() {
 
       {/* Domains: shared grid, identical to home */}
       <section style={{ padding: "0 1.5rem 5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
             <h2 style={{ marginBottom: "2rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
               What we do
@@ -152,7 +152,7 @@ export default async function AboutPage() {
 
       {/* Stats: dramatic, dot pattern */}
       <section className="pattern-dots" style={{ padding: "5.5rem 1.5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
             <div className="stats-grid">
               {STATS.map(({ number, label }) => (
@@ -168,7 +168,7 @@ export default async function AboutPage() {
 
       {/* Timeline: real events only */}
       <section style={{ padding: "5rem 1.5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "56rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "56rem" }}>
           <Reveal>
             <h2 style={{ marginBottom: "3rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
               The road so far
@@ -208,7 +208,7 @@ export default async function AboutPage() {
 
       {/* Values: geometric outlines, no emoji */}
       <section style={{ padding: "0 1.5rem 5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
             <h2 style={{ marginBottom: "2rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
               How we operate
@@ -235,7 +235,7 @@ export default async function AboutPage() {
       {/* Sponsors marquee: same treatment as home */}
       {sponsors.length > 0 ? (
         <section style={{ padding: "0 0 5rem" }}>
-          <div style={{ margin: "0 auto", maxWidth: "80rem" }}>
+          <div className="mx-auto" style={{ maxWidth: "80rem" }}>
             <h2
               className="heading"
               style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}

@@ -193,7 +193,8 @@ export default function GalleryClient({ items, filters }: Props) {
           </button>
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ position: "relative", margin: "0 auto", aspectRatio: "9/16", width: "90vw", maxWidth: "500px" }}
+            className="mx-auto"
+            style={{ position: "relative", aspectRatio: "9/16", width: "90vw", maxWidth: "500px" }}
           >
             <iframe
               src={activeVideo}

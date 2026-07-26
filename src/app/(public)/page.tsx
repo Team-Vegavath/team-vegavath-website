@@ -42,7 +42,7 @@ export default async function HomePage() {
           overflow: "hidden",
         }}
       >
-        <div style={{ maxWidth: "72rem", margin: "0 auto", textAlign: "center" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem", textAlign: "center" }}>
           <h1
             style={{
               fontSize: "clamp(48px, 12vw, 140px)",
@@ -89,7 +89,7 @@ export default async function HomePage() {
 
       {/* 3D kart */}
       <section style={{ padding: "5rem 1.5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
             <h2 style={{ marginBottom: "3rem", fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 700 }}>
               THE BUILD
@@ -101,7 +101,7 @@ export default async function HomePage() {
 
       {/* Domains */}
       <section style={{ padding: "2rem 1.5rem 5rem" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
             <p className="label-tech" style={{ marginBottom: "0.75rem", color: "var(--accent)" }}>
               Six domains, one team
@@ -113,7 +113,7 @@ export default async function HomePage() {
 
       {/* Events */}
       <section style={{ padding: "5rem 1.5rem", background: "var(--bg-surface)" }}>
-        <div style={{ margin: "0 auto", maxWidth: "72rem" }}>
+        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <EventsPreview
             upcoming={upcomingEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
             past={pastEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
@@ -124,7 +124,7 @@ export default async function HomePage() {
       {/* Sponsors strip */}
       {sponsors.length > 0 ? (
         <section style={{ padding: "4rem 0" }}>
-          <div style={{ margin: "0 auto", maxWidth: "80rem" }}>
+          <div className="mx-auto" style={{ maxWidth: "80rem" }}>
             <h2
               className="heading"
               style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
@@ -146,7 +146,7 @@ export default async function HomePage() {
           marginTop: "2rem",
         }}
       >
-        <div style={{ margin: "0 auto", maxWidth: "56rem", textAlign: "center" }}>
+        <div className="mx-auto" style={{ maxWidth: "56rem", textAlign: "center" }}>
           <h2 style={{ fontSize: "clamp(2.25rem, 6vw, 3.75rem)", fontWeight: 700, color: "var(--bg-base)", letterSpacing: "0.01em" }}>
             JOIN THE TEAM
           </h2>

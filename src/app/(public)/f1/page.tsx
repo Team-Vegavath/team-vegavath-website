@@ -223,7 +223,9 @@ export default async function F1Page() {
 
       {/* RACE CALENDAR */}
       <F1Section id="calendar" title="Race Calendar" subtitle={`${season} season`}>
-        <F1Table headers={["Rnd", "Race", "Circuit", "Country", "Date"]}>
+        <F1Table
+          headers={["Rnd", "Race", "Circuit", "Country", "Qualifying", "Race Day"]}
+        >
           {schedule.length > 0 ? (
             schedule.map((race) => {
               const isNext = nextRace?.round === race.round;
@@ -246,12 +248,19 @@ export default async function F1Page() {
                   </td>
                   <td>{race.Circuit.circuitName}</td>
                   <td>{race.Circuit.Location.country}</td>
+                  {/* Session sub-objects are only present on the schedule
+                      endpoint and only when the session exists. */}
+                  <td className="f1-num">
+                    {race.Qualifying
+                      ? formatRaceDate(race.Qualifying.date, race.Qualifying.time)
+                      : "-"}
+                  </td>
                   <td className="f1-num">{formatRaceDate(race.date, race.time)}</td>
                 </tr>
               );
             })
           ) : (
-            <F1Empty colSpan={5} message="Calendar unavailable" />
+            <F1Empty colSpan={6} message="Calendar unavailable" />
           )}
         </F1Table>
       </F1Section>

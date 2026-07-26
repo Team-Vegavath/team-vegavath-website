@@ -122,14 +122,16 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 - Error boundaries / .catch fallbacks on every async server component.
 - Mobile-first CSS - 375px first, scale up.
 - Colors/fonts from the design tokens in src/app/globals.css only.
-- Tailwind classes first; inline style={{}} elsewhere. S52B: the
-  "Tailwind v4 doesn't generate utilities here" belief was WRONG.
-  `.mx-auto` always generated - it lost to globals.css's own unlayered
-  `*{margin:0}`, because unlayered CSS beats `@layer utilities`. That
-  reset is now in `@layer base`. Keep centering inline anyway for
-  consistency with ~180 existing call sites; migrating is its own
-  session. If a Tailwind class silently does nothing, suspect one of the
-  ~447 still-unlayered globals.css rules, not a missing class.
+- Tailwind classes first; inline style={{}} elsewhere. The "Tailwind v4
+  doesn't generate utilities here" belief was WRONG. `.mx-auto` always
+  generated - it lost to globals.css's own unlayered `*{margin:0}`,
+  because unlayered CSS beats `@layer utilities`. S52B moved that reset
+  into `@layer base`; S53 converted all 24 inline centering workarounds
+  to `className="mx-auto"`. Use the utility. Exception: a lone
+  `marginRight: "auto"` on a flex child is a spacer, not centering -
+  `mx-auto` breaks it. If a Tailwind class silently does nothing,
+  suspect one of the ~447 still-unlayered globals.css rules, not a
+  missing class.
 - Upload R2 objects under NEW timestamped filenames. R2 serves immutable
   cache headers - overwriting a key serves stale content forever.
 - Reuse before inventing: Reveal, Container, DomainGrid, SponsorMarquee,
@@ -220,8 +222,8 @@ Two service-layer patterns worth knowing before you write a new one:
 ## Definition of done (every code change)
 
 1. `npm run build` with 0 errors and `npx tsc --noEmit` exit 0.
-2. Design gate on touched .tsx: no emoji, no banned radii, no mx-auto,
-   no em dashes, tokens only.
+2. Design gate on touched .tsx: no emoji, no banned radii, no em dashes,
+   tokens only.
 3. UI work needs a human's visual OK in the dev server before it is
    "finished".
 

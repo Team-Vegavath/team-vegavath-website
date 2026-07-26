@@ -150,7 +150,7 @@ export default function StallVolunteerView({
         </div>
       )}
 
-      <main style={{ maxWidth: "36rem", margin: "0 auto", padding: "24px 16px 48px" }}>
+      <main className="mx-auto" style={{ maxWidth: "36rem", padding: "24px 16px 48px" }}>
         {myStall ? (
           <>
             <div

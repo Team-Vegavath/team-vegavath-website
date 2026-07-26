@@ -61,7 +61,7 @@ export function Footer({ settings }: FooterProps) {
 
   return (
     <footer style={{ borderTop: "1px solid var(--border)", background: "var(--bg-base)" }}>
-      <div style={{ margin: "0 auto", maxWidth: "80rem", padding: "3rem clamp(1.25rem, 4vw, 4rem) 2rem" }}>
+      <div className="mx-auto" style={{ maxWidth: "80rem", padding: "3rem clamp(1.25rem, 4vw, 4rem) 2rem" }}>
         <div className="footer-row-1">
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <Image

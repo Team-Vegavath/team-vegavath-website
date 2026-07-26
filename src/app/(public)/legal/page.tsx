@@ -12,7 +12,7 @@ export const revalidate = 120;
 export default function LegalPage() {
   return (
     <main style={{ minHeight: "100vh", background: "var(--bg-base)", color: "var(--text-primary)", overflowX: "hidden" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "720px", padding: "8rem 1.5rem 5rem", boxSizing: "border-box" }}>
+      <div className="mx-auto" style={{ width: "100%", maxWidth: "720px", padding: "8rem 1.5rem 5rem", boxSizing: "border-box" }}>
         <p className="mono" style={{ fontSize: "0.68rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>
           Last updated: 26 July 2026
         </p>

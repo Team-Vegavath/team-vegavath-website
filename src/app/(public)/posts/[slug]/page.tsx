@@ -72,7 +72,7 @@ export default async function PostPage({ params }: PostPageProps) {
     >
       <section style={{ width: "100%", padding: "9rem 0 6rem" }}>
         <Container>
-          <div style={{ margin: "0 auto", maxWidth: "48rem" }}>
+          <div className="mx-auto" style={{ maxWidth: "48rem" }}>
             <Link
               href="/posts"
               className="mono"

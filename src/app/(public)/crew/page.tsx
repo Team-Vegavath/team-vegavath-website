@@ -146,7 +146,7 @@ export default async function CrewPage() {
 
   return (
     <main style={{ background: "var(--bg-base)", color: "var(--text-primary)", minHeight: "100vh", overflowX: "hidden" }}>
-      <div style={{ margin: "0 auto", width: "100%", maxWidth: "80rem", padding: "9rem 1.5rem 5rem", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "5rem" }}>
+      <div className="mx-auto" style={{ width: "100%", maxWidth: "80rem", padding: "9rem 1.5rem 5rem", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "5rem" }}>
         <header>
           <p className="label-tech" style={{ color: "var(--accent)", marginBottom: "0.75rem" }}>
             Core · Crew · Legacy

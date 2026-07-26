@@ -3,12 +3,12 @@
 import { useEffect, useRef } from "react";
 
 /* ────────────────────────────────────────────────────────────
-   404 F1 kart game — 2D canvas lane-dodger.
+   404 F1 kart game -- 2D canvas lane-dodger.
    Pure React + browser APIs; no dependencies. All game state
    lives in refs/closures so the loop never re-renders React.
    ──────────────────────────────────────────────────────────── */
 
-/* Canvas 2D can't read CSS variables — these mirror the
+/* Canvas 2D can't read CSS variables -- these mirror the
    globals.css tokens (--bg-base, --border, --accent, --gold,
    --error, --text-*). Keep in sync by hand. */
 const C = {
@@ -74,7 +74,7 @@ const LIVERIES: Livery[] = [
   },
 ];
 
-/* Side-profile F1 car, nose pointing right (direction of travel —
+/* Side-profile F1 car, nose pointing right (direction of travel --
    obstacles scroll right-to-left). viewBox 0 0 160 48; layered
    shapes: rear wing → floor → engine cover → sidepod → nose →
    wings → cockpit/halo → suspension → wheels. */
@@ -173,7 +173,7 @@ export default function KartGame() {
     if (!ctx) return;
 
     /* Every lane/HUD position derives from HEIGHT, so it must stay fixed
-       for the life of the game loop — computed once on mount, not on
+       for the life of the game loop -- computed once on mount, not on
        resize (a mid-run height change would teleport the car and slick). */
     const HEIGHT = Math.min(
       MAX_HEIGHT,
@@ -182,7 +182,7 @@ export default function KartGame() {
     const OIL_Y = HEIGHT / 2; // oil stripe centre line
     canvas.style.height = `${HEIGHT}px`;
 
-    /* next/font families are only reachable via their CSS variables —
+    /* next/font families are only reachable via their CSS variables --
        resolve the real family strings once so ctx.font can use them. */
     const rootStyles = getComputedStyle(document.documentElement);
     const chakraVar = rootStyles.getPropertyValue("--font-chakra").trim();
@@ -220,7 +220,7 @@ export default function KartGame() {
     try {
       g.hiscore = parseFloat(localStorage.getItem(HISCORE_KEY) ?? "0") || 0;
     } catch {
-      // localStorage unavailable (private mode) — hiscore stays session-only
+      // localStorage unavailable (private mode) -- hiscore stays session-only
     }
 
     const streaks: Streak[] = Array.from({ length: 12 }, () => ({
@@ -347,7 +347,7 @@ export default function KartGame() {
       const carBottom = g.carY + HIT_H / 2;
       for (const o of g.obstacles) {
         if (o.kind === "oil") {
-          // stripe covers [o.x, W] on the centre line; generous window — it signals run-end
+          // stripe covers [o.x, W] on the centre line; generous window -- it signals run-end
           if (o.x <= carRight && Math.abs(g.carY - OIL_Y) < OIL_KILL) {
             die();
             break;
@@ -402,11 +402,11 @@ export default function KartGame() {
     function drawOil(x: number) {
       if (!ctx) return;
       // thin stripe on the centre line, stretching from its leading edge to
-      // the right canvas edge — dodgeable by holding the top or bottom lane
+      // the right canvas edge -- dodgeable by holding the top or bottom lane
       const stripeW = W - x;
       if (stripeW <= 0) return;
       const top = OIL_Y - OIL_H / 2;
-      // translucent iridescent sheen — purple → teal → amber → purple —
+      // translucent iridescent sheen -- purple → teal → amber → purple --
       // so it reads as spilled oil rather than a solid wall
       const grad = ctx.createLinearGradient(x, 0, W, 0);
       grad.addColorStop(0, "rgba(80,0,120,0.55)");
@@ -698,7 +698,8 @@ export default function KartGame() {
   return (
     <div
       ref={wrapRef}
-      style={{ width: "100%", maxWidth: "56rem", margin: "0 auto", padding: "0 1.5rem", boxSizing: "border-box" }}
+      className="mx-auto"
+      style={{ width: "100%", maxWidth: "56rem", padding: "0 1.5rem", boxSizing: "border-box" }}
     >
       <canvas
         ref={canvasRef}

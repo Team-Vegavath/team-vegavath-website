@@ -358,7 +358,7 @@ export default function BootstrapDashboard({
         </div>
       )}
 
-      <main style={{ maxWidth: "56rem", margin: "0 auto", padding: "16px 16px 48px" }}>
+      <main className="mx-auto" style={{ maxWidth: "56rem", padding: "16px 16px 48px" }}>
         {/* S35 - the lead's group assignment, handed out FCFS at registration
             once the session is active */}
         <div
@@ -599,7 +599,7 @@ export default function BootstrapDashboard({
               textAlign: "center",
             }}
           >
-            CLASSROOM MODE ACTIVE — QUEUE ACTIONS PAUSED
+            CLASSROOM MODE ACTIVE -- QUEUE ACTIONS PAUSED
           </div>
         )}
 
