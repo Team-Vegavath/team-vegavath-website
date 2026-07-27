@@ -230,6 +230,27 @@ export default function BootstrapAdminDashboard({
     poll();
   }
 
+  // S55C: UNLOCK next door clears the session token; this replaces the code
+  // itself. Confirmed because the old code dies the moment this fires.
+  async function resetCode(v: BootstrapVolunteer) {
+    if (
+      !window.confirm(
+        `Issue ${v.display_name} a new login code? Their current code stops working immediately.`
+      )
+    )
+      return;
+    setVolBusy(v.id);
+    try {
+      await fetch(`/api/admin/bootstrap/volunteers/${v.id}/reset-code`, {
+        method: "POST",
+      }).catch(() => {});
+      // poll() re-reads the volunteers, so the new code lands in the table.
+      await poll();
+    } finally {
+      setVolBusy(null);
+    }
+  }
+
   async function deactivate() {
     if (!window.confirm("Deactivate this session? Volunteers will be signed out of /bootstrap.")) return;
     const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/active`, {
@@ -445,6 +466,19 @@ export default function BootstrapAdminDashboard({
         onClick={() => startVolunteerEdit(v)}
       >
         {volEditId === v.id ? "CANCEL" : "EDIT"}
+      </button>
+    );
+
+  // S55C: both tables render it, so it sits with the other shared cells.
+  const resetCodeButton = (v: BootstrapVolunteer) =>
+    isViewer ? null : (
+      <button
+        className="admin-row-action"
+        disabled={volBusy === v.id}
+        title="Issue a new login code"
+        onClick={() => resetCode(v)}
+      >
+        RESET CODE
       </button>
     );
 
@@ -924,6 +958,7 @@ export default function BootstrapAdminDashboard({
                           {stallSelect(v)}
                           {unlockButton(v)}
                           {editButton(v)}
+                          {resetCodeButton(v)}
                           {roleButton(v)}
                         </div>
                       </td>
@@ -1013,6 +1048,7 @@ export default function BootstrapAdminDashboard({
                         {stallSelect(v)}
                         {unlockButton(v)}
                         {editButton(v)}
+                        {resetCodeButton(v)}
                         {roleButton(v)}
                       </div>
                     </td>

@@ -185,6 +185,35 @@ export default function BootstrapSessions({
     }
   }
 
+  // S55C: pool members registered before any session existed, so their code has
+  // usually been lost by the time they need it. Confirmed because the old code
+  // stops working the moment this fires.
+  async function resetCode(v: PoolVolunteer) {
+    if (
+      !confirm(
+        `Issue ${v.display_name} a new login code? Their current code stops working immediately.`
+      )
+    )
+      return;
+    setBusyId(v.id);
+    setVolError("");
+    try {
+      const res = await fetch(`/api/admin/bootstrap/volunteers/${v.id}/reset-code`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? "Reset failed");
+        return;
+      }
+      // Same refresh path as saveVolunteer -- the server component re-renders the
+      // row with the new code, so no second copy of the pool lives in state.
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   // S55B: pool entries are duplicates, test rows and dropouts often enough to
   // need a bin. Safe to hard-delete because a pool row has no session and so
   // nothing references it -- see deletePoolVolunteer.
@@ -476,6 +505,7 @@ export default function BootstrapSessions({
                 <th>Username (SRN)</th>
                 <th>Phone</th>
                 <th>Prefers</th>
+                <th>Login code</th>
                 <th>Registered</th>
                 <th>Actions</th>
               </tr>
@@ -493,6 +523,9 @@ export default function BootstrapSessions({
                       <td style={{ color: "var(--text-secondary)" }}>
                         {v.preferred_stall_name ?? "-"}
                       </td>
+                      {/* S55C: plaintext by design, same as the active-session
+                          tables -- these accounts only reach /bootstrap. */}
+                      <td className="admin-cell-mono">{v.login_code ?? "-"}</td>
                       <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                         {shortDate(v.created_at)}
                       </td>
@@ -527,6 +560,14 @@ export default function BootstrapSessions({
                               {volEditId === v.id ? "CANCEL" : "EDIT"}
                             </button>
                             <button
+                              className="admin-row-action"
+                              disabled={busyId === v.id}
+                              title="Issue a new login code"
+                              onClick={() => resetCode(v)}
+                            >
+                              RESET CODE
+                            </button>
+                            <button
                               className="admin-row-action admin-row-action-danger"
                               disabled={busyId === v.id}
                               title="Remove this pre-registration entirely"
@@ -541,7 +582,7 @@ export default function BootstrapSessions({
 
                     {volEditId === v.id && !isViewer && (
                       <tr>
-                        <td colSpan={6} style={{ background: "var(--bg-elevated)" }}>
+                        <td colSpan={7} style={{ background: "var(--bg-elevated)" }}>
                           <div
                             style={{
                               display: "flex",
@@ -619,7 +660,7 @@ export default function BootstrapSessions({
 
                     {assignId === v.id && !isViewer && (
                       <tr>
-                        <td colSpan={6} style={{ background: "var(--bg-elevated)" }}>
+                        <td colSpan={7} style={{ background: "var(--bg-elevated)" }}>
                           <div
                             style={{
                               display: "flex",
@@ -692,7 +733,7 @@ export default function BootstrapSessions({
                 ))
               ) : (
                 <tr>
-                  <td className="admin-empty" colSpan={6}>
+                  <td className="admin-empty" colSpan={7}>
                     No pre-registered volunteers waiting.
                   </td>
                 </tr>

@@ -58,6 +58,7 @@ export interface PoolVolunteer {
   srn: string | null;
   phone: string | null;
   preferred_stall_name: string | null;
+  login_code: string | null; // S55C - plaintext, same deal as BootstrapVolunteer
   created_at: string;
 }
 
@@ -648,13 +649,35 @@ export async function updateVolunteer(
     WHERE id = ${volunteerId}`;
 }
 
+// S55C: the password reset updateVolunteer refuses to do. Pool rows and assigned
+// rows alike -- pool codes were issued at registration and get lost before the
+// session even exists.
+//
+// BOTH columns move together: password_hash is what auth.ts compares against and
+// login_code is the plaintext copy the admin tables display (S35). Writing one
+// without the other leaves the panel showing a code that does not log anyone in.
+// Returns null when no row matched, so the route can 404 instead of pretending.
+export async function resetVolunteerLoginCode(
+  volunteerId: string
+): Promise<string | null> {
+  const loginCode = generatePassword(8);
+  const hash = await bcrypt.hash(loginCode, 10);
+  const rows = await sql`
+    UPDATE bootstrap_volunteers
+    SET login_code = ${loginCode}, password_hash = ${hash}
+    WHERE id = ${volunteerId}
+    RETURNING id`;
+  return rows.length > 0 ? loginCode : null;
+}
+
 // ------------------------------------- pre-registration pool (S49, mig 021)
 
 // Volunteers who registered before any session existed. They have no session_id,
 // so they cannot log in yet - an admin assigns them to a session stall first.
 export async function getUnassignedVolunteers(): Promise<PoolVolunteer[]> {
   const rows = await sql`
-    SELECT id, display_name, username, srn, phone, preferred_stall_name, created_at
+    SELECT id, display_name, username, srn, phone, preferred_stall_name,
+           login_code, created_at
     FROM bootstrap_volunteers
     WHERE session_id IS NULL
     ORDER BY created_at ASC LIMIT 200`;
