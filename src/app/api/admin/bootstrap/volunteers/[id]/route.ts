@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import {
+  deletePoolVolunteer,
+  getPoolVolunteerBySrn,
+  updateVolunteer,
+} from "@/lib/services/bootstrap";
+
+// S55: admin corrects a volunteer's own registration details -- name, phone,
+// SRN. Password (login_code / password_hash) is not touched here; resetting a
+// login is a separate path.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
+  try {
+    const { id } = await params;
+    const body = await req.json();
+
+    // Empty strings are dropped, not forwarded. The service uses COALESCE, so a
+    // blank field means "leave alone" -- it cannot clear a column, and letting
+    // "" through would blank a name or an SRN instead.
+    const str = (v: unknown) => {
+      const s = typeof v === "string" ? v.trim() : "";
+      return s.length > 0 ? s : undefined;
+    };
+    const display_name = str(body?.display_name);
+    const phone = str(body?.phone);
+    const srn = str(body?.srn);
+
+    if (!display_name && !phone && !srn) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
+    // One pool account per SRN (see getPoolVolunteerBySrn -- Postgres treats
+    // NULL session_ids as distinct, so no unique index covers the pool). A typo
+    // fix must not create the duplicate the registration route prevents.
+    // Assigned volunteers are covered by UNIQUE(session_id, username) instead.
+    if (srn) {
+      const clash = await getPoolVolunteerBySrn(srn.toLowerCase());
+      if (clash && clash.id !== id) {
+        return NextResponse.json(
+          { error: "Another pre-registered volunteer already uses that SRN" },
+          { status: 409 }
+        );
+      }
+    }
+
+    await updateVolunteer(id, { display_name, phone, srn });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[PATCH /api/admin/bootstrap/volunteers/[id]]", error);
+    return NextResponse.json({ error: "Failed to update volunteer" }, { status: 500 });
+  }
+}
+
+// S55B: remove a pre-registration entry. Pool rows only -- the service's
+// session_id IS NULL guard is what enforces that, so an assigned volunteer's id
+// falls through to the 409 below rather than deleting anything.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.isViewer) {
+    return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
+  }
+
+  try {
+    const { id } = await params;
+    const deleted = await deletePoolVolunteer(id);
+    if (!deleted) {
+      return NextResponse.json(
+        {
+          error:
+            "Not found, or already assigned to a session. Delete the session instead.",
+        },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[DELETE /api/admin/bootstrap/volunteers/[id]]", error);
+    return NextResponse.json({ error: "Failed to delete volunteer" }, { status: 500 });
+  }
+}

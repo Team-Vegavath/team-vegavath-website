@@ -351,7 +351,7 @@ export default function BootstrapRegister({
                     marginTop: "0.5rem",
                   }}
                 >
-                  {["Go-Kart", "Engine", "Bike", "Car 1", "Car 2", "Tyres", "Kuka", "Robotics"].map(
+                  {["Go-Kart", "Engine", "Bike", "Car 1", "Tyres", "Kuka", "Robotics"].map(
                     (stallName) => (
                       <button
                         key={stallName}

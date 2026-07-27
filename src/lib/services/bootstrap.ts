@@ -586,7 +586,25 @@ export async function setVolunteerRole(
   volunteerId: string,
   role: "stall" | "lead"
 ): Promise<void> {
-  await sql`UPDATE bootstrap_volunteers SET role = ${role} WHERE id = ${volunteerId}`;
+  // S55B: checkin_token is minted at registration, but ONLY by
+  // registerGroupVolunteer. A volunteer promoted here would otherwise land on
+  // role 'lead' with a NULL token, which means a dead QR check-in URL and a
+  // getCheckinContext lookup that can never resolve them. Backfill on the way
+  // up; COALESCE keeps an existing token stable across a lead -> stall -> lead
+  // round trip, so an already-printed QR code survives a demotion.
+  //
+  // group_number is deliberately NOT touched here. assignGroupNumbers only
+  // fills NULLs, so re-activating the session picks a new lead up without
+  // reshuffling anyone who already has a number.
+  const token = randomBytes(20).toString("hex");
+  await sql`
+    UPDATE bootstrap_volunteers
+    SET role = ${role},
+        checkin_token = CASE
+          WHEN ${role} = 'lead' THEN COALESCE(checkin_token, ${token})
+          ELSE checkin_token
+        END
+    WHERE id = ${volunteerId}`;
 }
 
 // S36: leads flip themselves into classroom mode from the dashboard, which
@@ -603,6 +621,30 @@ export async function suggestStallToVolunteer(
   await sql`
     UPDATE bootstrap_volunteers
     SET suggested_stall_id = ${stallId}
+    WHERE id = ${volunteerId}`;
+}
+
+// S55: admin fixes a typo in a volunteer's own registration details. Works for
+// pool rows and assigned rows alike -- no session_id guard.
+//
+// SRN writes BOTH columns. `username` is the lowercased SRN and is what the
+// login lookup keys on (see registerStallVolunteer), while `srn` is the display
+// copy the admin tables read. Updating one without the other would leave a
+// volunteer logging in under an SRN the panel no longer shows.
+//
+// Deliberately NOT updatable here: login_code and password_hash. Password reset
+// is its own path.
+export async function updateVolunteer(
+  volunteerId: string,
+  data: { display_name?: string; phone?: string; srn?: string }
+): Promise<void> {
+  const srn = data.srn?.trim();
+  await sql`
+    UPDATE bootstrap_volunteers
+    SET display_name = COALESCE(${data.display_name ?? null}, display_name),
+        phone        = COALESCE(${data.phone ?? null}, phone),
+        srn          = COALESCE(${srn ?? null}, srn),
+        username     = COALESCE(${srn ? srn.toLowerCase() : null}, username)
     WHERE id = ${volunteerId}`;
 }
 
@@ -629,6 +671,24 @@ export async function getPoolVolunteerBySrn(
     WHERE session_id IS NULL AND username = ${username}
     LIMIT 1`;
   return (rows[0] as { id: string }) ?? null;
+}
+
+// S55B: drop a pre-registration entry -- a duplicate, a test row, someone who
+// pulled out before any session existed. A hard delete is safe HERE and only
+// here: a pool row has no session, so nothing references it. The same
+// session_id IS NULL guard assignVolunteerToSession uses makes that structural
+// rather than a promise -- an id belonging to an already-assigned volunteer
+// deletes nothing and returns false.
+//
+// Assigned volunteers are NOT deletable this way. They can be a group's
+// team_lead_id and can have visitors checked in through their token; unpicking
+// that is what deleteBootstrapSession's cascade is for.
+export async function deletePoolVolunteer(volunteerId: string): Promise<boolean> {
+  const rows = await sql`
+    DELETE FROM bootstrap_volunteers
+    WHERE id = ${volunteerId} AND session_id IS NULL
+    RETURNING id`;
+  return rows.length === 1;
 }
 
 // The session_id IS NULL guard makes this a one-way door: an already-assigned

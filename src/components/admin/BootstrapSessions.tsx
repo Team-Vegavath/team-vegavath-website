@@ -35,6 +35,13 @@ export default function BootstrapSessions({
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState("");
 
+  // S55 volunteer detail edit - name / phone / SRN, one row at a time
+  const [volEditId, setVolEditId] = useState<string | null>(null);
+  const [volName, setVolName] = useState("");
+  const [volPhone, setVolPhone] = useState("");
+  const [volSrn, setVolSrn] = useState("");
+  const [volError, setVolError] = useState("");
+
   async function activate(id: string) {
     setBusyId(id);
     try {
@@ -136,12 +143,82 @@ export default function BootstrapSessions({
     }
   }
 
+  // S55: the pool row can expand into either the assign form or the edit form,
+  // never both, so each opener closes the other.
+  function startVolunteerEdit(v: PoolVolunteer) {
+    setVolError("");
+    if (volEditId === v.id) {
+      setVolEditId(null);
+      return;
+    }
+    setAssignId(null);
+    setVolEditId(v.id);
+    setVolName(v.display_name);
+    setVolPhone(v.phone ?? "");
+    setVolSrn(v.srn ?? v.username);
+  }
+
+  async function saveVolunteer(volunteerId: string) {
+    setBusyId(volunteerId);
+    setVolError("");
+    try {
+      const res = await fetch(`/api/admin/bootstrap/volunteers/${volunteerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: volName.trim(),
+          phone: volPhone.trim(),
+          srn: volSrn.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setVolError(data?.error ?? "Update failed");
+        return;
+      }
+      setVolEditId(null);
+      // router.refresh() re-runs the server component and swaps the row in
+      // place - no reload, and no second copy of the pool in local state.
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // S55B: pool entries are duplicates, test rows and dropouts often enough to
+  // need a bin. Safe to hard-delete because a pool row has no session and so
+  // nothing references it -- see deletePoolVolunteer.
+  async function deleteVolunteer(v: PoolVolunteer) {
+    if (
+      !confirm(
+        `Delete the pre-registration for "${v.display_name}" (${v.username})? This cannot be undone. They would have to register again.`
+      )
+    )
+      return;
+    setBusyId(v.id);
+    setVolError("");
+    try {
+      const res = await fetch(`/api/admin/bootstrap/volunteers/${v.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error ?? "Delete failed");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function startAssign(volunteerId: string) {
     setAssignError("");
     if (assignId === volunteerId) {
       setAssignId(null);
       return;
     }
+    setVolEditId(null);
     setAssignId(volunteerId);
     setAssignSessionId("");
     setAssignStallId("");
@@ -425,21 +502,120 @@ export default function BootstrapSessions({
                             -
                           </span>
                         ) : (
-                          <button
-                            className="admin-row-action"
-                            disabled={busyId === v.id || sessions.length === 0}
-                            title={
-                              sessions.length === 0
-                                ? "Create a session first"
-                                : "Assign to a session stall"
-                            }
-                            onClick={() => startAssign(v.id)}
+                          <span
+                            style={{ display: "inline-flex", gap: "0.5rem", flexWrap: "wrap" }}
                           >
-                            {assignId === v.id ? "CANCEL" : "ASSIGN"}
-                          </button>
+                            <button
+                              className="admin-row-action"
+                              disabled={busyId === v.id || sessions.length === 0}
+                              title={
+                                sessions.length === 0
+                                  ? "Create a session first"
+                                  : "Assign to a session stall"
+                              }
+                              onClick={() => startAssign(v.id)}
+                            >
+                              {assignId === v.id ? "CANCEL" : "ASSIGN"}
+                            </button>
+                            {/* S55: fix a typo in what the volunteer typed at
+                                registration. Not a password reset. */}
+                            <button
+                              className="admin-row-action"
+                              disabled={busyId === v.id}
+                              onClick={() => startVolunteerEdit(v)}
+                            >
+                              {volEditId === v.id ? "CANCEL" : "EDIT"}
+                            </button>
+                            <button
+                              className="admin-row-action admin-row-action-danger"
+                              disabled={busyId === v.id}
+                              title="Remove this pre-registration entirely"
+                              onClick={() => deleteVolunteer(v)}
+                            >
+                              DELETE
+                            </button>
+                          </span>
                         )}
                       </td>
                     </tr>
+
+                    {volEditId === v.id && !isViewer && (
+                      <tr>
+                        <td colSpan={6} style={{ background: "var(--bg-elevated)" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "1rem",
+                              alignItems: "flex-end",
+                              flexWrap: "wrap",
+                              padding: "0.5rem 0",
+                            }}
+                          >
+                            <div>
+                              <label htmlFor={`bs-vol-name-${v.id}`} className="admin-label">
+                                Full name
+                              </label>
+                              <input
+                                id={`bs-vol-name-${v.id}`}
+                                type="text"
+                                className="admin-input"
+                                value={volName}
+                                onChange={(e) => setVolName(e.target.value)}
+                                maxLength={100}
+                                style={{ width: "16rem" }}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`bs-vol-phone-${v.id}`} className="admin-label">
+                                Phone
+                              </label>
+                              <input
+                                id={`bs-vol-phone-${v.id}`}
+                                type="tel"
+                                className="admin-input"
+                                value={volPhone}
+                                onChange={(e) => setVolPhone(e.target.value)}
+                                maxLength={20}
+                                style={{ width: "10rem" }}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`bs-vol-srn-${v.id}`} className="admin-label">
+                                SRN / PRN
+                              </label>
+                              <input
+                                id={`bs-vol-srn-${v.id}`}
+                                type="text"
+                                className="admin-input"
+                                value={volSrn}
+                                onChange={(e) => setVolSrn(e.target.value)}
+                                maxLength={40}
+                                style={{ width: "12rem" }}
+                              />
+                            </div>
+                            <button
+                              className="btn-primary"
+                              style={{ padding: "0.55rem 1.1rem", fontSize: "0.7rem", cursor: "pointer" }}
+                              disabled={busyId === v.id || !volName.trim() || !volSrn.trim()}
+                              onClick={() => saveVolunteer(v.id)}
+                            >
+                              {busyId === v.id ? "SAVING…" : "SAVE"}
+                            </button>
+                          </div>
+                          {/* Changing the SRN changes the login username too --
+                              say so, because the volunteer has to be told. */}
+                          <p className="admin-hint" style={{ marginTop: "0.5rem" }}>
+                            The SRN is also the login username. Changing it changes
+                            how this volunteer signs in; the password is unchanged.
+                          </p>
+                          {volError && (
+                            <p className="admin-error" style={{ marginTop: "0.5rem" }}>
+                              {volError}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
 
                     {assignId === v.id && !isViewer && (
                       <tr>

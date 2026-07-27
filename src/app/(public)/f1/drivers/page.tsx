@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import F1Paused from "@/components/f1/F1Paused";
 import { F1Empty, F1Section, F1Table } from "@/components/f1/F1Table";
-import { getF1AllDrivers, getF1DriverStandings } from "@/lib/services/f1";
+import { driverImage, getF1AllDrivers, getF1DriverStandings } from "@/lib/services/f1";
 import { getF1Enabled } from "@/lib/services/settings";
 
 export const metadata: Metadata = {
@@ -81,7 +81,7 @@ export default async function F1DriversPage({
         subtitle="Points and wins are this season's totals"
       >
         <F1Table
-          headers={["Pos", "Driver", "Code", "Nationality", "Born", "Team", "Pts", "Wins"]}
+          headers={["", "Pos", "Driver", "Code", "Nationality", "Born", "Team", "Pts", "Wins"]}
         >
           {current.length > 0 ? (
             current.map((row) => (
@@ -89,6 +89,37 @@ export default async function F1DriversPage({
                 key={row.Driver.driverId}
                 className={row.position === "1" ? "f1-leader" : undefined}
               >
+                {/* S55: 32x40 crop of the R2 full-body shot. Only the current
+                    grid gets this column -- the archive table below is 30
+                    historical drivers a page, all of whom would render an
+                    identical grey block. */}
+                <td style={{ padding: "0.4rem 0.5rem", width: "40px" }}>
+                  {driverImage(row.Driver.driverId) ? (
+                    <div style={{ width: "32px", height: "40px", overflow: "hidden" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={driverImage(row.Driver.driverId)!}
+                        alt=""
+                        loading="lazy"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          objectPosition: "top center",
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "40px",
+                        background: "var(--border)",
+                        opacity: 0.4,
+                      }}
+                    />
+                  )}
+                </td>
                 <td className="f1-pos">{row.positionText}</td>
                 <td className="f1-name">
                   <Link href={`/f1/drivers/${row.Driver.driverId}`}>
@@ -104,7 +135,7 @@ export default async function F1DriversPage({
               </tr>
             ))
           ) : (
-            <F1Empty colSpan={8} message="Grid unavailable" />
+            <F1Empty colSpan={9} message="Grid unavailable" />
           )}
         </F1Table>
       </F1Section>

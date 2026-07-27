@@ -5,6 +5,7 @@ import F1Paused from "@/components/f1/F1Paused";
 import { F1Empty, F1Section, F1Table } from "@/components/f1/F1Table";
 import {
   constructorColor,
+  constructorLogo,
   getF1ConstructorStandings,
   getF1CurrentSchedule,
   getF1DriverStandings,
@@ -30,6 +31,47 @@ export const metadata: Metadata = {
 // inside services/f1.ts (6h standings, 1h next race, 24h reference data): a
 // re-render inside those windows re-uses the cached Jolpica payload.
 export const revalidate = 60;
+
+// S55: team cell -- logo where R2 has one, name where it does not. One component
+// for all three tables that carry a Team column. Takes an array because driver
+// standings can list two constructors for a mid-season switch; the other two
+// tables pass a single-element array.
+//
+// Plain <img> and not next/image on purpose: the logos have mixed aspect ratios
+// and are sized by height with width:auto, which next/image cannot do without
+// intrinsic dimensions. Same call the posts list card makes for R2 thumbnails.
+function TeamCell({
+  constructors,
+  height,
+}: {
+  constructors: { constructorId: string; name: string }[];
+  height: number;
+}) {
+  if (constructors.length === 0) return <>--</>;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+      {constructors.map((c) => {
+        const logo = constructorLogo(c.constructorId);
+        return logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={c.constructorId}
+            src={logo}
+            alt={c.name}
+            style={{
+              height: `${height}px`,
+              width: "auto",
+              objectFit: "contain",
+              verticalAlign: "middle",
+            }}
+          />
+        ) : (
+          <span key={c.constructorId}>{c.name}</span>
+        );
+      })}
+    </span>
+  );
+}
 
 function formatRaceDate(date: string, time?: string): string {
   const iso = time ? `${date}T${time}` : date;
@@ -155,7 +197,9 @@ export default async function F1Page() {
                   </Link>
                 </td>
                 <td>{row.Driver.nationality}</td>
-                <td>{row.Constructors.map((c) => c.name).join(", ")}</td>
+                <td>
+                  <TeamCell constructors={row.Constructors} height={20} />
+                </td>
                 <td className="f1-num">{row.points}</td>
                 <td className="f1-num">{row.wins}</td>
               </tr>
@@ -182,7 +226,33 @@ export default async function F1Page() {
                 }}
               >
                 <td className="f1-pos">{row.positionText}</td>
-                <td className="f1-name">{row.Constructor.name}</td>
+                {/* Name stays alongside the logo here -- this table is ABOUT the
+                    constructors, so dropping the text would leave the column
+                    unreadable for anyone who does not know the liveries. */}
+                <td className="f1-name">
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    {constructorLogo(row.Constructor.constructorId) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={constructorLogo(row.Constructor.constructorId)!}
+                        alt=""
+                        style={{
+                          height: "24px",
+                          width: "auto",
+                          objectFit: "contain",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    ) : null}
+                    {row.Constructor.name}
+                  </span>
+                </td>
                 <td>{row.Constructor.nationality}</td>
                 <td className="f1-num">{row.points}</td>
                 <td className="f1-num">{row.wins}</td>
@@ -221,7 +291,9 @@ export default async function F1Page() {
                     {row.Driver.givenName} {row.Driver.familyName}
                   </Link>
                 </td>
-                <td>{row.Constructor.name}</td>
+                <td>
+                  <TeamCell constructors={[row.Constructor]} height={20} />
+                </td>
                 <td className="f1-num">{row.laps}</td>
                 <td className="f1-num">{row.Time?.time ?? row.status}</td>
                 <td className="f1-num">{row.points}</td>

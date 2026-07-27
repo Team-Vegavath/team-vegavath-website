@@ -6,6 +6,7 @@ import F1Paused from "@/components/f1/F1Paused";
 import { F1Section } from "@/components/f1/F1Table";
 import {
   constructorColor,
+  driverImage,
   getF1DriverConstructors,
   getF1DriverInfo,
   getF1DriverSeasonStanding,
@@ -117,30 +118,58 @@ export default async function F1DriverPage({ params }: DriverPageProps) {
           flexWrap: "wrap",
         }}
       >
-        {/* S54: placeholder, not a photo. Jolpica serves no headshots and R2
-            has none, so this is a flat block in the driver's team colour with an
-            inline helmet silhouette. F1Driver has no constructorId -- the team
-            comes off the standings row, and pre-1950s archive drivers with no
-            standing fall through to constructorColor's token default. Swap the
-            svg for an <Image> once R2 has headshots. */}
-        <div
-          aria-hidden="true"
-          style={{
-            width: "104px",
-            height: "104px",
-            flexShrink: 0,
-            background: constructorColor(standing?.Constructors[0]?.constructorId),
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
-            <ellipse cx="30" cy="24" rx="18" ry="16" fill="var(--bg-base)" opacity="0.55" />
-            <rect x="15" y="32" width="30" height="12" fill="var(--bg-base)" opacity="0.55" />
-            <rect x="18" y="27" width="24" height="8" fill="var(--bg-base)" opacity="0.35" />
-          </svg>
-        </div>
+        {/* S55: R2 now holds full-body shots for the current grid, so the S54
+            helmet-silhouette placeholder is the fallback rather than the whole
+            treatment. Historical and reserve drivers keep it. F1Driver has no
+            constructorId -- the team colour comes off the standings row, and
+            pre-1950s archive drivers with no standing fall through to
+            constructorColor's token default. */}
+        {driverImage(driver.driverId) ? (
+          <div
+            style={{
+              width: "160px",
+              height: "200px",
+              flexShrink: 0,
+              overflow: "hidden",
+              // Team colour behind the shot: the source PNGs are cut-outs, so
+              // without it a transparent edge sits on the page background.
+              background: constructorColor(standing?.Constructors[0]?.constructorId),
+            }}
+          >
+            {/* Plain <img>: same call the posts list card makes for R2 art. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={driverImage(driver.driverId)!}
+              alt={`${driver.givenName} ${driver.familyName}`}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                // Crops from the top of a full-body suit shot: head and torso.
+                objectPosition: "top center",
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            aria-hidden="true"
+            style={{
+              width: "104px",
+              height: "104px",
+              flexShrink: 0,
+              background: constructorColor(standing?.Constructors[0]?.constructorId),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+              <ellipse cx="30" cy="24" rx="18" ry="16" fill="var(--bg-base)" opacity="0.55" />
+              <rect x="15" y="32" width="30" height="12" fill="var(--bg-base)" opacity="0.55" />
+              <rect x="18" y="27" width="24" height="8" fill="var(--bg-base)" opacity="0.35" />
+            </svg>
+          </div>
+        )}
 
         <div>
           {driver.code ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 
@@ -42,6 +42,13 @@ export default function BootstrapAdminDashboard({
   const [newStallOcc, setNewStallOcc] = useState(1);
   const [stallBusy, setStallBusy] = useState<string | null>(null);
   const [stallError, setStallError] = useState("");
+  // S55 volunteer detail edit - name / phone / SRN, one row at a time
+  const [volEditId, setVolEditId] = useState<string | null>(null);
+  const [volName, setVolName] = useState("");
+  const [volPhone, setVolPhone] = useState("");
+  const [volSrn, setVolSrn] = useState("");
+  const [volBusy, setVolBusy] = useState<string | null>(null);
+  const [volError, setVolError] = useState("");
   const [feedback, setFeedback] = useState<BootstrapFeedbackSummary | null>(null);
   // S38: Gemini feedback summary modal
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -241,6 +248,45 @@ export default function BootstrapAdminDashboard({
     .filter((v) => v.role === "lead")
     .sort((a, b) => (a.group_number ?? Infinity) - (b.group_number ?? Infinity));
 
+  function startVolunteerEdit(v: BootstrapVolunteer) {
+    setVolError("");
+    if (volEditId === v.id) {
+      setVolEditId(null);
+      return;
+    }
+    setVolEditId(v.id);
+    setVolName(v.display_name);
+    setVolPhone(v.phone ?? "");
+    setVolSrn(v.srn ?? v.username);
+  }
+
+  async function saveVolunteer(volunteerId: string) {
+    setVolBusy(volunteerId);
+    setVolError("");
+    try {
+      const res = await fetch(`/api/admin/bootstrap/volunteers/${volunteerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: volName.trim(),
+          phone: volPhone.trim(),
+          srn: volSrn.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setVolError(data?.error ?? "Update failed");
+        return;
+      }
+      setVolEditId(null);
+      // poll() already re-reads stalls + volunteers into local state, so the
+      // edited row swaps in without a second copy of the update logic.
+      await poll();
+    } finally {
+      setVolBusy(null);
+    }
+  }
+
   async function suggest(volunteerId: string, stallId: string | null) {
     await fetch(`/api/admin/bootstrap/volunteers/${volunteerId}/suggest`, {
       method: "PATCH",
@@ -248,6 +294,33 @@ export default function BootstrapAdminDashboard({
       body: JSON.stringify({ stall_id: stallId }),
     }).catch(() => {});
     poll();
+  }
+
+  // S55B: move a volunteer between the two tables mid-event. The /role route
+  // and setVolunteerRole both predate this session; only the UI was missing.
+  // Confirmed rather than one-click because it moves the row to another table
+  // and swaps which dashboard the volunteer sees on their next /bootstrap load.
+  async function changeRole(v: BootstrapVolunteer) {
+    const next = v.role === "lead" ? "stall" : "lead";
+    if (
+      !window.confirm(
+        next === "lead"
+          ? `Make ${v.display_name} a group volunteer? They get the lead dashboard and a QR check-in code. Their stall assignment is kept in case you switch back.`
+          : `Make ${v.display_name} a stall volunteer? They lose the lead dashboard. Any group they lead keeps its visitors and needs a new lead.`
+      )
+    )
+      return;
+    setVolBusy(v.id);
+    try {
+      await fetch(`/api/admin/bootstrap/volunteers/${v.id}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: next }),
+      }).catch(() => {});
+      await poll();
+    } finally {
+      setVolBusy(null);
+    }
   }
 
   // shared cells for the two volunteer tables (S35)
@@ -296,9 +369,59 @@ export default function BootstrapAdminDashboard({
         whiteSpace: "nowrap",
       }}
     >
-      {v.login_code ?? "—"}
+      {v.login_code ?? "-"}
     </code>
   );
+
+  // S55B: was inline in the Group Volunteers table only. Stall volunteers are
+  // the ones who actually stand at a stall, so having no way to re-point them
+  // was the gap -- lifted here verbatim and used by both tables.
+  // value pinned to "" so the select re-arms after each pick.
+  const stallSelect = (v: BootstrapVolunteer) =>
+    isViewer ? null : (
+      <select
+        value=""
+        disabled={volBusy === v.id}
+        onChange={(e) => {
+          if (e.target.value === "") return;
+          suggest(v.id, e.target.value === "clear" ? null : e.target.value);
+        }}
+        style={{
+          background: "var(--bg-base)",
+          color: "var(--text-secondary)",
+          border: "1px solid var(--border)",
+          padding: "6px 8px",
+          fontFamily: "var(--font-mono), monospace",
+          fontSize: "11px",
+          minHeight: "36px",
+          cursor: "pointer",
+        }}
+      >
+        <option value="">{v.suggested_stall_name ? "MOVE STALL..." : "SUGGEST STALL..."}</option>
+        <option value="clear">-- CLEAR --</option>
+        {stalls.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.stall_name}
+          </option>
+        ))}
+      </select>
+    );
+
+  const roleButton = (v: BootstrapVolunteer) =>
+    isViewer ? null : (
+      <button
+        className="admin-row-action"
+        disabled={volBusy === v.id}
+        title={
+          v.role === "lead"
+            ? "Move to the Stall Volunteers table"
+            : "Move to the Group Volunteers table"
+        }
+        onClick={() => changeRole(v)}
+      >
+        {v.role === "lead" ? "TO STALL" : "TO GROUP"}
+      </button>
+    );
 
   const unlockButton = (v: BootstrapVolunteer) =>
     v.is_active && !isViewer ? (
@@ -309,6 +432,97 @@ export default function BootstrapAdminDashboard({
       >
         UNLOCK
       </button>
+    ) : null;
+
+  // S55: same volunteer detail edit the pre-registration pool got, for
+  // volunteers already assigned to this session. Two tables render it, so it
+  // lives with the other shared cells rather than being written twice.
+  const editButton = (v: BootstrapVolunteer) =>
+    isViewer ? null : (
+      <button
+        className="admin-row-action"
+        disabled={volBusy === v.id}
+        onClick={() => startVolunteerEdit(v)}
+      >
+        {volEditId === v.id ? "CANCEL" : "EDIT"}
+      </button>
+    );
+
+  const volunteerEditRow = (v: BootstrapVolunteer, colSpan: number) =>
+    volEditId === v.id && !isViewer ? (
+      <tr>
+        <td colSpan={colSpan} style={{ background: "var(--bg-elevated)" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "1rem",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              padding: "0.5rem 0",
+            }}
+          >
+            <div>
+              <label htmlFor={`bs-vol-name-${v.id}`} className="admin-label">
+                Full name
+              </label>
+              <input
+                id={`bs-vol-name-${v.id}`}
+                type="text"
+                className="admin-input"
+                value={volName}
+                onChange={(e) => setVolName(e.target.value)}
+                maxLength={100}
+                style={{ width: "16rem" }}
+              />
+            </div>
+            <div>
+              <label htmlFor={`bs-vol-phone-${v.id}`} className="admin-label">
+                Phone
+              </label>
+              <input
+                id={`bs-vol-phone-${v.id}`}
+                type="tel"
+                className="admin-input"
+                value={volPhone}
+                onChange={(e) => setVolPhone(e.target.value)}
+                maxLength={20}
+                style={{ width: "10rem" }}
+              />
+            </div>
+            <div>
+              <label htmlFor={`bs-vol-srn-${v.id}`} className="admin-label">
+                SRN / PRN
+              </label>
+              <input
+                id={`bs-vol-srn-${v.id}`}
+                type="text"
+                className="admin-input"
+                value={volSrn}
+                onChange={(e) => setVolSrn(e.target.value)}
+                maxLength={40}
+                style={{ width: "12rem" }}
+              />
+            </div>
+            <button
+              className="btn-primary"
+              style={{ padding: "0.55rem 1.1rem", fontSize: "0.7rem", cursor: "pointer" }}
+              disabled={volBusy === v.id || !volName.trim() || !volSrn.trim()}
+              onClick={() => saveVolunteer(v.id)}
+            >
+              {volBusy === v.id ? "SAVING…" : "SAVE"}
+            </button>
+          </div>
+          <p className="admin-hint" style={{ marginTop: "0.5rem" }}>
+            The SRN is also the login username. Changing it changes how this
+            volunteer signs in; the login code is unchanged.
+          </p>
+          {volError && (
+            <p className="admin-error" style={{ marginTop: "0.5rem" }}>
+              {volError}
+            </p>
+          )}
+        </td>
+      </tr>
     ) : null;
 
   const loadFeedback = useCallback(async () => {
@@ -695,15 +909,27 @@ export default function BootstrapAdminDashboard({
             <tbody>
               {stallVolunteers.length > 0 ? (
                 stallVolunteers.map((v) => (
-                  <tr key={v.id}>
-                    <td className="admin-td-primary">{v.display_name}</td>
-                    <td className="admin-cell-mono">{v.username}</td>
-                    <td>{v.suggested_stall_name ?? "—"}</td>
-                    <td className="admin-cell-mono">{v.phone ?? "—"}</td>
-                    <td>{loginCode(v)}</td>
-                    <td>{statusBadge(v)}</td>
-                    <td>{unlockButton(v)}</td>
-                  </tr>
+                  <Fragment key={v.id}>
+                    <tr>
+                      <td className="admin-td-primary">{v.display_name}</td>
+                      <td className="admin-cell-mono">{v.username}</td>
+                      <td>{v.suggested_stall_name ?? "-"}</td>
+                      <td className="admin-cell-mono">{v.phone ?? "-"}</td>
+                      <td>{loginCode(v)}</td>
+                      <td>{statusBadge(v)}</td>
+                      <td>
+                        <div
+                          style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}
+                        >
+                          {stallSelect(v)}
+                          {unlockButton(v)}
+                          {editButton(v)}
+                          {roleButton(v)}
+                        </div>
+                      </td>
+                    </tr>
+                    {volunteerEditRow(v, 7)}
+                  </Fragment>
                 ))
               ) : (
                 <tr>
@@ -738,13 +964,14 @@ export default function BootstrapAdminDashboard({
             <tbody>
               {groupVolunteers.length > 0 ? (
                 groupVolunteers.map((v) => (
-                  <tr key={v.id}>
+                  <Fragment key={v.id}>
+                  <tr>
                     <td className="admin-td-primary">{v.display_name}</td>
                     <td className="admin-cell-mono">{v.username}</td>
                     <td className="admin-cell-mono">
                       {v.group_number ? `Group ${v.group_number}` : "Not assigned"}
                     </td>
-                    <td className="admin-cell-mono">{v.phone ?? "—"}</td>
+                    <td className="admin-cell-mono">{v.phone ?? "-"}</td>
                     <td>{loginCode(v)}</td>
                     <td>{statusBadge(v)}</td>
                     <td>
@@ -764,7 +991,7 @@ export default function BootstrapAdminDashboard({
                           IN CLASS
                         </span>
                       ) : (
-                        "—"
+                        "-"
                       )}
                     </td>
                     <td>
@@ -783,38 +1010,15 @@ export default function BootstrapAdminDashboard({
                             {v.suggested_stall_name}
                           </span>
                         )}
-                        {/* value pinned to "" so the select re-arms after each pick */}
-                        {isViewer ? null : (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (e.target.value === "") return;
-                            suggest(v.id, e.target.value === "clear" ? null : e.target.value);
-                          }}
-                          style={{
-                            background: "var(--bg-base)",
-                            color: "var(--text-secondary)",
-                            border: "1px solid var(--border)",
-                            padding: "6px 8px",
-                            fontFamily: "var(--font-mono), monospace",
-                            fontSize: "11px",
-                            minHeight: "36px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <option value="">SUGGEST STALL...</option>
-                          <option value="clear">-- CLEAR --</option>
-                          {stalls.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.stall_name}
-                            </option>
-                          ))}
-                        </select>
-                        )}
+                        {stallSelect(v)}
                         {unlockButton(v)}
+                        {editButton(v)}
+                        {roleButton(v)}
                       </div>
                     </td>
                   </tr>
+                  {volunteerEditRow(v, 8)}
+                  </Fragment>
                 ))
               ) : (
                 <tr>
@@ -897,14 +1101,14 @@ export default function BootstrapAdminDashboard({
             {[
               {
                 label: "Avg overall",
-                value: feedback.avgOverall != null ? `${feedback.avgOverall.toFixed(2)} / 10` : "—",
+                value: feedback.avgOverall != null ? `${feedback.avgOverall.toFixed(2)} / 10` : "-",
               },
               {
                 label: "Avg join likelihood",
                 value:
                   feedback.avgJoinLikelihood != null
                     ? `${feedback.avgJoinLikelihood.toFixed(2)} / 5`
-                    : "—",
+                    : "-",
               },
               { label: "Responses", value: String(feedback.total) },
             ].map((stat) => (
@@ -1001,7 +1205,7 @@ export default function BootstrapAdminDashboard({
                     marginRight: "0.6rem",
                   }}
                 >
-                  {c.rating != null ? `${c.rating}/5` : "—"}
+                  {c.rating != null ? `${c.rating}/5` : "-"}
                   {c.stall_name ? ` · ${c.stall_name}` : ""}
                 </span>
                 {c.comment}

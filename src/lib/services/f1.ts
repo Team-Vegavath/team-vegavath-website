@@ -174,8 +174,9 @@ interface RaceResponse {
 // S54: brand colours for the current grid, keyed by Jolpica's constructorId.
 // Lives here rather than in a component because three pages read it (/f1 for
 // both standings tables, /f1/drivers/[driverId] for the placeholder).
-// No logo images: F1 team logos are trademarked and R2 has none, so a colour is
-// the whole treatment. Historical constructors fall through to a token.
+// S55: R2 now holds logos for the current grid (see CONSTRUCTOR_LOGOS below), so
+// the colour is no longer the whole treatment -- it still drives the row border
+// and the historical-driver placeholder, where no image exists.
 const CONSTRUCTOR_COLORS: Record<string, string> = {
   ferrari: "#E8002D",
   mclaren: "#FF8000",
@@ -191,6 +192,60 @@ const CONSTRUCTOR_COLORS: Record<string, string> = {
 
 export function constructorColor(id: string | undefined): string {
   return (id && CONSTRUCTOR_COLORS[id]) || "var(--border-strong)";
+}
+
+// ------------------------------------------------------------ constructor logos
+// S55: real imagery for the current grid. Keyed by Jolpica constructorId; the R2
+// filenames mostly match, and the two that do not are noted inline. Historical
+// constructors are absent on purpose and fall back to the colour treatment.
+const R2 = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev";
+
+const CONSTRUCTOR_LOGOS: Record<string, string> = {
+  red_bull: `${R2}/f1/constructors/red_bull.png`,
+  ferrari: `${R2}/f1/constructors/ferrari.png`,
+  mclaren: `${R2}/f1/constructors/mclaren.jpg`,
+  mercedes: `${R2}/f1/constructors/mercedes_amg.png`, // file: mercedes_amg
+  audi: `${R2}/f1/constructors/audi.png`,
+  haas: `${R2}/f1/constructors/haas.jpg`,
+  aston_martin: `${R2}/f1/constructors/aston_martin.jpg`,
+  rb: `${R2}/f1/constructors/vcarb.jpg`, // file: vcarb
+  alpine: `${R2}/f1/constructors/alpine.jpg`,
+  cadillac: `${R2}/f1/constructors/cadillac.jpg`,
+  williams: `${R2}/f1/constructors/williams.png`,
+};
+
+// Driver filenames already match Jolpica driverIds exactly.
+const DRIVER_IMAGES: Record<string, string> = {
+  george_russell: `${R2}/f1/drivers/george_russell.png`,
+  kimi_antonelli: `${R2}/f1/drivers/kimi_antonelli.png`,
+  charles_leclerc: `${R2}/f1/drivers/charles_leclerc.png`,
+  lewis_hamilton: `${R2}/f1/drivers/lewis_hamilton.png`,
+  lando_norris: `${R2}/f1/drivers/lando_norris.png`,
+  oscar_piastri: `${R2}/f1/drivers/oscar_piastri.png`,
+  max_verstappen: `${R2}/f1/drivers/max_verstappen.png`,
+  isack_hadjar: `${R2}/f1/drivers/isack_hadjar.png`,
+  liam_lawson: `${R2}/f1/drivers/liam_lawson.png`,
+  arvid_lindblad: `${R2}/f1/drivers/arvid_lindblad.png`,
+  pierre_gasly: `${R2}/f1/drivers/pierre_gasly.png`,
+  franco_colapinto: `${R2}/f1/drivers/franco_colapinto.png`,
+  esteban_ocon: `${R2}/f1/drivers/esteban_ocon.png`,
+  oliver_bearman: `${R2}/f1/drivers/oliver_bearman.png`,
+  nico_hulkenberg: `${R2}/f1/drivers/nico_hulkenberg.png`,
+  gabriel_bortoleto: `${R2}/f1/drivers/gabriel_bortoleto.png`,
+  carlos_sainz: `${R2}/f1/drivers/carlos_sainz.png`,
+  alexander_albon: `${R2}/f1/drivers/alexander_albon.png`,
+  fernando_alonso: `${R2}/f1/drivers/fernando_alonso.png`,
+  lance_stroll: `${R2}/f1/drivers/lance_stroll.png`,
+  sergio_perez: `${R2}/f1/drivers/sergio_perez.png`,
+  valtteri_bottas: `${R2}/f1/drivers/valtteri_bottas.png`,
+};
+
+export function constructorLogo(id: string | undefined): string | null {
+  return (id && CONSTRUCTOR_LOGOS[id]) || null;
+}
+
+export function driverImage(id: string | undefined): string | null {
+  return (id && DRIVER_IMAGES[id]) || null;
 }
 
 // ------------------------------------------------------- standings and results
