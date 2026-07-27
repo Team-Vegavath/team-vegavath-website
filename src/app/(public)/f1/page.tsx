@@ -84,7 +84,18 @@ function formatRaceDate(date: string, time?: string): string {
   });
 }
 
-export default async function F1Page() {
+export default async function F1Page({
+  searchParams,
+}: {
+  // S56: reading searchParams opts this page into dynamic rendering, so the
+  // revalidate above no longer gates anything -- the kill switch now takes
+  // effect on the next request instead of within a minute, which is strictly
+  // better. Jolpica egress is unchanged: it is bounded by the per-fetch
+  // revalidate windows in services/f1.ts, not by the page.
+  searchParams: Promise<{ constructor?: string }>;
+}) {
+  const { constructor: activeConstructor } = await searchParams;
+
   // Kill switch first: if this is off, not a single Jolpica request is made.
   const f1Enabled = await getF1Enabled().catch(() => false);
   if (!f1Enabled) return <F1Paused />;
@@ -99,6 +110,15 @@ export default async function F1Page() {
 
   const season =
     drivers?.season ?? schedule[0]?.season ?? new Date().getFullYear().toString();
+
+  // The filter only narrows the driver standings table. Constructor standings,
+  // the last race and the calendar are unaffected on purpose -- filtering those
+  // to one team leaves a one-row table and a calendar that says nothing.
+  const driverRows = activeConstructor
+    ? (drivers?.standings ?? []).filter((row) =>
+        row.Constructors.some((c) => c.constructorId === activeConstructor)
+      )
+    : (drivers?.standings ?? []);
 
   return (
     <>
@@ -170,6 +190,86 @@ export default async function F1Page() {
         )}
       </F1Section>
 
+      {/* CONSTRUCTOR FILTER -- narrows the driver standings table only.
+          Plain links, not client state: the filter is a URL the user can share
+          and the page is already a server component. */}
+      {constructors && constructors.standings.length > 0 ? (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+            marginBottom: "1.25rem",
+            alignItems: "center",
+          }}
+        >
+          <Link
+            href="/f1#standings"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.7rem",
+              padding: "0.35rem 0.75rem",
+              border: `1px solid ${!activeConstructor ? "var(--accent)" : "var(--border)"}`,
+              color: !activeConstructor ? "var(--accent)" : "var(--text-muted)",
+              textDecoration: "none",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            All
+          </Link>
+          {constructors.standings.map((standing) => {
+            const cId = standing.Constructor.constructorId;
+            const logo = constructorLogo(cId);
+            const isActive = activeConstructor === cId;
+            return (
+              <Link
+                key={cId}
+                href={isActive ? "/f1#standings" : `/f1?constructor=${cId}#standings`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  padding: "0.35rem 0.6rem",
+                  border: `1px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                  background: isActive
+                    ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                    : "transparent",
+                  textDecoration: "none",
+                }}
+              >
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logo}
+                    alt=""
+                    style={{
+                      height: "18px",
+                      width: "auto",
+                      maxWidth: "40px",
+                      objectFit: "contain",
+                    }}
+                  />
+                ) : null}
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "0.68rem",
+                    color: isActive ? "var(--accent)" : "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {standing.Constructor.name}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* DRIVER STANDINGS */}
       <F1Section
         id="standings"
@@ -179,8 +279,8 @@ export default async function F1Page() {
         <F1Table
           headers={["Pos", "Driver", "Nationality", "Team", "Pts", "Wins"]}
         >
-          {drivers && drivers.standings.length > 0 ? (
-            drivers.standings.map((row) => (
+          {driverRows.length > 0 ? (
+            driverRows.map((row) => (
               <tr
                 key={row.Driver.driverId}
                 className={row.position === "1" ? "f1-leader" : undefined}
@@ -205,7 +305,14 @@ export default async function F1Page() {
               </tr>
             ))
           ) : (
-            <F1Empty colSpan={6} message="Standings unavailable" />
+            <F1Empty
+              colSpan={6}
+              message={
+                activeConstructor && drivers
+                  ? "No drivers for that constructor"
+                  : "Standings unavailable"
+              }
+            />
           )}
         </F1Table>
       </F1Section>
@@ -250,7 +357,19 @@ export default async function F1Page() {
                         }}
                       />
                     ) : null}
-                    {row.Constructor.name}
+                    {/* Jolpica ships a Wikipedia url on every Constructor. */}
+                    <a
+                      href={row.Constructor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "inherit",
+                        textDecoration: "underline",
+                        textDecorationColor: "var(--border)",
+                      }}
+                    >
+                      {row.Constructor.name}
+                    </a>
                   </span>
                 </td>
                 <td>{row.Constructor.nationality}</td>

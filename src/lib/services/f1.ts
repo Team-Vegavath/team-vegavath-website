@@ -214,30 +214,37 @@ const CONSTRUCTOR_LOGOS: Record<string, string> = {
   williams: `${R2}/f1/constructors/williams.png`,
 };
 
-// Driver filenames already match Jolpica driverIds exactly.
+// S56: the keys here are Jolpica driverIds, which are NOT the R2 filenames.
+// Jolpica uses the bare surname wherever it is unambiguous ("hamilton",
+// "norris") and only falls back to firstname_lastname when it is not
+// ("max_verstappen", "arvid_lindblad"). S55 keyed the whole map on the R2
+// filename, so every lookup but those two missed and the grid rendered
+// placeholders. Keys verified against a live /f1/2026/drivers.json.
+// The 2026 entry list also carries nine reserve/junior drivers with no image in
+// R2 -- they are absent here on purpose and fall back to the placeholder.
 const DRIVER_IMAGES: Record<string, string> = {
-  george_russell: `${R2}/f1/drivers/george_russell.png`,
-  kimi_antonelli: `${R2}/f1/drivers/kimi_antonelli.png`,
-  charles_leclerc: `${R2}/f1/drivers/charles_leclerc.png`,
-  lewis_hamilton: `${R2}/f1/drivers/lewis_hamilton.png`,
-  lando_norris: `${R2}/f1/drivers/lando_norris.png`,
-  oscar_piastri: `${R2}/f1/drivers/oscar_piastri.png`,
+  russell: `${R2}/f1/drivers/george_russell.png`,
+  antonelli: `${R2}/f1/drivers/kimi_antonelli.png`,
+  leclerc: `${R2}/f1/drivers/charles_leclerc.png`,
+  hamilton: `${R2}/f1/drivers/lewis_hamilton.png`,
+  norris: `${R2}/f1/drivers/lando_norris.png`,
+  piastri: `${R2}/f1/drivers/oscar_piastri.png`,
   max_verstappen: `${R2}/f1/drivers/max_verstappen.png`,
-  isack_hadjar: `${R2}/f1/drivers/isack_hadjar.png`,
-  liam_lawson: `${R2}/f1/drivers/liam_lawson.png`,
+  hadjar: `${R2}/f1/drivers/isack_hadjar.png`,
+  lawson: `${R2}/f1/drivers/liam_lawson.png`,
   arvid_lindblad: `${R2}/f1/drivers/arvid_lindblad.png`,
-  pierre_gasly: `${R2}/f1/drivers/pierre_gasly.png`,
-  franco_colapinto: `${R2}/f1/drivers/franco_colapinto.png`,
-  esteban_ocon: `${R2}/f1/drivers/esteban_ocon.png`,
-  oliver_bearman: `${R2}/f1/drivers/oliver_bearman.png`,
-  nico_hulkenberg: `${R2}/f1/drivers/nico_hulkenberg.png`,
-  gabriel_bortoleto: `${R2}/f1/drivers/gabriel_bortoleto.png`,
-  carlos_sainz: `${R2}/f1/drivers/carlos_sainz.png`,
-  alexander_albon: `${R2}/f1/drivers/alexander_albon.png`,
-  fernando_alonso: `${R2}/f1/drivers/fernando_alonso.png`,
-  lance_stroll: `${R2}/f1/drivers/lance_stroll.png`,
-  sergio_perez: `${R2}/f1/drivers/sergio_perez.png`,
-  valtteri_bottas: `${R2}/f1/drivers/valtteri_bottas.png`,
+  gasly: `${R2}/f1/drivers/pierre_gasly.png`,
+  colapinto: `${R2}/f1/drivers/franco_colapinto.png`,
+  ocon: `${R2}/f1/drivers/esteban_ocon.png`,
+  bearman: `${R2}/f1/drivers/oliver_bearman.png`,
+  hulkenberg: `${R2}/f1/drivers/nico_hulkenberg.png`,
+  bortoleto: `${R2}/f1/drivers/gabriel_bortoleto.png`,
+  sainz: `${R2}/f1/drivers/carlos_sainz.png`,
+  albon: `${R2}/f1/drivers/alexander_albon.png`,
+  alonso: `${R2}/f1/drivers/fernando_alonso.png`,
+  stroll: `${R2}/f1/drivers/lance_stroll.png`,
+  perez: `${R2}/f1/drivers/sergio_perez.png`,
+  bottas: `${R2}/f1/drivers/valtteri_bottas.png`,
 };
 
 export function constructorLogo(id: string | undefined): string | null {
