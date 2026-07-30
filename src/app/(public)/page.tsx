@@ -151,7 +151,7 @@ export default async function HomePage() {
             JOIN THE TEAM
           </h2>
           <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
-            Build karts, ship code, and run the biggest events on campus, with 85 students who take it seriously.
+            Build karts, ship code, and run the biggest events on campus, with 47 students who take it seriously.
           </p>
           <div style={{ marginTop: "2.25rem" }}>
             <Link
