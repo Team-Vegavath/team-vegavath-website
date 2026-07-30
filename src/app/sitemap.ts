@@ -9,6 +9,10 @@ const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: "/", priority: 1.0 },
   { path: "/about", priority: 0.9 },
   { path: "/events", priority: 0.9 },
+  // S60/D4. /projects/combat-bot is deliberately absent: it is a
+  // "check back soon" stub, and submitting thin content wins nothing.
+  { path: "/projects", priority: 0.8 },
+  { path: "/projects/kart", priority: 0.8 },
   { path: "/crew", priority: 0.8 },
   { path: "/join", priority: 0.8 },
   { path: "/gallery", priority: 0.7 },

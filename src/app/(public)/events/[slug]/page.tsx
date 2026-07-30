@@ -131,8 +131,15 @@ export default async function EventDetailPage({ params }: EventPageProps) {
                 {showRegistration ? (
                   <div style={{ marginTop: "2rem" }}>
                     {event.registration_open ? (
-                      <Link href={`/events/${event.slug}/register`} className="btn-primary">
-                        REGISTER
+                      /* S60/D3: dot-expand REGISTER. The hover (gap 0.75rem ->
+                         1.25rem, accent -> accent-hover) is .btn-register in
+                         globals.css, not inline onMouseEnter handlers -- this
+                         page is an async server component, and adding a client
+                         boundary just to reproduce :hover would be backwards.
+                         Routing and the registration_open gate are untouched. */
+                      <Link href={`/events/${event.slug}/register`} className="btn-register">
+                        <span>REGISTER</span>
+                        <span className="btn-register-dot" aria-hidden="true" />
                       </Link>
                     ) : (
                       <p className="mono" style={{ fontSize: "0.8rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-muted)" }}>

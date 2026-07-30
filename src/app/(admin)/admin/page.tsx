@@ -6,6 +6,7 @@ import { AuthError } from "next-auth";
 
 import { auth, signIn } from "@/lib/auth";
 import { countRecentFailedLogins, logAdminLogin } from "@/lib/services/admin";
+import { GlyphMatrix } from "@/components/ui/glyph-matrix";
 
 export const metadata: Metadata = {
   title: "Admin Login",
@@ -69,9 +70,19 @@ export default async function AdminLoginPage({
     }
   }
 
+  /* S60/D3: split layout -- form left, Glyph Matrix visual right. Everything
+     above this line (handleLogin, the rate limit, the AuthError handling, the
+     redirects) is untouched; only the shell around the form changed. The form
+     JSX itself is byte-for-byte what it was, just re-parented.
+     Below 768px the right panel is display:none and the left goes full width
+     (.admin-login-* rules in globals.css) -- plain CSS rather than Tailwind
+     responsive prefixes, matching how the rest of this project does breakpoints. */
   return (
-    <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "var(--bg-base)", padding: "2.5rem 1rem" }}>
-      <section style={{ width: "100%", maxWidth: "28rem", border: "1px solid var(--border-strong)", background: "var(--bg-card)", padding: "2.5rem" }}>
+    <main style={{ display: "flex", minHeight: "100vh", background: "var(--bg-base)" }}>
+      <section
+        className="admin-login-left"
+        style={{ flex: "0 0 480px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "3rem", borderRight: "1px solid var(--border)" }}
+      >
         <Link
           href="/"
           className="mono"
@@ -133,6 +144,26 @@ export default async function AdminLoginPage({
         <p className="mono" style={{ marginTop: "1.75rem", fontSize: "0.65rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>
           All activity is monitored and logged
         </p>
+      </section>
+
+      {/* Right panel: Glyph Matrix. No wrapper opacity -- the component's own
+          per-cell alphas (0.05-0.5, times its bottom fade) ARE the subtlety
+          mechanism, and stacking a 0.2 on top of them renders it invisible.
+          It tints itself from `color: var(--accent)` rather than a color prop;
+          see the component header for why a token cannot be passed to canvas. */}
+      <section
+        className="admin-login-right"
+        style={{ flex: 1, position: "relative", overflow: "hidden", background: "var(--bg-elevated)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        <GlyphMatrix style={{ position: "absolute", inset: 0 }} />
+        <div style={{ position: "relative", zIndex: 1, textAlign: "center", padding: "2rem" }}>
+          <p className="heading" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "1rem" }}>
+            Team Vegavath Admin
+          </p>
+          <p className="mono" style={{ fontSize: "0.65rem", color: "var(--text-muted)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            Authorized access only
+          </p>
+        </div>
       </section>
     </main>
   );

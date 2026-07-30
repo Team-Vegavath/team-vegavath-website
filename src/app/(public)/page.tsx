@@ -9,7 +9,8 @@ import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
 import { Reveal } from "@/components/ui/Reveal";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
-import KartModelWrapper from "@/components/home/KartModelWrapper";
+import { TypewriterSubtitle } from "@/components/home/TypewriterSubtitle";
+import { Ripple } from "@/components/ui/ripple";
 
 export const metadata: Metadata = {
   title: {
@@ -57,19 +58,10 @@ export default async function HomePage() {
             VEGAVATH
           </h1>
 
-          <p
-            className="heading"
-            style={{
-              marginTop: "1.5rem",
-              fontWeight: 600,
-              fontSize: "clamp(0.8rem, 2vw, 1rem)",
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: "var(--accent)",
-            }}
-          >
-            Life At Full Throttle · PESU ECC
-          </p>
+          {/* S60: the static accent tagline is now a cycling typewriter. It
+              reproduces this element's exact styles, so the hero is unchanged
+              at rest. The VEGAVATH h1 above stays completely static. */}
+          <TypewriterSubtitle />
 
           <p style={{ marginTop: "0.9rem", fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "var(--text-secondary)" }}>
             Karts. Code. Innovation.
@@ -99,14 +91,33 @@ export default async function HomePage() {
         <StatsTicker />
       </BlurFade>
 
-      {/* 3D kart */}
+      {/* Projects teaser.
+          S60/D4: the 3D kart (KartModelWrapper -> KartModelSection) used to sit
+          here. It now lives only at /projects/kart, which is what clears
+          tasks.md's performance gate that no canvas/WebGL loads on the
+          homepage. This teaser takes its slot and drives traffic there, keeping
+          the same 5rem/1.5rem padding and 72rem measure so the page rhythm
+          below the stats ticker is unchanged. */}
       <section style={{ padding: "5rem 1.5rem" }}>
         <div className="mx-auto" style={{ maxWidth: "72rem" }}>
           <Reveal>
-            <h2 style={{ marginBottom: "3rem", fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 700 }}>
-              THE BUILD
-            </h2>
-            <KartModelWrapper />
+            <div style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "3rem 0" }}>
+              <p className="label-tech" style={{ marginBottom: "1rem", color: "var(--accent)" }}>
+                What we build
+              </p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
+                <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", fontWeight: 700, textTransform: "uppercase" }}>
+                  GO-KARTS. ROBOTS. MORE.
+                </h2>
+                <Link
+                  href="/projects"
+                  className="mono"
+                  style={{ fontSize: "0.75rem", color: "var(--accent)", textDecoration: "none", letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}
+                >
+                  VIEW PROJECTS →
+                </Link>
+              </div>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -157,13 +168,21 @@ export default async function HomePage() {
         <section
           className="pattern-speed-lines-strong"
           style={{
+            position: "relative",
+            overflow: "hidden",
             background: "var(--accent)",
             clipPath: "polygon(0 32px, 100% 0, 100% 100%, 0 100%)",
             padding: "7rem 1.5rem 5.5rem",
             marginTop: "2rem",
           }}
         >
-          <div className="mx-auto" style={{ maxWidth: "56rem", textAlign: "center" }}>
+          {/* S60: Ripple as background texture. The rings are var(--bg-base),
+              not var(--accent) -- this panel's own background IS the accent, so
+              accent rings would be invisible on it. Content sits above at
+              zIndex 1; the ripple takes zIndex 0 and no pointer events. */}
+          <Ripple style={{ zIndex: 0, opacity: 0.3 }} />
+
+          <div className="mx-auto" style={{ position: "relative", zIndex: 1, maxWidth: "56rem", textAlign: "center" }}>
             <h2 style={{ fontSize: "clamp(2.25rem, 6vw, 3.75rem)", fontWeight: 700, color: "var(--bg-base)", letterSpacing: "0.01em" }}>
               JOIN THE TEAM
             </h2>

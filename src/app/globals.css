@@ -1941,3 +1941,94 @@ textarea.admin-input {
     border-color: var(--accent);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   S60 -- D3 page upgrades + D4 projects page
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Hero typewriter (TypewriterSubtitle).
+   The cycled strings are all ~31 characters, which at 0.28em letter-spacing
+   wraps to two lines below 768px -- but a half-typed string still fits on one.
+   Without a reserved two-line box the entire hero would jump up and down on
+   every cycle, forever. Above 768px every string fits one line, so no
+   min-height is set there and no dead space is introduced. */
+@media (max-width: 767px) {
+  .hero-typewriter {
+    min-height: 2.6em;
+  }
+}
+
+/* Ripple (src/components/ui/ripple.tsx).
+   Upstream ships this animation as a Tailwind v4 @theme cssVars entry, which
+   this project has no @theme block for, so it lives here. --i is set inline
+   per ring to stagger the pulse. */
+@keyframes ripple-scale {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+.ripple-ring {
+  animation: ripple-scale var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
+}
+
+/* Event REGISTER button (/events/[slug]).
+   The dot-expand is CSS-only on purpose: events/[slug]/page.tsx is an async
+   server component, so the onMouseEnter/onMouseLeave handlers the brief
+   sketched would need a "use client" boundary around the button for an effect
+   :hover already does. Trailing dot keeps a 50% radius -- a decorative 6px dot,
+   not an interactive rounded corner. */
+.btn-register {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 2rem;
+  background: var(--accent);
+  color: var(--bg-base);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.2s ease, gap 0.2s ease;
+}
+
+.btn-register:hover,
+.btn-register:focus-visible {
+  background: var(--accent-hover);
+  gap: 1.25rem;
+}
+
+.btn-register-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  flex-shrink: 0;
+}
+
+/* Admin login split layout (S60).
+   Below 768px the Glyph Matrix panel is dropped entirely and the form goes
+   full-width -- a decorative canvas is not worth the paint cost on a phone. */
+@media (max-width: 767px) {
+  .admin-login-right {
+    display: none;
+  }
+
+  .admin-login-left {
+    flex: 1 1 auto !important;
+    border-right: none !important;
+  }
+}
+
+/* Projects cards (/projects). The 1px grid gap over a --border background is
+   the same hairline-divider trick the sponsor and crew grids use. */
+.project-card:hover,
+.project-card:focus-visible {
+  background: var(--bg-elevated);
+}

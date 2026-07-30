@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -325,30 +325,52 @@ export default function JoinClient({ recruitmentOpen }: Props) {
             where you want to build, and what you bring to the grid.
           </p>
 
-          {/* Step indicator */}
+          {/* Step indicator.
+              S60/D3: the four 18x4px bars this replaced showed position but not
+              progress -- a completed step and an unreached one differed only by
+              a near-identical border grey. Numbered boxes with filled connectors
+              read as a real stepped progress bar. Squares, not circles: the
+              radius ban applies, and they line up with the sharp inputs below.
+              The "Step X of 4" line is kept as the accessible text and the
+              stepper itself is aria-hidden, so nothing is announced twice.
+              Built inline rather than extracted -- one caller, no second use. */}
           <div style={{ marginBottom: "2.5rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <p className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.18em", color: "var(--text-muted)", textTransform: "uppercase" }}>
-                Step {step} of 4
-              </p>
-              <div style={{ display: "flex", gap: "6px" }}>
-                {([1, 2, 3, 4] as const).map((s) => (
+            <p className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.18em", color: "var(--text-muted)", textTransform: "uppercase" }}>
+              Step {step} of 4
+            </p>
+            <div aria-hidden="true" style={{ display: "flex", alignItems: "center", marginTop: "0.9rem" }}>
+              {([1, 2, 3, 4] as const).map((s, i) => (
+                <Fragment key={s}>
                   <div
-                    key={s}
+                    className="mono"
                     style={{
-                      width: "18px",
-                      height: "4px",
-                      background:
-                        s === step
-                          ? "var(--accent)"
-                          : s < step
-                            ? "var(--border-strong)"
-                            : "var(--border)",
-                      transition: "background 0.2s",
+                      width: "32px",
+                      height: "32px",
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: `2px solid ${step >= s ? "var(--accent)" : "var(--border-strong)"}`,
+                      background: step > s ? "var(--accent)" : step === s ? "var(--accent-dim)" : "transparent",
+                      fontSize: "0.75rem",
+                      color: step > s ? "var(--bg-base)" : step === s ? "var(--accent)" : "var(--text-muted)",
+                      transition: "border-color 0.2s ease, background 0.2s ease, color 0.2s ease",
                     }}
-                  />
-                ))}
-              </div>
+                  >
+                    {step > s ? "✓" : s}
+                  </div>
+                  {i < 3 ? (
+                    <div
+                      style={{
+                        flex: 1,
+                        height: "2px",
+                        background: step > s ? "var(--accent)" : "var(--border-strong)",
+                        transition: "background 0.2s ease",
+                      }}
+                    />
+                  ) : null}
+                </Fragment>
+              ))}
             </div>
             <h2 className="heading" style={{ marginTop: "1rem", fontSize: "clamp(1.35rem, 3vw, 1.75rem)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
               {STEP_TITLES[step]}
