@@ -7,6 +7,8 @@ import { StatsTicker } from "@/components/home/StatsTicker";
 import { EventsPreview } from "@/components/home/EventsPreview";
 import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
 import { Reveal } from "@/components/ui/Reveal";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
 import KartModelWrapper from "@/components/home/KartModelWrapper";
 
 export const metadata: Metadata = {
@@ -74,9 +76,13 @@ export default async function HomePage() {
           </p>
 
           <div style={{ marginTop: "2.75rem", display: "flex", justifyContent: "center", gap: "1rem", flexWrap: "wrap" }}>
-            <Link href="/join" className="btn-primary">
-              JOIN THE TEAM
-            </Link>
+            {/* S58: this is the "JOIN THE TEAM" CTA the brief named, so it gets the
+                InteractiveHoverButton. The APPLY NOW button in the bottom CTA
+                section is left alone: that section's background IS var(--accent),
+                so an accent-filled button would vanish into it. At rest this
+                renders identically to the .btn-primary it replaced, so it still
+                lines up with VIEW EVENTS beside it. */}
+            <InteractiveHoverButton href="/join">JOIN THE TEAM</InteractiveHoverButton>
             <Link href="/events" className="btn-outline">
               VIEW EVENTS
             </Link>
@@ -85,7 +91,13 @@ export default async function HomePage() {
       </section>
 
       {/* Stats ticker */}
-      <StatsTicker />
+      {/* S58: `inView` is passed on every BlurFade below. Its default is false,
+          which in Magic UI's API means "animate on mount", not "never" -- without
+          it these would all fire at once on page load. THE BUILD and Domains
+          sections keep <Reveal> instead; nothing is wrapped in both. */}
+      <BlurFade inView delay={0.1}>
+        <StatsTicker />
+      </BlurFade>
 
       {/* 3D kart */}
       <section style={{ padding: "5rem 1.5rem" }}>
@@ -112,70 +124,76 @@ export default async function HomePage() {
       </section>
 
       {/* Events */}
-      <section style={{ padding: "5rem 1.5rem", background: "var(--bg-surface)" }}>
-        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
-          <EventsPreview
-            upcoming={upcomingEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
-            past={pastEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
-          />
-        </div>
-      </section>
+      <BlurFade inView delay={0.2}>
+        <section style={{ padding: "5rem 1.5rem", background: "var(--bg-surface)" }}>
+          <div className="mx-auto" style={{ maxWidth: "72rem" }}>
+            <EventsPreview
+              upcoming={upcomingEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
+              past={pastEvents.map(({ slug, title, category, event_date, cover_image_url }) => ({ slug, title, category, event_date, cover_image_url }))}
+            />
+          </div>
+        </section>
+      </BlurFade>
 
       {/* Sponsors strip */}
       {sponsors.length > 0 ? (
-        <section style={{ padding: "4rem 0" }}>
-          <div className="mx-auto" style={{ maxWidth: "80rem" }}>
-            <h2
-              className="heading"
-              style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
-            >
-              PARTNERS
-            </h2>
-            <SponsorMarquee sponsors={sponsors} />
-          </div>
-        </section>
+        <BlurFade inView delay={0.2}>
+          <section style={{ padding: "4rem 0" }}>
+            <div className="mx-auto" style={{ maxWidth: "80rem" }}>
+              <h2
+                className="heading"
+                style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
+              >
+                PARTNERS
+              </h2>
+              <SponsorMarquee sponsors={sponsors} />
+            </div>
+          </section>
+        </BlurFade>
       ) : null}
 
       {/* Join CTA */}
-      <section
-        className="pattern-speed-lines-strong"
-        style={{
-          background: "var(--accent)",
-          clipPath: "polygon(0 32px, 100% 0, 100% 100%, 0 100%)",
-          padding: "7rem 1.5rem 5.5rem",
-          marginTop: "2rem",
-        }}
-      >
-        <div className="mx-auto" style={{ maxWidth: "56rem", textAlign: "center" }}>
-          <h2 style={{ fontSize: "clamp(2.25rem, 6vw, 3.75rem)", fontWeight: 700, color: "var(--bg-base)", letterSpacing: "0.01em" }}>
-            JOIN THE TEAM
-          </h2>
-          <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
-            Build karts, ship code, and run the biggest events on campus, with 47 students who take it seriously.
-          </p>
-          <div style={{ marginTop: "2.25rem" }}>
-            <Link
-              href="/join"
-              className="heading"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "var(--bg-base)",
-                color: "var(--text-primary)",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-                padding: "0.9rem 2.5rem",
-                textDecoration: "none",
-              }}
-            >
-              APPLY NOW
-            </Link>
+      <BlurFade inView delay={0.3}>
+        <section
+          className="pattern-speed-lines-strong"
+          style={{
+            background: "var(--accent)",
+            clipPath: "polygon(0 32px, 100% 0, 100% 100%, 0 100%)",
+            padding: "7rem 1.5rem 5.5rem",
+            marginTop: "2rem",
+          }}
+        >
+          <div className="mx-auto" style={{ maxWidth: "56rem", textAlign: "center" }}>
+            <h2 style={{ fontSize: "clamp(2.25rem, 6vw, 3.75rem)", fontWeight: 700, color: "var(--bg-base)", letterSpacing: "0.01em" }}>
+              JOIN THE TEAM
+            </h2>
+            <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
+              Build karts, ship code, and run the biggest events on campus, with 47 students who take it seriously.
+            </p>
+            <div style={{ marginTop: "2.25rem" }}>
+              <Link
+                href="/join"
+                className="heading"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--bg-base)",
+                  color: "var(--text-primary)",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  padding: "0.9rem 2.5rem",
+                  textDecoration: "none",
+                }}
+              >
+                APPLY NOW
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </BlurFade>
     </div>
   );
 }

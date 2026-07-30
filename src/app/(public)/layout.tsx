@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { ScrollProgress } from "@/components/ui/scroll-progress";
 import { getAllSettings } from "@/lib/services/settings";
 
 export default async function PublicLayout({
@@ -34,6 +35,13 @@ export default async function PublicLayout({
   return (
     <>
       <Navbar />
+      {/* S58: here rather than the root layout. The brief said root, but the root
+          layout has no Navbar (it wraps /admin and /bootstrap too, which have no
+          72px header at all) so a top-[72px] bar there would float in dead space
+          on those routes. This layout is where the Navbar actually is, and it
+          covers every long public page. The maintenance branch above returns
+          before this, so the bar is correctly absent there. */}
+      <ScrollProgress />
       <main className="w-full">{children}</main>
       <Footer settings={settings} />
     </>

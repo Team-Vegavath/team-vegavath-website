@@ -2,10 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { getApplications } from "@/lib/services/applications";
 import { getAllSettings } from "@/lib/services/settings";
 import SettingsForm from "@/components/admin/SettingsForm";
-import type { Application, SiteSettings } from "@/types/settings";
+import type { SiteSettings } from "@/types/settings";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -26,18 +25,6 @@ const DEFAULT_SETTINGS: SiteSettings = {
   github_url: "",
 };
 
-function formatDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-  }).format(date);
-}
-
 export default async function AdminSettingsPage() {
   const session = await auth();
 
@@ -46,16 +33,11 @@ export default async function AdminSettingsPage() {
   }
 
   let settings: SiteSettings = DEFAULT_SETTINGS;
-  let applications: Application[] = [];
 
   try {
-    [settings, applications] = await Promise.all([
-      getAllSettings(),
-      getApplications({ limit: 50 }),
-    ]);
+    settings = await getAllSettings();
   } catch {
     settings = DEFAULT_SETTINGS;
-    applications = [];
   }
 
   return (
@@ -64,54 +46,18 @@ export default async function AdminSettingsPage() {
         <h1 className="admin-page-title">Settings</h1>
       </header>
 
+      {/* S58: the Recent Applications table that used to sit below this form was
+          removed. /admin/applications is the canonical view. A viewer has nothing
+          writable here, so it gets the notice instead of a blank page. */}
       {!session.user.isViewer ? (
         <div style={{ maxWidth: "52rem", marginBottom: "2rem" }}>
           <SettingsForm settings={settings} />
         </div>
-      ) : null}
-
-      <section className="admin-table-wrap">
-        <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: "1px solid var(--border-strong)" }}>
-          <h2 className="heading" style={{ fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-primary)" }}>
-            Recent Applications
-          </h2>
-        </div>
-
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Domain</th>
-              <th>Status</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {applications.length > 0 ? (
-              applications.map((application) => (
-                <tr key={application.id}>
-                  <td style={{ whiteSpace: "nowrap", fontWeight: 500 }}>{application.name}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.email}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.domain_interest}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    {application.status}
-                  </td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
-                    {formatDate(application.submitted_at)}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className="admin-empty">
-                  No applications yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      ) : (
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+          Site settings are read-only for viewer accounts.
+        </p>
+      )}
     </>
   );
 }
