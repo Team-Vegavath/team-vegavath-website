@@ -48,8 +48,12 @@ export const metadata: Metadata = {
   // child page, so `canonical: "/"` told crawlers all 19 public pages were
   // duplicates of the homepage. Canonicals are now set per page.
   keywords: ["Vegavath", "PESU ECC", "student club", "robotics", "automotive", "kart"],
+  // S57: the R2 logo replaces the generated shield from app/icon.tsx, which is
+  // deleted. Reusing the R2 const so a NEXT_PUBLIC_R2_PUBLIC_URL override moves
+  // the icon with everything else instead of leaving one hardcoded host behind.
   icons: {
-    icon: "/icon",
+    icon: `${R2}/icons/64x64_logo.jpg`,
+    apple: `${R2}/icons/64x64_logo.jpg`,
   },
   openGraph: {
     title: "Team Vegavath",

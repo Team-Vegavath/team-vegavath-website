@@ -35,12 +35,9 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 - Seed scripts in scripts/ hit the live database - never run unprompted.
 - Migrations are numbered files in migrations/ applied to Neon MANUALLY
   by the owner. Never auto-apply; write the file, flag it, stop.
-  Status as of S51: 001-017 confirmed applied; 018, 019 and 020 written
-  and flagged but never confirmed applied; **021 (Bootstrap
-  pre-registration pool) and 022 (posts) are unapplied**. Code that
-  depends on an unapplied migration must not be treated as verified.
-  There is also one unapplied non-migration seed:
-  `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`.
+  Status as of S57: 001-024 are ALL confirmed applied, as is the
+  `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`
+  seed. Nothing is outstanding.
 
 ## Folder Structure - Do Not Deviate
 

@@ -42,6 +42,7 @@ next-env.d.ts
 
 # tasks.md
 TASKS.md
+tasks.md
 .claude/
 CLAUDE.md
 docs/*.zip
