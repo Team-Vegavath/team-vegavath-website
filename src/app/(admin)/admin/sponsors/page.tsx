@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import InlineDelete from "@/components/admin/InlineDelete";
 import SponsorForm from "@/components/admin/SponsorForm";
+import SponsorsTable from "@/components/admin/SponsorsTable";
 import { auth } from "@/lib/auth";
 import { getSponsors } from "@/lib/services/sponsors";
 import type { Sponsor } from "@/types/sponsor";
@@ -57,69 +57,10 @@ export default async function AdminSponsorsPage({
         ) : null}
       </header>
 
-      <section className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Tier</th>
-              <th>Active</th>
-              <th>Order</th>
-              <th>Logo URL</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sponsors.length > 0 ? (
-              sponsors.map((sponsor) => (
-                <tr key={sponsor.id}>
-                  <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>{sponsor.name}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>{sponsor.tier}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    <span
-                      className="admin-dot"
-                      style={{ background: sponsor.is_active ? "var(--success)" : "var(--text-muted)" }}
-                      aria-hidden="true"
-                    />
-                    {sponsor.is_active ? "ACTIVE" : "INACTIVE"}
-                  </td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{sponsor.display_order}</td>
-                  <td className="admin-cell-mono">{truncateText(sponsor.logo_url, 40)}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {isViewer ? (
-                      <span className="admin-cell-mono" style={{ color: "var(--text-muted)" }}>-</span>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                        <Link href={`/admin/sponsors/${sponsor.id}/edit`} className="admin-row-action">
-                          EDIT
-                        </Link>
-                        <InlineDelete
-                          endpoint={`/api/admin/sponsors?id=${encodeURIComponent(sponsor.id)}`}
-                          confirmMessage={`Delete sponsor "${sponsor.name}"? This cannot be undone.`}
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="admin-empty">
-                  No sponsors yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      {/* S62: the table and its row actions moved into a client component so
+          EDIT can open a slide-in panel instead of navigating. The
+          /admin/sponsors/[id]/edit route still exists and still works. */}
+      <SponsorsTable sponsors={sponsors} isViewer={isViewer} />
     </>
   );
-}
-
-function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, maxLength)}...`;
 }

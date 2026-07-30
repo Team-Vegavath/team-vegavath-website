@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { CommandPalette } from "@/components/admin/CommandPalette";
+
 // Same R2 shield as the public Navbar (constant duplicated; Navbar doesn't export it).
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 
@@ -257,10 +259,31 @@ export default function AdminShell({ children, signOutSlot, hasPendingAccounts =
           ))}
         </nav>
 
+        {/* S62: the palette's only discoverability affordance. It is a <p>, not a
+            button -- the shortcut is the interface, and a clickable hint would
+            need its own open handler threaded down from here for no gain. */}
+        <p
+          className="mono"
+          style={{
+            padding: "0.9rem 1.25rem 0",
+            fontSize: "0.6rem",
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            color: "var(--text-muted)",
+          }}
+        >
+          Ctrl+K to search
+        </p>
+
         <div className="admin-sidebar-foot">{signOutSlot}</div>
       </aside>
 
       <main className="admin-content">{children}</main>
+
+      {/* Fed from NAV_ITEMS so the palette can never drift from the sidebar.
+          Mounted after the /admin early return above, so the login screen has
+          no Ctrl+K handler bound. */}
+      <CommandPalette pages={NAV_ITEMS} />
     </div>
   );
 }

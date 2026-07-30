@@ -37,10 +37,11 @@ export default async function PublicLayout({
       <Navbar />
       {/* S58: here rather than the root layout. The brief said root, but the root
           layout has no Navbar (it wraps /admin and /bootstrap too, which have no
-          72px header at all) so a top-[72px] bar there would float in dead space
-          on those routes. This layout is where the Navbar actually is, and it
-          covers every long public page. The maintenance branch above returns
-          before this, so the bar is correctly absent there. */}
+          fixed public header at all) so an offset bar there would float in dead
+          space on those routes. This layout is where the Navbar actually is, and
+          it covers every long public page. The maintenance branch above returns
+          before this, so the bar is correctly absent there.
+          S62: the component's own top is now 64px, tracking the navbar height. */}
       <ScrollProgress />
       <main className="w-full">{children}</main>
       <Footer settings={settings} />

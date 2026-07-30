@@ -5,6 +5,7 @@ import { getActiveSponsors } from "@/lib/services/sponsors";
 import { DomainGrid } from "@/components/home/DomainGrid";
 import { StatsTicker } from "@/components/home/StatsTicker";
 import { EventsPreview } from "@/components/home/EventsPreview";
+import { ProjectsTeaser } from "@/components/home/ProjectsTeaser";
 import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
 import { Reveal } from "@/components/ui/Reveal";
 import { BlurFade } from "@/components/ui/blur-fade";
@@ -102,30 +103,10 @@ export default async function HomePage() {
           tasks.md's performance gate that no canvas/WebGL loads on the
           homepage. This teaser takes its slot and drives traffic there, keeping
           the same 5rem/1.5rem padding and 72rem measure so the page rhythm
-          below the stats ticker is unchanged. */}
-      <section style={{ padding: "5rem 1.5rem" }}>
-        <div className="mx-auto" style={{ maxWidth: "72rem" }}>
-          <Reveal>
-            <div style={{ borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "3rem 0" }}>
-              <p className="label-tech" style={{ marginBottom: "1rem", color: "var(--accent)" }}>
-                What we build
-              </p>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
-                <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.5rem)", fontWeight: 700, textTransform: "uppercase" }}>
-                  GO-KARTS. ROBOTS. MORE.
-                </h2>
-                <Link
-                  href="/projects"
-                  className="mono"
-                  style={{ fontSize: "0.75rem", color: "var(--accent)", textDecoration: "none", letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}
-                >
-                  VIEW PROJECTS →
-                </Link>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+          below the stats ticker is unchanged.
+          S62: extracted to a client component to carry the scroll parallax --
+          useScroll cannot run in this server component. Markup is unchanged. */}
+      <ProjectsTeaser />
 
       {/* Domains */}
       <section style={{ padding: "2rem 1.5rem 5rem" }}>

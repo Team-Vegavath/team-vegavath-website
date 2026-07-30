@@ -8,6 +8,11 @@ import ToggleSwitch from "@/components/admin/ToggleSwitch";
 
 interface SponsorFormProps {
   mode: "create" | "edit";
+  // S62: when present, a successful save calls this instead of navigating to
+  // /admin/sponsors. That is the only difference between the full-page edit
+  // route and the slide-in panel -- the form, the upload and the PATCH are
+  // shared, so the two entry points cannot drift.
+  onSuccess?: () => void;
   initialData?: {
     id?: string;
     name?: string;
@@ -20,7 +25,7 @@ interface SponsorFormProps {
   };
 }
 
-export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
+export default function SponsorForm({ mode, onSuccess, initialData }: SponsorFormProps) {
   const router = useRouter();
 
   const [name, setName] = useState(initialData?.name ?? "");
@@ -88,7 +93,11 @@ export default function SponsorForm({ mode, initialData }: SponsorFormProps) {
         throw new Error("Failed to save sponsor");
       }
 
-      router.push("/admin/sponsors");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/admin/sponsors");
+      }
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Something went wrong";
       setError(message);

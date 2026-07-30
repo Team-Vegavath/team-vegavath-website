@@ -4,16 +4,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useScroll } from "framer-motion";
 
 /* S61/D2: one navbar at every width -- logo left, MENU button right, full-screen
    overlay. The horizontal desktop link list is gone, which retires the tablet
    crowding flagged in S60 (9 links wanted ~990px of chrome at a 768px
-   breakpoint) instead of patching the gap. The scroll-aware transparent->solid
-   background is gone too: the bar is now always opaque when closed, so the
-   hero no longer needs to reserve space for a see-through header.
+   breakpoint) instead of patching the gap.
    MENU/CLOSE is a word, not three animated bars -- the bars needed the
    .nav-hamburger class plus a media query to exist at all, and .btn-outline
-   already carries the border + accent hover this needs. */
+   already carries the border + accent hover this needs.
+
+   S62: the S2 scroll-aware transparent->solid background is back, which S61 had
+   deleted along with the link list. It reads off framer-motion's `scrollY`
+   rather than a raw window listener: framer-motion is already in the bundle for
+   Reveal/BlurFade, and its MotionValue is rAF-throttled, so this does not add a
+   layout-thrashing scroll handler. State flips at 80px, not 0, so a 1px
+   trackpad nudge does not strobe the bar. The full-bleed hero from S61 is what
+   makes transparency worth having -- the bar now sits over the hero art. */
 
 const NAV_LINKS = [
   { href: "/", label: "HOME" },
@@ -32,7 +39,12 @@ const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo
 export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const isHome = pathname === "/";
+  const { scrollY } = useScroll();
+
+  // scrollY.on returns its own unsubscribe, so it IS the cleanup function.
+  useEffect(() => scrollY.on("change", (v) => setScrolled(v > 80)), [scrollY]);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -54,9 +66,9 @@ export function Navbar() {
         left: 0,
         right: 0,
         zIndex: 50,
-        background: menuOpen ? "transparent" : "var(--bg-base)",
-        borderBottom: menuOpen ? "1px solid transparent" : "1px solid var(--border)",
-        transition: "background 0.2s ease, border-color 0.2s ease",
+        background: menuOpen || scrolled ? "var(--bg-base)" : "transparent",
+        borderBottom: menuOpen || scrolled ? "1px solid var(--border)" : "1px solid transparent",
+        transition: "background 0.3s ease, border-color 0.3s ease",
       }}
     >
       <nav
@@ -126,7 +138,9 @@ export function Navbar() {
                     color: pathname === href ? "var(--accent)" : "var(--text-primary)",
                   }}
                 >
-                  {label}
+                  {/* The fullstop is rendered, not stored in NAV_LINKS, so the
+                      labels stay usable as plain route names elsewhere. */}
+                  {label}.
                 </Link>
               </li>
             ))}
