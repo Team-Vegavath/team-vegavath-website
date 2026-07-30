@@ -70,15 +70,32 @@ export default async function AdminLoginPage({
     }
   }
 
-  /* S60/D3: split layout -- form left, Glyph Matrix visual right. Everything
-     above this line (handleLogin, the rate limit, the AuthError handling, the
-     redirects) is untouched; only the shell around the form changed. The form
-     JSX itself is byte-for-byte what it was, just re-parented.
-     Below 768px the right panel is display:none and the left goes full width
-     (.admin-login-* rules in globals.css) -- plain CSS rather than Tailwind
-     responsive prefixes, matching how the rest of this project does breakpoints. */
+  /* S60/D3: split layout -- form left, Glyph Matrix visual right.
+     S61/D2: below 768px there is no split. The right panel still goes, but the
+     matrix returns as a fixed full-screen background and the form floats over
+     it inside .admin-login-card. That card has NO desktop styles (its rules
+     live only in the max-width:767px block), so the desktop panel is unchanged
+     -- which also means bg-elevated does not have to coincidentally match the
+     panel background.
+     Everything above this line (handleLogin, the rate limit, the AuthError
+     handling, the redirects) is untouched; only the shell around the form
+     changed. The form JSX itself is byte-for-byte what it was, just re-parented.
+     Breakpoints are plain CSS rather than Tailwind responsive prefixes, matching
+     how the rest of this project does them. */
   return (
     <main style={{ display: "flex", minHeight: "100vh", background: "var(--bg-base)" }}>
+      {/* Mobile only: full-screen glyph background. The inline display:none is
+          overridden by .admin-login-glyph-bg's `display: block !important`
+          under 768px -- an author !important beats a non-important inline style.
+          No wrapper opacity, for the reason in the component's header. */}
+      <div
+        className="admin-login-glyph-bg"
+        style={{ display: "none", position: "fixed", inset: 0, zIndex: 0, background: "var(--bg-base)" }}
+        aria-hidden="true"
+      >
+        <GlyphMatrix style={{ position: "absolute", inset: 0 }} />
+      </div>
+
       <section
         className="admin-login-left"
         style={{ flex: "0 0 480px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "3rem", borderRight: "1px solid var(--border)" }}
@@ -86,7 +103,7 @@ export default async function AdminLoginPage({
         <Link
           href="/"
           className="mono"
-          style={{ display: "inline-flex", alignItems: "center", fontSize: "0.75rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem" }}
+          style={{ display: "inline-flex", alignItems: "center", fontSize: "0.75rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-secondary)", textDecoration: "none", marginBottom: "2rem", alignSelf: "flex-start" }}
         >
           ← Back to site
         </Link>

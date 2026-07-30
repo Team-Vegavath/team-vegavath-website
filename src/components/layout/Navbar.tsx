@@ -4,7 +4,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useScroll, useMotionValueEvent } from "framer-motion";
+
+/* S61/D2: one navbar at every width -- logo left, MENU button right, full-screen
+   overlay. The horizontal desktop link list is gone, which retires the tablet
+   crowding flagged in S60 (9 links wanted ~990px of chrome at a 768px
+   breakpoint) instead of patching the gap. The scroll-aware transparent->solid
+   background is gone too: the bar is now always opaque when closed, so the
+   hero no longer needs to reserve space for a see-through header.
+   MENU/CLOSE is a word, not three animated bars -- the bars needed the
+   .nav-hamburger class plus a media query to exist at all, and .btn-outline
+   already carries the border + accent hover this needs. */
 
 const NAV_LINKS = [
   { href: "/", label: "HOME" },
@@ -23,12 +32,7 @@ const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo
 export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const { scrollY } = useScroll();
-
-  useMotionValueEvent(scrollY, "change", (latest) => {
-    setScrolled(latest > 80);
-  });
+  const isHome = pathname === "/";
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -38,22 +42,21 @@ export function Navbar() {
   }, [menuOpen]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- close mobile menu on route change
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close overlay on route change
     setMenuOpen(false);
   }, [pathname]);
 
   return (
     <header
-      className="site-nav"
       style={{
         position: "fixed",
         top: 0,
         left: 0,
         right: 0,
         zIndex: 50,
-        background: scrolled || menuOpen ? "var(--bg-base)" : "transparent",
-        borderBottom: scrolled && !menuOpen ? "1px solid var(--border)" : "1px solid transparent",
-        transition: "background 0.25s ease, border-color 0.25s ease",
+        background: menuOpen ? "transparent" : "var(--bg-base)",
+        borderBottom: menuOpen ? "1px solid transparent" : "1px solid var(--border)",
+        transition: "background 0.2s ease, border-color 0.2s ease",
       }}
     >
       <nav
@@ -61,56 +64,58 @@ export function Navbar() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          height: "72px",
+          height: "64px",
           paddingLeft: "clamp(1.25rem, 4vw, 4rem)",
           paddingRight: "clamp(1.25rem, 4vw, 4rem)",
         }}
       >
-        <Link href="/" aria-label="Team Vegavath home" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        <Link
+          href="/"
+          aria-label="Team Vegavath home"
+          style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0, textDecoration: "none" }}
+        >
           <Image
             src={LOGO_URL}
             alt="Team Vegavath shield"
-            width={48}
-            height={48}
-            style={{ height: "48px", width: "48px", objectFit: "contain" }}
+            width={40}
+            height={40}
+            style={{ height: "40px", width: "40px", objectFit: "contain" }}
           />
-        </Link>
-
-        <ul className="nav-links-desktop">
-          {NAV_LINKS.map(({ href, label }) => (
-            <li key={href}>
-              <Link
-                href={href}
-                className="nav-link"
-                style={{
-                  color: pathname === href ? "var(--accent)" : "var(--text-secondary)",
-                }}
-              >
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        <Link href="/join" className="btn-primary nav-join-desktop" style={{ padding: "0.55rem 1.4rem" }}>
-          JOIN US
+          {/* The wordmark is redundant on the homepage, where the hero already
+              renders VEGAVATH at 140px. Everywhere else it is the only place
+              the team name appears above the fold. */}
+          {!isHome && (
+            <span
+              className="heading"
+              style={{
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                color: "var(--text-secondary)",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Team Vegavath
+            </span>
+          )}
         </Link>
 
         <button
+          type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
-          aria-label="Toggle menu"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
-          className="nav-hamburger"
+          className="btn-outline mono"
+          style={{ position: "relative", zIndex: 1, padding: "0.5rem 1.1rem", fontSize: "0.7rem", letterSpacing: "0.16em" }}
         >
-          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", transition: "transform 0.2s", transform: menuOpen ? "translateY(7px) rotate(45deg)" : "none" }} />
-          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", opacity: menuOpen ? 0 : 1, transition: "opacity 0.2s" }} />
-          <span style={{ display: "block", height: "2px", width: "22px", background: "var(--text-primary)", transition: "transform 0.2s", transform: menuOpen ? "translateY(-7px) rotate(-45deg)" : "none" }} />
+          {menuOpen ? "CLOSE" : "MENU"}
         </button>
       </nav>
 
       {menuOpen && (
         <div className="nav-overlay">
-          <ul style={{ display: "flex", flexDirection: "column", gap: "0.25rem", listStyle: "none" }}>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "0.1rem", listStyle: "none" }}>
             {NAV_LINKS.map(({ href, label }) => (
               <li key={href}>
                 <Link
@@ -126,14 +131,16 @@ export function Navbar() {
               </li>
             ))}
           </ul>
-          <Link
-            href="/join"
-            onClick={() => setMenuOpen(false)}
-            className="btn-primary"
-            style={{ width: "100%", padding: "1rem" }}
-          >
-            JOIN US
-          </Link>
+          <div style={{ marginTop: "2.5rem" }}>
+            <Link
+              href="/join"
+              onClick={() => setMenuOpen(false)}
+              className="btn-primary"
+              style={{ padding: "0.875rem 2.5rem" }}
+            >
+              JOIN THE TEAM
+            </Link>
+          </div>
         </div>
       )}
     </header>

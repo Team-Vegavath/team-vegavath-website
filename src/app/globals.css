@@ -221,75 +221,42 @@ p, label, input, textarea, select, button {
   color: var(--text-muted);
 }
 
-/* ── Navbar ── */
-
-.nav-links-desktop {
-  display: flex;
-  align-items: center;
-  gap: 2.25rem;
-  list-style: none;
-}
-
-.nav-link {
-  font-family: var(--font-chakra), sans-serif;
-  font-weight: 600;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.nav-link:hover {
-  color: var(--text-primary) !important;
-}
-
-.nav-hamburger {
-  display: none;
-  flex-direction: column;
-  gap: 5px;
-  padding: 0.6rem 0.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
+/* ── Navbar ──
+   S61: .nav-links-desktop, .nav-link, .nav-hamburger, .nav-join-desktop and
+   their max-width:767px block are gone -- the navbar is a single hamburger at
+   every width now, so nothing called them. The overlay rules stay because the
+   overlay stayed, but it starts at the top of the viewport rather than under a
+   72px header and centres its links vertically. */
 
 .nav-overlay {
+  /* No z-index: the overlay is a later sibling of the nav bar inside the
+     header's stacking context, and the CLOSE button carries z-index: 1, which
+     beats this element's z-index: auto whatever the DOM order. A negative
+     z-index here would paint the overlay behind the header's own background. */
   position: fixed;
-  top: 72px;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: var(--bg-base);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 2.5rem clamp(1.25rem, 4vw, 4rem) 3rem;
+  justify-content: center;
+  padding: 6rem clamp(1.5rem, 6vw, 6rem) 3rem;
+  overflow-y: auto;
 }
 
 .nav-overlay-link {
   display: block;
-  font-family: var(--font-orbitron), sans-serif;
-  font-weight: 900;
-  font-size: clamp(1.75rem, 8vw, 2.5rem);
-  letter-spacing: 0.04em;
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
   text-decoration: none;
-  padding: 0.5rem 0;
   transition: color 0.2s;
 }
 
 .nav-overlay-link:hover {
   color: var(--accent);
-}
-
-@media (max-width: 767px) {
-  .nav-links-desktop,
-  .nav-join-desktop {
-    display: none !important;
-  }
-  .nav-hamburger {
-    display: flex;
-  }
 }
 
 /* ── Footer ── */
@@ -2012,17 +1979,36 @@ textarea.admin-input {
   flex-shrink: 0;
 }
 
-/* Admin login split layout (S60).
-   Below 768px the Glyph Matrix panel is dropped entirely and the form goes
-   full-width -- a decorative canvas is not worth the paint cost on a phone. */
+/* Admin login (S60 split, S61 mobile rework).
+   Desktop: form panel left, Glyph Matrix panel right.
+   Below 768px there is no split -- the right panel goes, and the matrix comes
+   back as a full-screen background with the form floating over it in a card.
+   S60 dropped the canvas on phones for paint cost; it is back because the
+   full-width bordered form read as an unfinished half of a split layout. The
+   cost is the same few thousand fillText calls per repaint either way. */
 @media (max-width: 767px) {
   .admin-login-right {
     display: none;
   }
 
+  .admin-login-glyph-bg {
+    display: block !important;
+  }
+
+  /* The panel IS the card here -- margin: auto centres it in both axes inside
+     the 100vh flex main, so no extra wrapper element was needed in the JSX.
+     None of these rules exist above 768px, so the desktop panel is untouched. */
   .admin-login-left {
-    flex: 1 1 auto !important;
-    border-right: none !important;
+    flex: 0 1 auto !important;
+    margin: auto;
+    width: calc(100% - 2.5rem);
+    max-width: 400px;
+    position: relative;
+    z-index: 1;
+    padding: 2rem 1.5rem !important;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-right: 1px solid var(--border) !important;
   }
 }
 

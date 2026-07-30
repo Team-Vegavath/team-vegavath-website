@@ -1,8 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RacingCursor } from "./RacingCursor";
+import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import CursorToggle from "./CursorToggle";
+
+/* S61: SmoothCursor replaces RacingCursor here. RacingCursor.tsx is left in the
+   tree on purpose -- this is a draft-branch swap, and reverting should be a
+   two-line import change, not a file restore.
+   RacingCursor took `enabled` as a prop and stayed mounted; SmoothCursor has no
+   such prop, so the gate is a conditional mount. That is also what restores the
+   real cursor: SmoothCursor's effect cleanup clears `body.style.cursor`, which
+   only fires on unmount. */
 
 export function CursorControls() {
   const [enabled, setEnabled] = useState(false);
@@ -32,7 +40,7 @@ export function CursorControls() {
 
   return (
     <>
-      <RacingCursor enabled={enabled} />
+      {enabled && <SmoothCursor />}
       <CursorToggle enabled={enabled} onToggle={handleToggle} />
     </>
   );

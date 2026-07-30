@@ -41,7 +41,12 @@ export default async function HomePage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "6rem 1.5rem 4rem",
+          /* S61: the top 6rem is gone. It existed to clear the old 72px navbar;
+             the navbar is now a 64px bar with only a logo and a MENU button, so
+             the hero can run full-bleed under it and the button floats over the
+             hero. The section is a centring flex box, so with equal-ish padding
+             the content sits optically centred rather than pushed down. */
+          padding: "0 1.5rem 4rem",
           overflow: "hidden",
         }}
       >
