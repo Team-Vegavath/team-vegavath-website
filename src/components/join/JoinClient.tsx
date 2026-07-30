@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
+import { HyperText } from "@/components/ui/hyper-text";
 
 /* FY26 recruitment domains. These six values are what /api/join and the DB
    CHECK constraints accept (requires migrations/004_application_new_fields.sql
@@ -270,12 +271,22 @@ export default function JoinClient({ recruitmentOpen }: Props) {
     <main className="join-split" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
       {/* Branding panel: dark surface, orange edge + type (no logo; the navbar already has it) */}
       <div className="join-brand pattern-speed-lines">
+        {/* S59: HyperText scrambles each word in, staggered 0 / 120 / 240ms, and
+            re-scrambles that word on hover. The <h1> keeps its own class and
+            inline style so the spans inherit Orbitron, the clamp() size and
+            var(--accent) -- same containment pattern as NumberTicker inside
+            .stat-number. One HyperText per word rather than one for the whole
+            string because the three hard <br /> line breaks have to survive, and
+            HyperText takes a plain string. Words are passed already uppercased
+            so the A-Z scramble charset matches the resolved letters; the h1's
+            textTransform would mask a case mismatch visually but the accessible
+            text comes from the string itself. */}
         <h1 className="heading" style={{ fontWeight: 700, fontSize: "clamp(2.75rem, 7vw, 4.5rem)", lineHeight: 0.95, textTransform: "uppercase", color: "var(--accent)" }}>
-          Join
+          <HyperText>JOIN</HyperText>
           <br />
-          The
+          <HyperText delay={120}>THE</HyperText>
           <br />
-          Team
+          <HyperText delay={240}>TEAM</HyperText>
         </h1>
         <div style={{ marginTop: "auto" }}>
           <p className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "0.6rem" }}>

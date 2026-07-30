@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import AboutHeroImage from "@/components/about/AboutHeroImage";
 import { DomainGrid } from "@/components/home/DomainGrid";
 import { SponsorMarquee } from "@/components/sponsors/SponsorMarquee";
+import { BlurFade } from "@/components/ui/blur-fade";
+import { NumberTicker } from "@/components/ui/number-ticker";
 import { Reveal } from "@/components/ui/Reveal";
 import { getMilestones, type Milestone } from "@/lib/services/about";
 import { getActiveSponsors } from "@/lib/services/sponsors";
@@ -153,27 +155,46 @@ export default async function AboutPage() {
       {/* Stats: dramatic, dot pattern */}
       <section className="pattern-dots" style={{ padding: "5.5rem 1.5rem" }}>
         <div className="mx-auto" style={{ maxWidth: "72rem" }}>
-          <Reveal>
+          {/* S59: BlurFade REPLACES the <Reveal> that was here rather than
+              wrapping it -- both do an opacity + y entrance and the y offsets
+              would stack (see the note on blur-fade.tsx). `inView` has to be
+              passed explicitly; its default of false means "play on mount". */}
+          <BlurFade inView delay={0.1}>
+            {/* S58: NumberTicker counts up on first view. The <p className="stat-number">
+                wrapper is left in place and the ticker span inherits its font,
+                size and accent colour from `.stats-grid .stat-number` -- passing
+                that class to NumberTicker instead would put Tailwind utilities up
+                against an unlayered globals.css rule, which they lose. Unlike the
+                homepage StatsTicker there is no AnimatePresence here, so these
+                count once and stay put. Every STATS number is a plain integer
+                string; a non-numeric one would have to stay plain text. */}
             <div className="stats-grid">
               {STATS.map(({ number, label }) => (
                 <div key={label}>
-                  <p className="stat-number">{number}</p>
+                  <p className="stat-number">
+                    <NumberTicker value={Number(number)} />
+                  </p>
                   <p className="stat-label">{label}</p>
                 </div>
               ))}
             </div>
-          </Reveal>
+          </BlurFade>
         </div>
       </section>
 
       {/* Timeline: real events only */}
       <section style={{ padding: "5rem 1.5rem" }}>
         <div className="mx-auto" style={{ maxWidth: "56rem" }}>
-          <Reveal>
+          {/* S59: BlurFade on the HEADING only. The milestone list below keeps its
+              per-item <Reveal delay={index * 0.08}> stagger -- wrapping the list
+              too would put a second entrance over an existing one at the same
+              scroll point, which is the mushiness S58 flagged on the homepage
+              events grid. */}
+          <BlurFade inView delay={0.2}>
             <h2 style={{ marginBottom: "3rem", fontSize: "clamp(1.5rem, 3.5vw, 2rem)", fontWeight: 700, textTransform: "uppercase" }}>
               The road so far
             </h2>
-          </Reveal>
+          </BlurFade>
 
           <div style={{ borderLeft: "1px solid var(--border-strong)", paddingLeft: "2rem", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
             {milestones.map((entry, index) => (
@@ -236,13 +257,17 @@ export default async function AboutPage() {
       {sponsors.length > 0 ? (
         <section style={{ padding: "0 0 5rem" }}>
           <div className="mx-auto" style={{ maxWidth: "80rem" }}>
-            <h2
-              className="heading"
-              style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
-            >
-              PARTNERS
-            </h2>
-            <SponsorMarquee sponsors={sponsors} />
+            {/* S59: the only section on this page that had NO entrance animation
+                at all, so this is an addition rather than a Reveal swap. */}
+            <BlurFade inView delay={0.2}>
+              <h2
+                className="heading"
+                style={{ textAlign: "center", marginBottom: "1.5rem", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-secondary)" }}
+              >
+                PARTNERS
+              </h2>
+              <SponsorMarquee sponsors={sponsors} />
+            </BlurFade>
           </div>
         </section>
       ) : null}
