@@ -2016,6 +2016,51 @@ textarea.admin-input {
   animation: ripple-scale var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
 }
 
+/* Hero spotlight (src/components/ui/spotlight.tsx).
+   Same situation as ripple above: upstream ships the animation as a Tailwind v4
+   @theme cssVars entry and the geometry as arbitrary utilities. No @theme block
+   here, and unlayered rules in this file beat @layer utilities anyway, so both
+   live in one class. The cone paints under the hero copy, which carries
+   z-index: 1 in page.tsx. */
+@keyframes spotlight {
+  0% {
+    opacity: 0;
+    transform: translate(-72%, -62%) scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -40%) scale(1);
+  }
+}
+
+.spotlight-cone {
+  position: absolute;
+  top: -10rem;
+  left: 0;
+  z-index: 0;
+  height: 169%;
+  width: 138%;
+  opacity: 0;
+  pointer-events: none;
+  animation: spotlight 2s ease 0.75s 1 forwards;
+}
+
+@media (min-width: 1024px) {
+  .spotlight-cone {
+    top: -5rem;
+    left: 15rem;
+    width: 84%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-cone {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -40%) scale(1);
+  }
+}
+
 /* Event REGISTER button (/events/[slug]).
    The dot-expand is CSS-only on purpose: events/[slug]/page.tsx is an async
    server component, so the onMouseEnter/onMouseLeave handlers the brief

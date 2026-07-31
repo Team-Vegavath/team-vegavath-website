@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
+import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 import { isNoRegistrationEvent } from "@/lib/utils";
 
@@ -277,6 +278,7 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           onFilesChange={setLogoFiles}
           currentUrl={initialData?.logo_url}
           hint="PNG preferred · optional, can be added later"
+          uploading={saving}
         />
       </div>
 
@@ -289,14 +291,21 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
           onFilesChange={setCoverFiles}
           currentUrl={initialData?.cover_image_url}
           hint="JPG preferred · optional, can be added later"
+          uploading={saving}
         />
       </div>
 
       {error ? <p className="admin-error">{error}</p> : null}
 
-      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
-        {saving ? "SAVING…" : "SAVE EVENT"}
-      </button>
+      {/* S63: no success state is passed. handleSubmit router.push()es to
+          /admin/events on success, so this button unmounts before a SAVED
+          could ever paint -- a saveSuccess flag here would be dead state. */}
+      <StatefulButton
+        state={saving ? "loading" : error ? "error" : "idle"}
+        style={{ width: "100%" }}
+      >
+        SAVE EVENT
+      </StatefulButton>
     </form>
   );
 }

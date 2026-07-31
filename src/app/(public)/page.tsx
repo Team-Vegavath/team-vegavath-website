@@ -12,6 +12,7 @@ import { BlurFade } from "@/components/ui/blur-fade";
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
 import { TypewriterSubtitle } from "@/components/home/TypewriterSubtitle";
 import { Ripple } from "@/components/ui/ripple";
+import { Spotlight } from "@/components/ui/spotlight";
 
 export const metadata: Metadata = {
   title: {
@@ -51,7 +52,14 @@ export default async function HomePage() {
           overflow: "hidden",
         }}
       >
-        <div className="mx-auto" style={{ maxWidth: "72rem", textAlign: "center" }}>
+        {/* S63: first child so it paints behind the copy. It is a positioned
+            element, so the in-flow content below needs its own stacking context
+            (position + z-index) to stay on top -- otherwise the cone would
+            render over the VEGAVATH h1. pointer-events: none lives in the
+            .spotlight-cone class, so the CTAs stay clickable through it. */}
+        <Spotlight />
+
+        <div className="mx-auto" style={{ maxWidth: "72rem", textAlign: "center", position: "relative", zIndex: 1 }}>
           <h1
             style={{
               fontSize: "clamp(48px, 12vw, 140px)",

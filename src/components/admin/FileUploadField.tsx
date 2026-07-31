@@ -12,6 +12,9 @@ interface FileUploadFieldProps {
   currentUrl?: string | null;
   /** Accepted-types / usage hint shown inside the zone. */
   hint?: string;
+  /** Upload/save in flight. Dims the preview and makes the zone inert -- picking
+   *  a new file mid-flight would not reach the request already on the wire. */
+  uploading?: boolean;
 }
 
 function formatSize(bytes: number): string {
@@ -28,11 +31,13 @@ export default function FileUploadField({
   multiple = false,
   currentUrl,
   hint,
+  uploading = false,
 }: FileUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   function acceptFiles(list: FileList | null) {
+    if (uploading) return;
     if (!list || list.length === 0) return;
     const picked = Array.from(list);
     onFilesChange(multiple ? [...files, ...picked] : picked.slice(0, 1));
@@ -45,6 +50,7 @@ export default function FileUploadField({
   }
 
   function removeAt(index: number) {
+    if (uploading) return;
     onFilesChange(files.filter((_, i) => i !== index));
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -63,7 +69,7 @@ export default function FileUploadField({
 
       <div style={{ display: "flex", gap: "0.9rem", alignItems: "stretch" }}>
         {currentUrl && files.length === 0 ? (
-          <div className="admin-current-thumb" title="Current image">
+          <div className="admin-current-thumb" title="Current image" style={{ opacity: uploading ? 0.4 : 1 }}>
             {/* Plain img: R2 URLs + tiny thumbs; next/image adds nothing here. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={currentUrl} alt="Current file" />
@@ -78,10 +84,14 @@ export default function FileUploadField({
           className="admin-upload-zone"
           data-drag={dragging}
           role="button"
-          tabIndex={0}
+          tabIndex={uploading ? -1 : 0}
+          aria-disabled={uploading}
           aria-label="Upload file"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => {
+            if (!uploading) inputRef.current?.click();
+          }}
           onKeyDown={(event) => {
+            if (uploading) return;
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               inputRef.current?.click();
@@ -89,13 +99,13 @@ export default function FileUploadField({
           }}
           onDragOver={(event) => {
             event.preventDefault();
-            setDragging(true);
+            if (!uploading) setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          style={{ flex: 1 }}
+          style={{ flex: 1, opacity: uploading ? 0.5 : 1, cursor: uploading ? "not-allowed" : "pointer" }}
         >
-          DRAG FILE OR CLICK TO UPLOAD
+          {uploading ? "UPLOADING…" : "DRAG FILE OR CLICK TO UPLOAD"}
           {hint ? (
             <span style={{ display: "block", marginTop: "0.4rem", fontSize: "0.58rem", color: "var(--text-muted)", textTransform: "none", letterSpacing: "0.08em" }}>
               {hint}

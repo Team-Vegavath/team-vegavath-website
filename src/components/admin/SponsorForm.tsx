@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
+import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 
 interface SponsorFormProps {
@@ -178,6 +179,7 @@ export default function SponsorForm({ mode, onSuccess, initialData }: SponsorFor
           onFilesChange={setLogoFiles}
           currentUrl={initialData?.logo_url}
           hint="PNG or SVG recommended"
+          uploading={saving}
         />
       </div>
 
@@ -206,9 +208,14 @@ export default function SponsorForm({ mode, onSuccess, initialData }: SponsorFor
 
       {error ? <p className="admin-error">{error}</p> : null}
 
-      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
-        {saving ? "SAVING…" : "SAVE SPONSOR"}
-      </button>
+      {/* No success state: on success this either calls onSuccess (SponsorsTable
+          collapses the inline editor) or navigates away. Either way it unmounts. */}
+      <StatefulButton
+        state={saving ? "loading" : error ? "error" : "idle"}
+        style={{ width: "100%" }}
+      >
+        SAVE SPONSOR
+      </StatefulButton>
     </form>
   );
 }

@@ -279,6 +279,7 @@ export default function GalleryUploadForm() {
               files={files}
               onFilesChange={handleFilesChange}
               hint="JPG or PNG · multiple files supported"
+              uploading={uploading}
             />
             {files.length > 0 && (
               <p className="mono" style={{ marginTop: "0.5rem", fontSize: "0.65rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-muted)" }}>

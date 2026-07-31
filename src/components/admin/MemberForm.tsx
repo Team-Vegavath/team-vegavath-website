@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
+import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 
 interface MemberFormProps {
@@ -237,6 +238,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
           onFilesChange={setPhotoFiles}
           currentUrl={initialData?.photo_url}
           hint="Square crop preferred · optional, can be added later"
+          uploading={saving}
         />
       </div>
 
@@ -265,9 +267,13 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
 
       {error ? <p className="admin-error">{error}</p> : null}
 
-      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
-        {saving ? "SAVING…" : "SAVE MEMBER"}
-      </button>
+      {/* No success state: handleSubmit navigates to /admin/team on success. */}
+      <StatefulButton
+        state={saving ? "loading" : error ? "error" : "idle"}
+        style={{ width: "100%" }}
+      >
+        SAVE MEMBER
+      </StatefulButton>
     </form>
   );
 }

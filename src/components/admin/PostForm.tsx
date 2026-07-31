@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
+import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 import { slugify } from "@/lib/utils";
 // From src/types/post.ts, NOT from services/posts.ts: a value import out of a
@@ -261,6 +262,7 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
           onFilesChange={setThumbFiles}
           currentUrl={initialData?.thumbnail_url}
           hint="Shown on the /posts card · optional"
+          uploading={saving}
         />
       </div>
 
@@ -355,14 +357,13 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
 
       {error ? <p className="admin-error">{error}</p> : null}
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="btn-primary"
-        style={{ width: "100%", opacity: saving ? 0.6 : 1 }}
+      {/* No success state: handleSubmit navigates to /admin/posts on success. */}
+      <StatefulButton
+        state={saving ? "loading" : error ? "error" : "idle"}
+        style={{ width: "100%" }}
       >
-        {saving ? "SAVING…" : "SAVE POST"}
-      </button>
+        SAVE POST
+      </StatefulButton>
     </form>
   );
 }

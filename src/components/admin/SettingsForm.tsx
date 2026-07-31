@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { updateSettings } from "@/app/(admin)/admin/settings/actions";
+import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
 import type { SiteSettings } from "@/types/settings";
 
@@ -170,34 +171,16 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         />
       </div>
 
-      <button type="submit" disabled={saving} className="btn-primary" style={{ width: "100%", opacity: saving ? 0.6 : 1 }}>
-        {saving ? "SAVING…" : "SAVE CHANGES"}
-      </button>
-      {saved && (
-        <span
-          style={{
-            alignSelf: "center",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.4rem",
-            color: "var(--success)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.72rem",
-            letterSpacing: "0.1em",
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path
-              d="M1.5 6.5l3.5 3.5 6.5-7"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          SAVED
-        </span>
-      )}
+      {/* S63: the only form whose success state is actually visible -- the
+          others navigate away on save. The separate SAVED tick that used to sit
+          below this button is gone: it fired off the same `saved` flag, in the
+          same spot, three seconds long. The button says it now. */}
+      <StatefulButton
+        state={saving ? "loading" : saved ? "success" : "idle"}
+        style={{ width: "100%" }}
+      >
+        SAVE CHANGES
+      </StatefulButton>
     </form>
   );
 }
