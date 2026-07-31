@@ -343,23 +343,91 @@ p, label, input, textarea, select, button {
    so there is no aria-hidden or tabIndex={-1} bookkeeping in the TSX. The 0s
    delay on close is what lets the clip finish before it vanishes. */
 
+/* ── S71: the panel is FULL SCREEN, and the type is the design ───────────────
+   S70's bounded 360px panel was wrong, and S71's first attempt (full height,
+   still 360px wide) only fixed half of it. On a 2879px display a 360px column
+   is 12% of the screen: the menu read as a strip stuck to the edge, and the
+   nine links floating in the middle of it had no relationship to anything.
+   Direct feedback, and it is the correct read.
+
+   So: inset: 0. The reference behaviour (hover.dev Corner Nav / Liquid Side
+   Nav) is a panel that OWNS the viewport once it is open, with the nav set at
+   display scale rather than at UI scale. That is the actual difference between
+   those and a dropdown, and 360px could never get there.
+
+   THE INSET IS NOW THE HEADER'S OWN clamp(1.25rem, 4vw, 4rem), copied
+   deliberately rather than picked. This is the payoff that a bounded panel
+   could not have: the logo, the link column, the CTA and the hamburger all sit
+   on the SAME two vertical lines, because the panel and the bar behind it are
+   measured from one rule. S71's first pass had to write off trigger alignment
+   as "two systems"; at full screen there is only one.
+
+   LINK SIZE SCALES WITH VIEWPORT HEIGHT, NOT WIDTH -- clamp(1.5rem, 4.2vh,
+   3.25rem). Nine rows have to fit between the header clearance and the footer
+   row, and that is a height problem. 5vw would size them off the wrong axis and
+   overflow a 1080p screen while looking timid on a short wide one. Vertical
+   padding is in `em` so the row grows with its own type and the rhythm holds at
+   every size from one number.
+
+   THE HAIRLINES ARE WHAT MAKE A FULL-SCREEN NAV NOT LOOK EMPTY. A single
+   left-aligned column on a 2879px screen leaves two thirds of the width blank.
+   Running the row rules edge to edge turns that blank into structure -- the
+   right side is now the end of nine ruled lines rather than nothing. It is also
+   the same 1px lattice .domain-grid and .footer-row-1 already use, at a
+   different scale. This is the one device the layout leans on; there is no
+   second column, no invented contact block, no filler.
+
+   HOVER CHANGES SCALE WITH THE TYPE. .admin-nav-item's 2px accent left edge
+   plus an 8% row tint was designed for a 42px admin row; at 3.25rem across a
+   full viewport that tint is a huge orange band and the 2px tick is a rounding
+   error. Same IDEA, right scale: the row's own hairline lights accent. "Lit
+   from the edge" survives; the edge is just a different edge now.
+
+   dvh, and this is the file's first: every other full-height rule here uses
+   100vh, but those are page-flow containers where 100vh's mobile URL-bar
+   overshoot just adds scroll. This is a fixed overlay -- overshoot would push
+   the CTA under the browser chrome, which is the one place the difference is
+   load-bearing. The 100vh line above it is the fallback.
+
+   THE REVEAL IS STILL UNTOUCHED: same clip-path endpoints, same 380ms
+   var(--ease-admin), same visibility timing. inset(0 0 100% 100%) sweeping
+   across the whole viewport is more dramatic than it was across 360px, not
+   less -- it is the same animation given something worth animating. */
+
 .nav-panel {
   /* No z-index, same reasoning as S69's .nav-overlay: this is a later sibling
      of the nav bar inside the header's stacking context, and .nav-hamburger's
      z-index: 1 beats z-index: auto whatever the DOM order -- which is what
-     keeps the trigger clickable ON TOP of the panel it opened. */
+     keeps the trigger clickable ON TOP of the panel it opened. At full screen
+     the LOGO needs the same treatment; see .nav-brand in Navbar.tsx. */
+  /* TWO insets, one per axis, and they are different ON PURPOSE -- this is the
+     one place S71's "one number everywhere" rule is deliberately broken, so it
+     is worth being explicit about why.
+       --nav-pad (horizontal) exists to ALIGN. It is the header's own padding,
+         copied verbatim, so the links land under the logo to the pixel.
+       --nav-gap (vertical) exists to FIT. Nine display-scale rows plus a footer
+         row have to clear a 950px laptop viewport, and spending 4rem top and
+         bottom on a 4vw value picked for a horizontal job costs ~80px that the
+         list needs. Measured: at 950px tall, 4rem vertical overflows and 1.5rem
+         leaves ~100px spare.
+     Two axes with different constraints get two numbers. Three numbers on ONE
+     axis, which is what S70 had, is the thing that was actually wrong. */
+  --nav-pad: clamp(1.25rem, 4vw, 4rem);
+  --nav-gap: 1.5rem;
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 360px;
-  max-height: 100vh;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  /* A scroll container on short viewports: nine rows at the clamp's floor plus
+     the footer row overrun a landscape phone, and scrolling is the right answer
+     to that rather than a second set of breakpoints. */
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-base);
-  border-left: 1px solid var(--border-strong);
-  border-bottom: 1px solid var(--border-strong);
-  /* 5.5rem clears the 64px header so the trigger sits over the panel's own
-     background rather than over the page. */
-  padding: 5.5rem 1.5rem 1.75rem;
+  /* No borders at all now. Every edge is the viewport's, which is S70's own
+     weld rule taken to its conclusion. */
+  padding: calc(64px + var(--nav-gap)) var(--nav-pad) var(--nav-gap);
   visibility: hidden;
   clip-path: inset(0 0 100% 100%);
   transition:
@@ -375,20 +443,31 @@ p, label, input, textarea, select, button {
     visibility 0s linear 0s;
 }
 
-/* Below 420px a 360px panel leaves a ~15px sliver of page down the left edge,
-   which reads as a rendering fault rather than a bounded panel. Commit to
-   full-bleed instead. */
-@media (max-width: 419px) {
-  .nav-panel {
-    width: 100%;
-    border-left: none;
-  }
-}
+/* The @media (max-width: 419px) full-bleed block is DELETED, not adjusted. It
+   existed to stop a 360px panel leaving a 15px sliver of page down the left
+   edge on a 375px phone. The panel is 100% wide at every width now, so there is
+   no sliver to patch and no threshold to tune. One layout, no breakpoints.
 
+   margin: auto 0 is the whole vertical distribution, in one declaration. Auto
+   margins on a flex child absorb ALL free space and split it evenly, which
+   centres the ruled block of links between the header clearance and the footer
+   row AND pushes that footer row onto the panel's bottom padding at the same
+   time. No justify-content, no spacer element, no second wrapper.
+
+   The border-top plus a border-bottom per row CLOSES the block at both ends
+   (ten rules for nine links). S70 ruled only between rows, which is right for a
+   list inside a bordered card; a full-screen layout has no card, so the list
+   has to draw its own top and bottom edges or it floats. */
 .nav-panel-list {
   display: flex;
   flex-direction: column;
   list-style: none;
+  margin: auto 0;
+  border-top: 1px solid var(--border);
+}
+
+.nav-panel-list li {
+  border-bottom: 1px solid var(--border);
 }
 
 /* The links stagger in AFTER the clip opens (90ms lead-in, 28ms apart). This is
@@ -400,27 +479,35 @@ p, label, input, textarea, select, button {
    The link carries the REVEAL transform and nothing else. The hover shift lives
    on the inner span, so no element is ever asked to hold two transforms -- same
    discipline as .ripple-follow (translate) vs .ripple-ring (scale). */
+/* S71 SYMMETRY: NO padding-left and NO border-left. The row starts exactly on
+   --nav-pad, which at full screen is the header's own inset -- so a link label
+   is on the same vertical line as the logo above it, to the pixel. S70 had the
+   label at 40.4px from three independent values (1.5rem panel + 0.9rem link +
+   2px border) and the CTA near 40px, close by accident. There is now one left
+   margin in the whole panel and zero deviations from it, which is only possible
+   because the left border is gone.
+
+   font-size is clamped on VIEWPORT HEIGHT. Nine rows have to fit between the
+   header clearance and the footer row -- a height problem, so vh is the axis.
+   Vertical padding is in `em`, so the row grows with its own type and the whole
+   rhythm follows one number at every viewport. */
 .nav-panel-link {
   display: flex;
   align-items: center;
-  height: 42px;
-  padding-left: 0.9rem;
+  padding: 0.34em 0;
   font-family: var(--font-chakra), sans-serif;
   font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: 0.08em;
+  font-size: clamp(1.5rem, 4.2vh, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   text-decoration: none;
   color: var(--text-primary);
-  /* Always present so hover never shifts the row by 2px. */
-  border-left: 2px solid transparent;
   opacity: 0;
   transform: translateX(14px);
   transition:
     opacity 260ms var(--ease-admin),
     transform 260ms var(--ease-admin),
-    background 200ms var(--ease-admin),
-    border-color 200ms var(--ease-admin),
     color 200ms var(--ease-admin);
 }
 
@@ -434,37 +521,57 @@ p, label, input, textarea, select, button {
   transition: transform 200ms var(--ease-admin);
 }
 
-/* Hover language is .admin-nav-item's, transplanted to public type scale rather
-   than invented: 2px accent left edge, an 8% accent row tint, label to accent.
-   The 6px label shift is the one addition -- at 1.1rem the row is tall enough
-   that the edge alone reads as static, and the shift is what makes it a sweep.
-   Reusing S67's system means the public nav, the admin nav and the domain tiles
-   all say "lit from the left edge" in one voice. */
+/* S71: the hover language is RESCALED, not replaced. .admin-nav-item's version
+   (2px accent left edge + 8% row tint + label to accent) was designed for a
+   42px admin row. At 3.25rem across a full viewport that tint becomes a huge
+   orange band and the 2px tick becomes a rounding error -- the same rule reads
+   completely differently at 4x the size. The IDEA survives ("lit from the
+   edge"); the edge is now the row's own full-width hairline, which is the edge
+   this layout actually has. Tint and left border are dropped.
+
+   The shift is 0.2em rather than 6px so it scales with the type like everything
+   else here. */
+.nav-panel-list li:hover,
+.nav-panel-list li:focus-within {
+  border-bottom-color: var(--accent);
+}
+
 .nav-panel-link:hover,
 .nav-panel-link[data-active="true"] {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  border-left-color: var(--accent);
   color: var(--accent);
 }
 
 .nav-panel-link:hover > span,
 .nav-panel-link[data-active="true"] > span {
-  transform: translateX(6px);
+  transform: translateX(0.2em);
 }
 
 .nav-panel-link:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline-offset: 4px;
 }
 
-/* Hairline rules between rows only, never after the last -- the same 1px
-   lattice .domain-grid and .footer-row-1 already use. */
-.nav-panel-list li + li .nav-panel-link {
-  border-top: 1px solid var(--border);
-}
+/* The footer row spans the FULL width and that is load-bearing, not decorative.
+   A single left-aligned link column on a wide screen leaves the right side
+   dangling; a row that runs edge to edge closes the composition at the bottom
+   the way the hairlines close it on the right. The CTA sits on the panel's left
+   line with the links, the wordmark on its right line with the trigger.
 
-.nav-panel-cta {
-  margin-top: 1.5rem;
+   margin-top is only ever a FLOOR -- the list's auto margins have already
+   parked this on the bottom padding. It is what keeps the row off the last link
+   when a short viewport leaves no free space to distribute. Same number as
+   every other edge, so the short layout is the tall one compressed rather than
+   a different design.
+
+   One element carries the reveal, not two: --i is set on this row so the CTA
+   and the wordmark arrive together as the last beat of the stagger. */
+.nav-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin-top: var(--nav-gap);
   opacity: 0;
   transform: translateX(14px);
   transition:
@@ -472,10 +579,17 @@ p, label, input, textarea, select, button {
     transform 260ms var(--ease-admin);
 }
 
-.nav-panel[data-open="true"] .nav-panel-cta {
+.nav-panel[data-open="true"] .nav-panel-foot {
   opacity: 1;
   transform: translateX(0);
   transition-delay: calc(var(--i, 0) * 28ms + 90ms);
+}
+
+.nav-panel-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* ── Footer ── */
@@ -670,6 +784,34 @@ p, label, input, textarea, select, button {
      1.05rem -> 16.8px x 0.70 x 11 = ~129px. Fits 138px.
      1.15rem -> 18.4px x 0.70 x 11 = ~142px. Overflows. Rejected.
    So 1.05rem, a 24% increase, with ~9px of margin on the worst case. */
+/* S72A. `color`, not `stroke` -- every path inside the SVG is
+   stroke: currentColor, so one property drives the whole mark and the hover
+   rule below is a single line instead of one per path.
+
+   position: relative for the same reason .domain-name carries it: .domain-letter
+   is absolutely positioned and would otherwise paint over in-flow siblings.
+   They do not actually overlap (watermark top-right, icon bottom-left), but the
+   two in-flow children of this face should not disagree about it.
+
+   flex-shrink: 0 because the face is a flex column -- without it a two-line
+   domain name squashes the icon instead of the face growing upward, which is
+   what justify-content: flex-end is there to allow. */
+.domain-face-front .domain-icon {
+  position: relative;
+  flex-shrink: 0;
+  margin-bottom: 0.85rem;
+  color: var(--accent);
+  transition: color 0.2s;
+}
+
+/* The whole reason these are inline and not R2 images: the front face turns
+   var(--accent) on hover, so an accent-coloured mark would vanish into its own
+   background at exactly the moment it is being looked at. It goes to --bg-base
+   with the name, in one rule, because it inherits `color`. */
+.domain-flip:hover .domain-face-front .domain-icon {
+  color: var(--bg-base);
+}
+
 .domain-face-front .domain-name {
   position: relative;
   font-family: var(--font-chakra), sans-serif;

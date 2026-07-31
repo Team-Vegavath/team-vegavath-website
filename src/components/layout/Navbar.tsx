@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useScroll } from "framer-motion";
 
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
@@ -49,7 +49,31 @@ import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button
       dismissals a full-screen overlay never did. The outside test runs against
       the whole HEADER, not the panel -- a panel-only ref would let a click on
       the trigger close via outside-click and reopen via onClick in the same
-      gesture, and the menu would appear stuck open. */
+      gesture, and the menu would appear stuck open.
+
+   ── S71: the panel is FULL SCREEN, and consequences 2 and 3 invert ───────────
+
+   A 360px column is 12% of a 2879px display -- the menu read as a strip stuck to
+   the edge rather than a menu. inset: 0 now, with the nav set at display scale.
+   The clip-path reveal, its 380ms and its easing are all untouched; the same
+   wipe simply has the whole viewport to cross. Geometry lives in .nav-panel.
+
+   Three things in THIS file follow from covering the viewport again:
+
+   a. THE SCROLL LOCK IS BACK, for the reason S70 removed it. S70's argument was
+      "a bounded panel does not cover the viewport, so locking the page behind a
+      dropdown is wrong" -- correct then, and it inverts exactly now that the
+      panel does cover it. Scrolling a page you cannot see is the bug.
+   b. THE CLICK-OUTSIDE LISTENER IS DELETED, because it became unreachable code
+      rather than because it stopped being wanted. The test is "target is not
+      inside <header>", and the panel is INSIDE the header while covering the
+      whole screen -- so no click can land outside it. Escape stays; it is now
+      the only dismissal besides the trigger and the links, which is what a
+      full-screen overlay has always had.
+   c. THE LOGO NEEDS z-index: 1, like the trigger. Both are in the static <nav>,
+      and .nav-panel is fixed, so the panel paints over anything in that bar
+      without its own stacking. At 360px the logo was nowhere near the panel and
+      this never showed; at full screen it would be buried. */
 
 const NAV_LINKS = [
   { href: "/", label: "HOME" },
@@ -69,7 +93,6 @@ export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
   const isHome = pathname === "/";
   const { scrollY } = useScroll();
 
@@ -82,17 +105,16 @@ export function Navbar() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
-    // pointerdown, not click: dismisses on press rather than release, which is
-    // how every other dismissible surface on the platform behaves.
-    const onPointerDown = (e: PointerEvent) => {
-      if (!headerRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
 
+    // Restore whatever was there rather than assuming "" -- this is the only
+    // thing that writes body.overflow, but assuming is how that stops being
+    // true later.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
     return () => {
+      document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [menuOpen]);
 
@@ -103,7 +125,6 @@ export function Navbar() {
 
   return (
     <header
-      ref={headerRef}
       style={{
         position: "fixed",
         top: 0,
@@ -128,10 +149,21 @@ export function Navbar() {
           paddingRight: "clamp(1.25rem, 4vw, 4rem)",
         }}
       >
+        {/* S71/c: position + z-index are load-bearing now, the same way
+            .nav-hamburger's are. The panel is fixed and covers the viewport, so
+            an unpositioned logo in this static bar gets painted over. */}
         <Link
           href="/"
           aria-label="Team Vegavath home"
-          style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0, textDecoration: "none" }}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            flexShrink: 0,
+            textDecoration: "none",
+          }}
         >
           <Image
             src={LOGO_URL}
@@ -201,24 +233,32 @@ export function Navbar() {
           ))}
         </ul>
 
-        {/* S70/C1: the same InteractiveHoverButton the hero uses, not a
-            .btn-primary -- one CTA mechanic across the site. --i continues the
-            link stagger so the button arrives last. */}
-        <InteractiveHoverButton
-          href="/join"
-          onClick={() => setMenuOpen(false)}
-          className="nav-panel-cta"
-          style={
-            {
-              "--i": NAV_LINKS.length,
-              display: "flex",
-              padding: "0.9rem 1rem",
-              letterSpacing: "0.1em",
-            } as CSSProperties
-          }
-        >
-          JOIN THE TEAM
-        </InteractiveHoverButton>
+        {/* S71: the CTA moved into a full-width footer ROW. On a wide screen a
+            left-aligned link column leaves the right side dangling, and a row
+            that runs edge to edge closes the composition -- CTA on the panel's
+            left line with the links, wordmark on its right line with the
+            trigger. --i sits on the row rather than the button so both arrive
+            together as the last beat of the stagger.
+
+            The wordmark is the string the footer already ships. Nothing here is
+            invented copy, and no settings/socials are plumbed into the navbar
+            for it -- those live on <Footer>, which is a server component with
+            the data. */}
+        <div className="nav-panel-foot" style={{ "--i": NAV_LINKS.length } as CSSProperties}>
+          {/* S70/C1: the same InteractiveHoverButton the hero uses, not a
+              .btn-primary -- one CTA mechanic across the site. No display:flex
+              override now; inline-flex is what keeps it button-width in a row
+              instead of stretching across the viewport. */}
+          <InteractiveHoverButton
+            href="/join"
+            onClick={() => setMenuOpen(false)}
+            style={{ padding: "0.9rem 2rem", letterSpacing: "0.1em" } as CSSProperties}
+          >
+            JOIN THE TEAM
+          </InteractiveHoverButton>
+
+          <span className="heading nav-panel-meta">TEAM VEGAVATH &middot; PESU ECC</span>
+        </div>
       </div>
     </header>
   );

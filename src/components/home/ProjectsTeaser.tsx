@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 
 import { Reveal } from "@/components/ui/Reveal";
 
@@ -16,8 +16,12 @@ import { Reveal } from "@/components/ui/Reveal";
    has no kart asset any more -- S60 moved the 3D model to /projects/kart to keep
    canvas/WebGL off `/` -- so the parallax layer is the shield logo at 0.04
    opacity. transform + opacity only, one composited layer, no canvas: the same
-   budget the CSS-transform rule in tasks.md asks for. S69 does not touch that
-   constraint; there is still no canvas, no WebGL and no kart image here.
+   budget the CSS-transform rule in tasks.md asks for.
+
+   S71 briefly replaced the shield with a hand-drawn SVG kart silhouette and it
+   was REVERTED the same session: the ask was never a drawn stand-in in this
+   band, it was the real kart on the HERO. A second, lesser kart down here would
+   compete with that. The shield stays what it always was -- texture.
 
    offset ["start end", "end start"] measures the section's own travel through
    the viewport, so the drift is tied to this section rather than page scroll.
@@ -65,7 +69,17 @@ export function ProjectsTeaser() {
     target: ref,
     offset: ["start end", "end start"],
   });
-  const y = useTransform(scrollYProgress, [0, 1], ["-8%", "8%"]);
+  /* The kart SVG reverted with S71; this did NOT, because it was never part of
+     it. The site-wide prefers-reduced-motion block only zeroes
+     transition-duration and animation-duration, and a MotionValue driven by
+     useTransform is neither -- so this drift has been an uncovered Framer
+     animation since S60, sitting silently alongside
+     GlyphMatrix/SmoothCursor/HyperText/KartGame on S67's open list. Collapsing
+     the range to a constant is the fix for that pre-existing gap and stands on
+     its own. useReducedMotion returns boolean | null; the null-before-hydration
+     case is falsy, which is the correct default. */
+  const reduceMotion = useReducedMotion();
+  const y = useTransform(scrollYProgress, [0, 1], reduceMotion ? ["0%", "0%"] : ["-8%", "8%"]);
 
   return (
     <section ref={ref} style={{ position: "relative", padding: "5rem 1.5rem", overflow: "hidden" }}>
