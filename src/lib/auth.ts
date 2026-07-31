@@ -107,6 +107,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.isAdmin = token.isAdmin as boolean;
       session.user.isGodfather = (token.isGodfather as boolean | undefined) ?? false;
       session.user.isViewer = (token.isViewer as boolean | undefined) ?? false;
+      // S67: surfaced for the self-service profile route, which has to scope its
+      // UPDATE to the caller's own row. The env godfather's id is the literal
+      // "godfather" (it has no admin_accounts row at all), so that string is the
+      // exact test for "environment-configured account" -- isGodfather alone is
+      // not, since a DB account can carry role='godfather' too.
+      session.user.accountId = (token.accountId as string | undefined) ?? "";
       return session;
     },
   },

@@ -189,9 +189,22 @@ function daysLeft(expiresAt: string): number {
   );
 }
 
+/** S67: production-only. An open registration link created against the draft or
+ *  a local database is a live credential path into whichever environment made
+ *  it, and there is no reason to mint one outside prod. Set to "true" ONLY in
+ *  the prod Vercel project; unset everywhere else, which is falsy.
+ *
+ *  Read at module scope because NEXT_PUBLIC_* is inlined at build time -- this
+ *  is a literal in the bundle, not a runtime lookup (same pattern as
+ *  NEXT_PUBLIC_R2_PUBLIC_URL in src/lib/r2.ts and CheckinQROverlay.tsx). */
+const SHOW_VIEWER_INVITES = process.env.NEXT_PUBLIC_SHOW_VIEWER_INVITES === "true";
+
 /** Godfather-only (S48): one reusable link that registers anyone as a viewer.
  *  Named invites don't scale to a 30-person domain; this is the alternative,
- *  with per-person approval still happening in Pending Requests. */
+ *  with per-person approval still happening in Pending Requests.
+ *
+ *  This is an ADDITIONAL condition on top of the godfather gate the accounts
+ *  page already applies -- it does not replace it. */
 export function OpenViewerLink({ initialTokens }: { initialTokens: OpenTokenRow[] }) {
   const router = useRouter();
   const [tokens, setTokens] = useState<OpenTokenRow[]>(initialTokens);
@@ -248,6 +261,12 @@ export function OpenViewerLink({ initialTokens }: { initialTokens: OpenTokenRow[
       setRevoking("");
     }
   }
+
+  // After the hooks, never before -- SHOW_VIEWER_INVITES is a build-time
+  // constant so the order is stable either way, but the lint rule is not.
+  // Renders nothing at all rather than a disabled control: outside production
+  // this feature does not exist, and a greyed-out button advertises it.
+  if (!SHOW_VIEWER_INVITES) return null;
 
   return (
     <div style={{ marginTop: "2rem", borderTop: "1px solid var(--border)", paddingTop: "1.5rem" }}>

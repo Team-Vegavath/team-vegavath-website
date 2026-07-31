@@ -141,6 +141,46 @@ export async function deleteAdminAccount(id: string): Promise<void> {
   await sql`DELETE FROM admin_accounts WHERE id = ${id}`;
 }
 
+// ------------------------------------------------------- self-service (S67)
+
+/** Own-account details. mobile_number is nullable and the profile form must be
+ *  able to CLEAR it, so it is written directly rather than through COALESCE --
+ *  `COALESCE(${x ?? null}, col)` can never write a NULL back (see CLAUDE.md).
+ *  The caller decides what null means; this just stores it. */
+export async function updateOwnAccountDetails(
+  id: string,
+  displayName: string,
+  mobile: string | null
+): Promise<void> {
+  await sql`
+    UPDATE admin_accounts
+    SET display_name = ${displayName},
+        mobile_number = ${mobile}
+    WHERE id = ${id}`;
+}
+
+export async function getAdminPasswordHashById(id: string): Promise<string | null> {
+  const rows = await sql`
+    SELECT password_hash FROM admin_accounts WHERE id = ${id} LIMIT 1`;
+  return (rows[0] as { password_hash: string } | undefined)?.password_hash ?? null;
+}
+
+/** Self-service password change. Bumps token_version for the same reason
+ *  consumePasswordResetToken does: it kills every live JWT for this account.
+ *  Note that "every" includes the caller's own current session -- auth.ts's jwt
+ *  callback compares the token's version against the row on the next refresh and
+ *  returns null when they differ. That is the correct security behaviour, not a
+ *  bug, so the profile form warns before submitting and the route says so in its
+ *  response. */
+export async function updateOwnPassword(id: string, newPassword: string): Promise<void> {
+  const hash = await bcrypt.hash(newPassword, 10);
+  await sql`
+    UPDATE admin_accounts
+    SET password_hash = ${hash},
+        token_version = token_version + 1
+    WHERE id = ${id}`;
+}
+
 export async function countAdminAccounts(): Promise<number> {
   const rows = await sql`SELECT count(*)::int AS n FROM admin_accounts`;
   return (rows[0] as { n: number }).n;

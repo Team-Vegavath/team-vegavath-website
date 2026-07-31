@@ -16,6 +16,8 @@ declare module "next-auth" {
       isAdmin: boolean;
       isGodfather: boolean;
       isViewer: boolean;
+      /** admin_accounts.id, or the literal "godfather" for the env account (S67). */
+      accountId: string;
     };
   }
 }

@@ -32,6 +32,22 @@ html, body {
   --success:        #22c55e;
   --error:          #ef4444;
   --warning:        #F29C04;
+
+  /* S67 elevation. On a #0a0a0a base a shadow cannot be "seen" the way it is on
+     a light theme -- it is felt as the edge going soft. Two layers: a tight,
+     near-opaque contact shadow that separates the element from what it sits on,
+     and a wider, softer one that gives it height. -lg is the same recipe scaled
+     up, and is reserved for the two things that float over the whole panel
+     (the slide-in edit panel and the command palette). */
+  --shadow-elevation:    0 1px 2px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-elevation-lg: 0 2px 6px rgba(0, 0, 0, 0.6), 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  /* S67 motion. ONE curve for the whole admin panel: ease-out-expo -- leaves
+     immediately, lands soft. fast for colour/border changes, base for anything
+     that actually moves (toggle thumb, slide-in panel). */
+  --ease-admin:     cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:  120ms;
+  --duration-base:  180ms;
 }
 
 /* S52B: this reset MUST stay inside @layer base. Unlayered CSS beats every
@@ -1158,6 +1174,21 @@ p, label, input, textarea, select, button {
    (not Tailwind) because responsive prefixes are unreliable
    in this project's Tailwind v4 setup. */
 
+/* ── S67 admin elevation hierarchy ──────────────────────────────────────────
+   Strict, and every admin rule below obeys it. Before S67 the four --bg-*
+   tokens were used near-interchangeably; sidebar and content were exactly
+   inverted, so the chrome sat lighter than the content it framed.
+
+     --bg-base      page + chrome    body, .admin-sidebar, .admin-topbar
+     --bg-surface   the content area .admin-content
+     --bg-card      at rest          stat cards, table rows, .admin-form
+     --bg-elevated  actively raised  hover states, .admin-panel, the palette,
+                                     open dropdowns, nested drop zones
+
+   Background alone is not depth -- it is just a different flat colour. Anything
+   that should read as physically lifted also carries --shadow-elevation.
+   ──────────────────────────────────────────────────────────────────────── */
+
 .admin-sidebar {
   position: fixed;
   top: 0;
@@ -1166,7 +1197,7 @@ p, label, input, textarea, select, button {
   width: 300px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: var(--bg-base);
   border-right: 1px solid var(--border);
   overflow-x: hidden;
   z-index: 40;
@@ -1235,7 +1266,10 @@ p, label, input, textarea, select, button {
   color: var(--text-secondary);
   text-decoration: none;
   border-left: 2px solid transparent;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color var(--duration-fast) var(--ease-admin),
+    background var(--duration-fast) var(--ease-admin),
+    border-color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-nav-item svg {
@@ -1251,10 +1285,18 @@ p, label, input, textarea, select, button {
   color: var(--text-primary);
 }
 
+/* S67: the active item is lit from its left edge rather than flat-tinted. The
+   inset shadow does the work -- a negative spread pulls the glow back off the
+   right side so it decays inside the item instead of washing the whole row.
+   position:relative is only here so the glow paints over the nav's own stacking
+   order predictably; border-left stays a solid 2px (a gradient border needs
+   border-image + a fallback, which is not worth it for 2 pixels). */
 .admin-nav-item.active {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-left-color: var(--accent);
   color: var(--accent);
+  box-shadow: inset 6px 0 16px -10px var(--accent);
 }
 
 .admin-sidebar-footer {
@@ -1298,7 +1340,7 @@ p, label, input, textarea, select, button {
   font-size: 0.65rem;
   text-transform: uppercase;
   color: var(--text-muted);
-  transition: color 0.12s;
+  transition: color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-sidebar-signout .admin-signout:hover {
@@ -1321,18 +1363,37 @@ p, label, input, textarea, select, button {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
-  transition: color 0.15s;
+  transition: color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-signout:hover {
   color: var(--error);
 }
 
+/* S67: --bg-surface, one step above the sidebar's --bg-base, so the content
+   area reads as the lit half of the panel.
+
+   The background-image is .pattern-speed-lines' geometry, admin-tuned:
+   the same -55deg 4px/1px repeat the public site uses, at half its alpha. This
+   is the admin panel's only texture, and .admin-content is the only
+   place in the panel with texture, and it has to be felt, not seen: at 0.04 it
+   showed up as noise under the new card shadows, which read as dirt rather than
+   surface. No background-color of its own here, unlike .pattern-speed-lines,
+   which would pin this back to --bg-base. Deliberately NOT on the sidebar --
+   flat chrome against textured content is the same "chrome vs content"
+   separation S65 drew with colour. */
 .admin-content {
   margin-left: 300px;
   padding: 2.5rem 3rem 4rem;
   min-width: 0;
-  background: var(--bg-base);
+  background-color: var(--bg-surface);
+  background-image: repeating-linear-gradient(
+    -55deg,
+    transparent,
+    transparent 4px,
+    rgba(239, 93, 8, 0.02) 4px,
+    rgba(239, 93, 8, 0.02) 5px
+  );
   min-height: 100vh;
 }
 
@@ -1372,6 +1433,8 @@ p, label, input, textarea, select, button {
   .admin-sidebar[data-open="true"] .admin-nav-item.active {
     color: var(--accent);
     background: transparent;
+    /* The overlay nav is deliberately flat -- cancel S67's edge glow too. */
+    box-shadow: none;
   }
   .admin-sidebar[data-open="true"] .admin-signout {
     display: block;
@@ -1388,7 +1451,8 @@ p, label, input, textarea, select, button {
     right: 0;
     height: 56px;
     padding: 0 1.25rem;
-    background: var(--bg-surface);
+    /* S67: chrome, so --bg-base -- same tier as the sidebar it replaces here. */
+    background: var(--bg-base);
     border-bottom: 1px solid var(--border);
     z-index: 41;
   }
@@ -1409,20 +1473,37 @@ p, label, input, textarea, select, button {
   margin-bottom: 28px;
 }
 
+/* S67: flex-wrap added with the bigger title. The action is flex-shrink:0, so
+   without it a 2.2rem title on a 360px screen squeezes the title column to
+   ~120px and wraps it four lines deep beside the button; now the button drops
+   to its own line instead. */
 .admin-page-header-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
+/* S67: 1.4rem sat in the same visual band as everything else on the page.
+   Tracking drops 0.1em -> 0.06em as the size goes up -- wide tracking is a
+   small-caps device; at 2.2rem it reads as a spaced-out sign, not a title. */
 .admin-page-header-title {
   font-family: var(--font-chakra), sans-serif;
   font-weight: 700;
-  font-size: 1.4rem;
-  letter-spacing: 0.1em;
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  line-height: 1.1;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-primary);
+}
+
+/* AdminPageHeader level={2}: a section header inside a page that already has an
+   h1. The tag is the hook -- no extra class or data attribute needed. Tracking
+   goes back up as the size comes down, per C1's reasoning in reverse. */
+h2.admin-page-header-title {
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
 }
 
 .admin-page-header-sub {
@@ -1436,8 +1517,12 @@ p, label, input, textarea, select, button {
   flex-shrink: 0;
 }
 
-/* The 32px accent tick on the rule is the mark that anchors every admin page
-   to the same product. */
+/* The accent tick on the rule is the mark that anchors every admin page to the
+   same product.
+   S67: the tick widens 32px -> 48px and fades out instead of stopping dead. A
+   solid block reads as a rule someone followed; a gradient reads as a decision.
+   Same change is repeated on .admin-form-section::after and the stat card, so
+   the mark is one shape everywhere it appears. */
 .admin-page-header-rule {
   position: relative;
   margin-top: 16px;
@@ -1450,17 +1535,18 @@ p, label, input, textarea, select, button {
   position: absolute;
   left: 0;
   top: -0.5px;
-  width: 32px;
+  width: 48px;
   height: 2px;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), transparent);
 }
 
-/* Legacy header (S10). S66 migrated all nine new/edit sub-page call sites to
-   AdminPageHeader, so the ONLY remaining users are BootstrapCreateSession (2),
-   BootstrapAdminDashboard (1) and EventRegistrationsTable (1) -- plus
-   .admin-page-title alone in the SponsorsTable slide-in panel. Bootstrap-only
-   from here: delete both rules when those four components migrate. Kept, not
-   deleted, because they are still rendered today. */
+/* Legacy header (S10). S66 migrated the nine new/edit sub-page call sites and
+   S67 migrated EventRegistrationsTable, which was the last non-Bootstrap one.
+   Remaining users are now ONLY BootstrapCreateSession (2 headers) and
+   BootstrapAdminDashboard (1, which shows a session name rather than a page
+   title) -- plus .admin-page-title alone in the SponsorsTable slide-in panel.
+   Truly Bootstrap-only from here: delete both rules when those migrate. Kept,
+   not deleted, because they are still rendered today. */
 .admin-page-header {
   display: flex;
   align-items: center;
@@ -1486,7 +1572,7 @@ p, label, input, textarea, select, button {
   text-transform: uppercase;
   color: var(--text-muted);
   text-decoration: none;
-  transition: color 0.15s;
+  transition: color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-back-link:hover {
@@ -1495,9 +1581,14 @@ p, label, input, textarea, select, button {
 
 /* Admin tables */
 
+/* S67: a table is a surface, not bare borders floating on the page. The shadow
+   plus --bg-card rows lift the whole block off the textured --bg-surface
+   content area. */
 .admin-table-wrap {
   border: 1px solid var(--border);
   overflow-x: auto;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-elevation);
 }
 
 .admin-table {
@@ -1533,13 +1624,15 @@ p, label, input, textarea, select, button {
   background: var(--bg-elevated);
 }
 
+/* S67: rows are "at rest" -> --bg-card, hover is "raised" -> --bg-elevated.
+   Both tiers moved up one; before this the row bg matched the old page bg. */
 .admin-table tbody tr {
-  background: var(--bg-base);
-  transition: background 0.15s;
+  background: var(--bg-card);
+  transition: background var(--duration-fast) var(--ease-admin);
 }
 
 .admin-table tbody tr:hover {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
 }
 
 .admin-table tbody tr:last-child td {
@@ -1588,7 +1681,10 @@ p, label, input, textarea, select, button {
   cursor: pointer;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color var(--duration-fast) var(--ease-admin),
+    border-color var(--duration-fast) var(--ease-admin),
+    background var(--duration-fast) var(--ease-admin);
 }
 
 .admin-row-action:hover {
@@ -1670,9 +1766,15 @@ p, label, input, textarea, select, button {
 }
 
 /* .status-shortlisted aliased: the DB status value is "shortlisted", so S66
-   can key off the raw value without a lookup table. */
+   can key off the raw value without a lookup table.
+   S67: event_registrations.waitlisted joins this group, not the text-muted
+   pending group. `pending` and `waitlisted` sit in the SAME table -- muting both
+   would leave the badge unable to tell them apart, which is the one job it has.
+   Gold already means "held, still in the running", which is exactly waitlisted,
+   and it is the colour that cell rendered before it was a badge. */
 .status-shortlist,
-.status-shortlisted {
+.status-shortlisted,
+.status-waitlisted {
   color: var(--gold);
 }
 
@@ -1680,7 +1782,8 @@ p, label, input, textarea, select, button {
    --success (#22c55e) does exist, and CLAUDE.md forbids hardcoded hex. */
 .status-selected,
 .status-published,
-.status-accepted {
+.status-accepted,
+.status-confirmed {
   color: var(--success);
 }
 
@@ -1692,9 +1795,15 @@ p, label, input, textarea, select, button {
    carry inline white-space:nowrap for the desktop table. The primary cell
    is tagged .admin-td-primary in the page markup. */
 @media (max-width: 767px) {
+  /* S67: the wrap's desktop surface has to go here too. Rows are separate
+     cards below 768px, and a bg-card wrap would fill the gaps between them --
+     the separation would vanish and the shadow would outline the whole stack
+     instead of each card. */
   .admin-table-wrap {
     border: none;
     overflow: visible;
+    background: transparent;
+    box-shadow: none;
   }
   .admin-table thead {
     display: none;
@@ -1711,6 +1820,9 @@ p, label, input, textarea, select, button {
     border: 1px solid var(--border);
     padding: 0.9rem 1rem;
     margin-bottom: 0.75rem;
+    /* S67: each row IS the card here, so it carries the elevation the
+       .admin-table-wrap gives the whole table on desktop. */
+    box-shadow: var(--shadow-elevation);
   }
   .admin-table tbody tr:hover {
     background: var(--bg-card);
@@ -1748,10 +1860,13 @@ p, label, input, textarea, select, button {
 
 /* Admin forms */
 
+/* S67: --bg-card, not --bg-surface. .admin-content took --bg-surface, so a
+   surface-coloured form would now be invisible against the page it sits on. */
 .admin-form {
-  background: var(--bg-surface);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   padding: 1.75rem;
+  box-shadow: var(--shadow-elevation);
 }
 
 .admin-section-label {
@@ -1778,14 +1893,15 @@ p, label, input, textarea, select, button {
   position: relative;
 }
 
+/* S67: same gradient tick as .admin-page-header-rule::after. */
 .admin-form-section::after {
   content: "";
   position: absolute;
   left: 0;
   bottom: -1px;
-  width: 32px;
+  width: 48px;
   height: 2px;
-  background: var(--accent);
+  background: linear-gradient(90deg, var(--accent), transparent);
 }
 
 /* S66: right-aligned submit row with its own boundary, so a long form ends on a
@@ -1820,15 +1936,16 @@ p, label, input, textarea, select, button {
   font-size: 0.95rem;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.2s;
+  transition: border-color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-input:focus {
   border-bottom-color: var(--accent);
 }
 
+/* S67: an open dropdown is raised above its container -> --bg-elevated. */
 select.admin-input option {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
@@ -1859,7 +1976,8 @@ textarea.admin-input {
   width: 100%;
   border: 1px dashed var(--border-strong);
   /* S66: bg-elevated, so the drop zone reads as a container inside .admin-form
-     (bg-surface) rather than sitting at almost the same value as it. */
+     rather than sitting at almost the same value as it. S67 moved .admin-form
+     up to bg-card, so this stays one step above it and the relationship holds. */
   background: var(--bg-elevated);
   padding: 1.6rem 1rem;
   text-align: center;
@@ -1869,7 +1987,7 @@ textarea.admin-input {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-secondary);
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-upload-zone:hover,
@@ -1897,7 +2015,7 @@ textarea.admin-input {
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
-  transition: color 0.15s;
+  transition: color var(--duration-fast) var(--ease-admin);
 }
 
 .admin-file-remove:hover {
@@ -1933,7 +2051,7 @@ textarea.admin-input {
   font-size: 0.5rem;
   letter-spacing: 0.1em;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast) var(--ease-admin);
 }
 
 .admin-current-thumb:hover span {
@@ -1960,7 +2078,8 @@ textarea.admin-input {
   height: 22px;
   background: var(--border-strong);
   border: 1px solid var(--border);
-  transition: background 150ms;
+  /* S67: base, not fast -- the thumb moves, and the track has to arrive with it. */
+  transition: background var(--duration-base) var(--ease-admin);
 }
 
 .admin-toggle-thumb {
@@ -1970,7 +2089,9 @@ textarea.admin-input {
   width: 14px;
   height: 14px;
   background: var(--text-secondary);
-  transition: left 150ms, background 150ms;
+  transition:
+    left var(--duration-base) var(--ease-admin),
+    background var(--duration-base) var(--ease-admin);
 }
 
 .admin-toggle input:checked + .admin-toggle-track {
@@ -2022,7 +2143,7 @@ textarea.admin-input {
   border: 1px solid var(--error);
   padding: 0.65rem 1.4rem;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast) var(--ease-admin);
 }
 
 .admin-btn-danger:hover {
@@ -2045,7 +2166,7 @@ textarea.admin-input {
   border: 1px solid var(--error);
   padding: 0.65rem 1.4rem;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast) var(--ease-admin);
 }
 
 .admin-btn-danger-outline:hover {
@@ -2059,16 +2180,30 @@ textarea.admin-input {
 
 /* Admin dashboard stat cards */
 
-/* S65: values retuned for AdminStatCard. border-left-width is 3px and its
-   colour comes from the component (accent or border-strong). */
+/* S65: values retuned for AdminStatCard.
+   S67: the accent colour moved OFF an inline style and onto a [data-accent]
+   attribute, because a pseudo-element and a companion box-shadow cannot be
+   expressed inline per-instance. Card sits at --bg-card (at rest) with the
+   shared elevation shadow, so it reads as a raised tile on the textured
+   content area rather than a bordered rectangle. */
 .admin-stat-card {
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-left-width: 3px;
+  border-left: 3px solid var(--border-strong);
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: var(--shadow-elevation);
+}
+
+/* Accent card: solid border kept (a 3px gradient border needs border-image and
+   a fallback for one visible pixel of gain) and the gradient idea is carried by
+   an inset glow bleeding right off that edge instead -- the same "lit from the
+   left" language as .admin-nav-item.active, so the two accents agree. */
+.admin-stat-card[data-accent] {
+  border-left-color: var(--accent);
+  box-shadow: var(--shadow-elevation), inset 8px 0 24px -18px var(--accent);
 }
 
 .admin-stat-label {
@@ -2079,19 +2214,26 @@ textarea.admin-input {
   color: var(--text-muted);
 }
 
+/* S67: back up from S65's clamp(1.6rem, 2.5vw, 2rem). S65 shrank it to make it
+   fit; the goal now is different -- this is the one number on the dashboard that
+   should command attention, and at 2rem it was just another line of text. Stays
+   Chakra rather than reverting to the pre-S65 mono: mono at 3rem reads as
+   terminal output, Chakra reads as a designed figure. */
 .admin-stat-value {
   font-family: var(--font-chakra), sans-serif;
-  font-size: clamp(1.6rem, 2.5vw, 2rem);
+  font-size: clamp(2.2rem, 4vw, 3rem);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1;
   color: var(--text-primary);
 }
 
+/* S67: --text-muted, not --text-secondary. It sits directly under the enlarged
+   value; at secondary it competed with it instead of receding. */
 .admin-stat-sub {
   margin-top: 2px;
   font-family: var(--font-mono), monospace;
   font-size: 0.7rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 /* ── Admin command palette (S62) ──
@@ -2100,6 +2242,14 @@ textarea.admin-input {
 
 .command-palette::backdrop {
   background: rgba(0, 0, 0, 0.72);
+}
+
+/* S67: the palette floats over the entire panel, so it gets the -lg shadow.
+   Here rather than in CommandPalette.tsx's inline style block for the same
+   reason ::backdrop is: the component sets no box-shadow, so nothing inline
+   outranks this. */
+.command-palette {
+  box-shadow: var(--shadow-elevation-lg);
 }
 
 .command-palette-item {
@@ -2118,7 +2268,9 @@ textarea.admin-input {
   text-align: left;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background var(--duration-fast) var(--ease-admin),
+    color var(--duration-fast) var(--ease-admin);
 }
 
 .command-palette-item:hover,
@@ -2150,11 +2302,15 @@ textarea.admin-input {
   z-index: 61;
   height: 100vh;
   width: min(34rem, 100%);
-  background: var(--bg-surface);
+  /* S67: the most-raised element in the panel -- elevated bg + the -lg shadow,
+     which is what actually sells it as sliding over the page rather than being
+     part of it. */
+  background: var(--bg-elevated);
   border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-elevation-lg);
   overflow-y: auto;
   transform: translateX(100%);
-  transition: transform 0.25s ease;
+  transition: transform var(--duration-base) var(--ease-admin);
 }
 
 .admin-panel[data-open="true"] {
@@ -2427,4 +2583,31 @@ textarea.admin-input {
 .project-card:hover,
 .project-card:focus-visible {
   background: var(--bg-elevated);
+}
+
+/* ── S67: site-wide reduced motion. Overdue since S60; last in the file so it
+   wins on order without an escalating specificity fight.
+
+   No component needed excluding. The four rAF-driven pieces (glyph-matrix,
+   smooth-cursor, hyper-text, KartGame) paint to canvas or animate through
+   Framer Motion's JS timeline, so they carry no CSS transition or animation for
+   this to reach -- reduced motion for those is a separate, unbuilt concern, not
+   something this block breaks.
+
+   The only fill-mode:forwards animation on the site is .spotlight-cone, which
+   already has its own reduce override above pinning the FINAL state (opacity 1,
+   settled transform); animation:none there means there is nothing left for the
+   0.01ms duration to snap to the start of. .marquee-track is infinite and gets
+   cut to one iteration, landing at translateX(-50%) -- the track is a duplicated
+   list, so that end position is pixel-identical to the start. Nothing lands
+   half-scrolled. ─────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import type {
   EventRegistration,
   EventRegistrationStatus,
@@ -14,12 +15,11 @@ const STATUSES: EventRegistrationStatus[] = [
   "waitlisted",
 ];
 
-const STATUS_COLORS: Record<EventRegistrationStatus, string> = {
-  pending: "var(--text-muted)",
-  confirmed: "var(--success)",
-  rejected: "var(--accent)",
-  waitlisted: "var(--gold)",
-};
+// S67: STATUS_COLORS is gone -- .status-badge status-${status} carries all four
+// colours now, and S67 added the .status-confirmed / .status-waitlisted
+// modifiers that were missing. Same deletion S66 made in ApplicationsTable, for
+// the same reason: one place for a status colour, not two that can disagree.
+// (They already did: rejected was --accent here and --error in the badge.)
 
 interface Props {
   eventId: string;
@@ -64,17 +64,15 @@ export default function EventRegistrationsTable({
 
   return (
     <section style={{ marginTop: "3rem" }}>
-      <header className="admin-page-header">
-        <h2 className="admin-page-title" style={{ fontSize: "1.1rem" }}>
-          Registrations
-        </h2>
-        <span
-          className="mono"
-          style={{ fontSize: "0.7rem", letterSpacing: "0.12em", color: "var(--text-muted)" }}
-        >
-          {items.length} TOTAL
-        </span>
-      </header>
+      {/* S67: last non-Bootstrap legacy .admin-page-header call site, migrated.
+          The "n TOTAL" span was the header's right-hand slot; it is the subtitle
+          now -- a count is what a subtitle is for, and AdminPageHeader's action
+          slot is for controls. */}
+      <AdminPageHeader
+        title="Registrations"
+        subtitle={`${items.length} ${items.length === 1 ? "registration" : "registrations"}`}
+        level={2}
+      />
 
       <section className="admin-table-wrap">
         <table className="admin-table">
@@ -104,15 +102,11 @@ export default function EventRegistrationsTable({
                     {formatDate(reg.registered_at)}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    <span
-                      className="admin-dot"
-                      style={{ background: STATUS_COLORS[reg.status] }}
-                      aria-hidden="true"
-                    />
+                    {/* Viewer gets the badge; the admin's cell stays a <select>,
+                        because a badge cannot be an interactive dropdown and the
+                        select is already the colour-free control. */}
                     {isViewer ? (
-                      <span className="admin-cell-mono" style={{ textTransform: "uppercase" }}>
-                        {reg.status}
-                      </span>
+                      <span className={`status-badge status-${reg.status}`}>{reg.status}</span>
                     ) : (
                       <select
                         value={reg.status}
@@ -123,7 +117,9 @@ export default function EventRegistrationsTable({
                         className="mono"
                         aria-label={`Status for ${reg.name}`}
                         style={{
-                          background: "var(--bg-card)",
+                          // S67: elevated -- table rows are --bg-card now, and a
+                          // control has to sit above the row it lives in.
+                          background: "var(--bg-elevated)",
                           border: "1px solid var(--border-strong)",
                           borderRadius: 0,
                           color: "var(--text-primary)",
