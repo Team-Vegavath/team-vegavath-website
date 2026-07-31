@@ -242,12 +242,73 @@ p, label, input, textarea, select, button {
    their max-width:767px block are gone -- the navbar is a single hamburger at
    every width now, so nothing called them. The overlay rules stay because the
    overlay stayed, but it starts at the top of the viewport rather than under a
-   72px header and centres its links vertically. */
+   72px header and centres its links vertically.
+
+   S69: .nav-hamburger is back, and this time it is the only thing the button
+   renders. S61 retired the name because the button became the word MENU and
+   .btn-outline already carried the border plus accent hover it needed; the ask
+   this session is no VISIBLE text at any width, so the word is gone and the
+   bars need a class again. Two differences from the S61-era version worth
+   knowing: it is NOT behind a media query (there is one navbar at every width
+   now, so the icon shows everywhere), and the bar geometry is AdminShell's
+   mobile hamburger verbatim -- 20x2px bars, 5px gap, translateY(7px) to
+   collapse onto the middle -- so the public and admin toggles read as one
+   family rather than two hand-tuned icons. AdminShell keeps its transforms
+   inline; these live in CSS because a class can express the transition and the
+   :hover that inline styles cannot. */
+
+.nav-hamburger {
+  /* z-index: 1 is load-bearing -- see the .nav-overlay note below. */
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  /* 44px is the pointer-target floor. The icon inside is only 20x16, so the
+     rest is hit area, not visual weight. */
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.nav-hamburger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* currentColor, not var(--text-primary): the bars then follow the button's own
+   colour transition on hover with no second rule. */
+.nav-hamburger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: currentColor;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.nav-hamburger[data-open="true"] span:first-child {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-hamburger[data-open="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-hamburger[data-open="true"] span:last-child {
+  transform: translateY(-7px) rotate(-45deg);
+}
 
 .nav-overlay {
   /* No z-index: the overlay is a later sibling of the nav bar inside the
-     header's stacking context, and the CLOSE button carries z-index: 1, which
-     beats this element's z-index: auto whatever the DOM order. A negative
+     header's stacking context, and the hamburger button carries z-index: 1,
+     which beats this element's z-index: auto whatever the DOM order. A negative
      z-index here would paint the overlay behind the header's own background. */
   position: fixed;
   inset: 0;
@@ -350,20 +411,82 @@ p, label, input, textarea, select, button {
   }
 }
 
-.domain-tile {
+/* S69: .domain-tile is gone. The tile is now a two-faced flip card -- clicking
+   it rotates in place and the description that used to open a fixed modal
+   (S20) lives on the back face.
+
+   Why the height went 130px -> 180px, with the arithmetic, because it is the
+   one number the whole section depends on. The longest description (COD, 123
+   characters) is the constraint, and the narrowest tile is the 6-column
+   desktop case: a 72rem grid gives each tile ~192px, less 0.9rem of back-face
+   padding each side, so ~163px of text width. At 0.75rem Space Grotesk that is
+   ~27 characters a line, so COD wraps to 5 lines; at line-height 1.45 that is
+   ~87px, plus the abbr tag and its gap (~18px) and 28.8px of padding = ~134px.
+   130px could not hold it. 180px holds it with ~45px spare, and the 2-column
+   375px case (6 lines, ~151px) also fits. BOTH levers were needed: the height
+   AND a back-face font smaller than the front's -- 0.75rem is 12px, which is
+   the legible floor for supporting text and is only ever read dark-on-accent
+   at full contrast, on deliberate interaction. The increase is uniform rather
+   than per-domain so the grid stays aligned.
+
+   No `overflow` on .domain-flip-inner: per spec, any overflow other than
+   visible on a preserve-3d element forces it back to flat and the flip
+   collapses into a 2D squash. The clipping the ghost letter needs is on the
+   faces, which are leaves and carry no preserve-3d.
+
+   The back face is var(--accent) at rest, which is deliberately the SAME fill
+   as the front face's :hover -- so the flip reads as the hover state
+   committing rather than as a second unrelated visual. */
+
+.domain-flip {
+  /* Grid item and click target. A real <button>, so these five lines are
+     undoing UA chrome rather than styling anything. */
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+
   position: relative;
-  background: var(--bg-card);
-  padding: 2.25rem 1rem 1.5rem;
-  min-height: 130px;
+  min-height: 180px;
+  cursor: pointer;
+  perspective: 1000px;
+}
+
+.domain-flip-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.domain-flip-inner[data-flipped="true"] {
+  transform: rotateY(180deg);
+}
+
+.domain-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* No -webkit- prefix. A hand-written one was verified to be STRIPPED from the
+     compiled stylesheet: Lightning CSS prefixes from the browserslist target
+     itself, so the manual copy was dead weight claiming to be a safeguard. */
+  backface-visibility: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.domain-face-front {
+  background: var(--bg-card);
+  padding: 2.25rem 1rem 1.5rem;
   justify-content: flex-end;
   align-items: flex-start;
-  overflow: hidden;
   transition: background 0.2s;
 }
 
-.domain-tile .domain-letter {
+.domain-face-front .domain-letter {
   position: absolute;
   top: 0;
   right: 0.5rem;
@@ -377,7 +500,7 @@ p, label, input, textarea, select, button {
   pointer-events: none;
 }
 
-.domain-tile .domain-name {
+.domain-face-front .domain-name {
   position: relative;
   font-family: var(--font-chakra), sans-serif;
   font-weight: 700;
@@ -388,16 +511,45 @@ p, label, input, textarea, select, button {
   transition: color 0.2s;
 }
 
-.domain-tile:hover {
+/* Hover lives on the container, not the face, so the front lights up from
+   anywhere in the tile including the padding. */
+.domain-flip:hover .domain-face-front {
   background: var(--accent);
 }
 
-.domain-tile:hover .domain-letter {
+.domain-flip:hover .domain-face-front .domain-letter {
   color: var(--text-primary);
   opacity: 0.35;
 }
 
-.domain-tile:hover .domain-name {
+.domain-flip:hover .domain-face-front .domain-name {
+  color: var(--bg-base);
+}
+
+.domain-face-back {
+  background: var(--accent);
+  padding: 0.9rem;
+  gap: 0.45rem;
+  transform: rotateY(180deg);
+}
+
+/* The abbr survives the flip so you can tell which tile you are reading
+   without flipping it back. opacity rather than a dimmed colour value keeps
+   this token-only -- there is no hardcoded rgba anywhere in the pair. */
+.domain-back-abbr {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bg-base);
+  opacity: 0.6;
+}
+
+.domain-back-text {
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.45;
   color: var(--bg-base);
 }
 
@@ -2340,14 +2492,65 @@ textarea.admin-input {
   min-height: 100vh;
   background: var(--bg-base);
   color: var(--text-primary);
-  overflow-x: hidden;
+  /* clip, NOT hidden. S69 made the contents rail position: sticky, and
+     overflow: hidden on an ancestor turns that ancestor into a scroll
+     container -- the rail would then stick to a box that never scrolls, which
+     looks exactly like sticky "not working". overflow-x: clip does the same
+     clipping without establishing a scroll container, so the rail sticks. */
+  overflow-x: clip;
 }
 
-.legal-shell {
-  width: 100%;
+/* ── Layout ─────────────────────────────────────────────────────────────────
+   S69: /legal was a single 780px centred column (.legal-shell, now gone). It is
+   a sidebar-plus-content two-column layout, following DocsShell's shape: a
+   260px sticky rail and the document in the remaining width.
+
+   These are .legal-* mirrors rather than the .docs-* classes themselves, and
+   the reason is elevation. .docs-content-wrapper sets background:
+   var(--bg-surface) against a --bg-base rail, which is the chrome/content split
+   S68 built for the password-gated docs surface. /legal is a public document on
+   --bg-base and reusing those classes would have silently repainted it.
+   .docs-layout also hard-codes padding-top: 72px for the navbar, where the
+   legal page carries its own 8rem of breathing room above the title.
+
+   The content column stays at S68's 780px. Its original justification is gone
+   (S68 widened 720px -> 780px specifically to fit the 2-column contents block,
+   which no longer lives in this column), but 780px is a good measure for legal
+   prose on its own, and narrowing it back would be churn nobody asked for. */
+
+.legal-layout {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* The 8rem initial offset is a MARGIN, not padding, and that distinction is
+   the whole rule. Sticky pins the element's own box, so 8rem of internal top
+   padding would pin 128px of empty rail to the top of the viewport for the
+   rest of the page. As a margin it only shifts where the rail starts in flow;
+   `top: 96px` still decides where it pins, clearing the 72px navbar with a
+   little air. */
+.legal-sidebar-wrapper {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 96px;
+  margin-top: 8rem;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 0 0 2rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.legal-content-wrapper {
+  flex: 1;
+  min-width: 0;
   max-width: 780px;
   padding: 8rem 1.5rem 5rem;
   box-sizing: border-box;
+}
+
+.legal-mobile-bar {
+  display: none;
 }
 
 .legal-updated,
@@ -2377,33 +2580,22 @@ textarea.admin-input {
   letter-spacing: 0.16em;
 }
 
-/* ── Contents ───────────────────────────────────────────────────────────────
-   S68: plain jump links, no scroll-spy. A 19-clause legal page is used by
-   lookup -- you arrive, find the clause, read it and leave -- and this block
-   scrolls away the moment you jump, so an active highlight would be tracking
-   state nobody can see. Scroll-spy only earns its keep against a STICKY
-   contents rail, which a 780px centred column has no room for. */
+/* ── Contents rail ──────────────────────────────────────────────────────────
+   S68 shipped this as a 2-column bordered block near the top of the page, with
+   plain jump links and no scroll-spy. S69 makes it a sticky rail, and the
+   scroll-spy that S68 rejected is now IN -- see the note in LegalShell.tsx.
+   S68's objection was that the block scrolled away on jump so an active
+   highlight would be invisible state; a sticky rail never scrolls away, so the
+   highlight is visible state and earns its keep. S68 said as much itself.
 
-.legal-toc {
-  border-top: 1px solid var(--border-strong);
-  border-bottom: 1px solid var(--border-strong);
-  padding: 1.5rem 0 1.75rem;
-  margin-bottom: 3.5rem;
-}
+   .legal-toc-label is gone: the rail has a .legal-mobile-bar heading below 768px
+   and the two group labels above it at every width, so a third "Contents"
+   heading inside the rail was labelling a list that already announced itself
+   twice. The <nav aria-label="Contents"> carries the name for AT.
+   .legal-toc-cols is gone too -- 260px holds one column. */
 
-.legal-toc-label {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 1.25rem;
-}
-
-.legal-toc-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rem;
+.legal-toc-group + .legal-toc-group {
+  margin-top: 1.75rem;
 }
 
 .legal-toc-group-label {
@@ -2417,24 +2609,94 @@ textarea.admin-input {
   border-bottom: 1px solid var(--border);
 }
 
+/* The 2px left border is .docs-nav-item's active-state language, reused so the
+   two sidebars on this site mark "you are here" the same way. Transparent at
+   rest, so nothing shifts when it lights up. */
 .legal-toc-link {
   display: block;
-  padding: 0.28rem 0;
+  padding: 0.3rem 0.6rem;
   font-size: 0.85rem;
   line-height: 1.4;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-admin);
+  border-left: 2px solid transparent;
+  transition:
+    color var(--duration-fast) var(--ease-admin),
+    background var(--duration-fast) var(--ease-admin),
+    border-color var(--duration-fast) var(--ease-admin);
 }
 
 .legal-toc-link:hover,
 .legal-toc-link:focus-visible {
-  color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border-left-color: var(--border-strong);
 }
 
-@media (max-width: 639px) {
-  .legal-toc-cols {
-    grid-template-columns: minmax(0, 1fr);
+/* Listed after :hover so the clause you are actually reading keeps its accent
+   when the pointer crosses some other link -- same ordering fix .docs-nav-item
+   needed. */
+.legal-toc-link[aria-current="true"],
+.legal-toc-link[aria-current="true"]:hover {
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+@media (max-width: 767px) {
+  .legal-layout {
+    flex-direction: column;
+  }
+
+  /* Slide-over, matching the docs mobile pattern: fixed, translated off-canvas,
+     revealed by data-open. The margin-top/sticky/max-height from the desktop
+     rule are all overridden -- at this width it is an overlay, not a rail. */
+  .legal-sidebar-wrapper {
+    position: fixed;
+    top: 72px;
+    left: 0;
+    z-index: 40;
+    width: 100%;
+    max-height: none;
+    height: calc(100vh - 72px);
+    margin-top: 0;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background: var(--bg-base);
+    border-right: none;
+    transform: translateX(-100%);
+    transition: transform var(--duration-base) var(--ease-admin);
+  }
+
+  .legal-sidebar-wrapper[data-open="true"] {
+    transform: translateX(0);
+  }
+
+  .legal-mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 72px;
+    z-index: 30;
+    padding: 0.75rem 1.5rem;
+    margin-top: 72px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-base);
+  }
+
+  .legal-mobile-bar-label {
+    font-family: var(--font-mono), monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* The mobile bar now supplies the top clearance the column's 8rem was for. */
+  .legal-content-wrapper {
+    max-width: 100%;
+    padding: 2.5rem 1.5rem 5rem;
   }
 }
 
@@ -2968,7 +3230,15 @@ textarea.admin-input {
 /* Ripple (src/components/ui/ripple.tsx).
    Upstream ships this animation as a Tailwind v4 @theme cssVars entry, which
    this project has no @theme block for, so it lives here. --i is set inline
-   per ring to stagger the pulse. */
+   per ring to stagger the pulse.
+
+   S69: the rings follow the cursor on a fine pointer, so the pulse animation
+   moved OFF .ripple-ring and onto the touch-fallback rule only. The two modes
+   are mutually exclusive by design: a pulsing ring that also tracks the cursor
+   reads as a jitter, and a device with no pointer has nothing to track. Which
+   mode is live is decided in JS (matchMedia) and expressed here as
+   data-tracking, rather than duplicating the query as a CSS @media -- one
+   source of truth for the gate. */
 @keyframes ripple-scale {
   0%,
   100% {
@@ -2979,8 +3249,221 @@ textarea.admin-input {
   }
 }
 
-.ripple-ring {
+/* No opacity here. S60 had this wrapper at 0.3 from the mount site, which
+   multiplied against each ring's own 0.24 and rendered the brightest ring at
+   7%. That compounding is what made the ripple invisible; per-ring opacity is
+   now the only opacity in the pair. */
+.ripple-root {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ripple-follow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  /* The lag. A transition on ONE transform, rather than a spring per ring --
+     GPU-composited, and it costs no React render. Covered by the site-wide
+     prefers-reduced-motion block, which cuts it to 0.01ms: the rings then snap
+     to the pointer with no trail, which is the correct reduced behaviour
+     because they still render and still track. */
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms linear;
+}
+
+/* Cursor mode: nothing until the pointer is actually inside the wedge. */
+.ripple-follow[data-tracking="true"] {
+  opacity: 0;
+}
+
+.ripple-follow[data-tracking="true"][data-visible="true"] {
+  opacity: 1;
+}
+
+/* Touch fallback: no pointer to follow, so park at the panel centre and keep
+   S60's static pulse rather than showing nothing. */
+.ripple-follow[data-tracking="false"] {
+  top: 50%;
+  left: 50%;
+  opacity: 1;
+}
+
+.ripple-follow[data-tracking="false"] .ripple-ring {
   animation: ripple-scale var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
+}
+
+/* 1.5px, up from 1px: the rings are less than a third of their S60 size now,
+   so the stroke is carrying the visibility that sheer area used to. */
+.ripple-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px solid var(--bg-base);
+  transform: translate(-50%, -50%);
+}
+
+/* ── Projects teaser (src/components/home/ProjectsTeaser.tsx) -- S69 ─────────
+   The whole band is one <Link>, so every rule below is on or inside an anchor
+   and the hover state is the card's, not a child's. Before S69 this was a
+   bordered box with a label, a heading and a small text link, and the only
+   thing that responded to the pointer was the word VIEW PROJECTS.
+
+   --ease-admin despite the name: it is a :root token, and .legal-* and .docs-*
+   already use it on non-admin surfaces. It is the site's one motion curve, so
+   this needs no public-side duplicate. */
+
+.teaser-card {
+  position: relative;
+  display: block;
+  /* Clips .teaser-scan at both ends of its travel. This is also why the scan
+     sits at top: 0 rather than top: -1px -- overflow clips to the padding box,
+     so a scan on the border itself would be cut. At 0 it reads as sitting on
+     the rule anyway. */
+  overflow: hidden;
+  padding: 2.75rem 2rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition:
+    background 0.25s var(--ease-admin),
+    border-color 0.25s var(--ease-admin);
+}
+
+.teaser-card:hover,
+.teaser-card:focus-visible {
+  background: var(--bg-elevated);
+  border-top-color: var(--border-strong);
+  border-bottom-color: var(--border-strong);
+}
+
+/* The section's one idle motion: a hairline crossing the top rule every 5s.
+   Not scroll-triggered on purpose -- the complaint was that the band is dead
+   while sitting still, which a scroll-linked effect does not answer.
+   Gradient ends rather than a hard-edged bar so it does not pop in and out at
+   the clip boundary. A gradient on a 1px rule is the same mark the admin and
+   legal page headers already carry; the ban is on gradient TEXT and glows.
+   Under prefers-reduced-motion the site-wide block cuts this to one 0.01ms
+   iteration, and with no fill-mode: forwards the element then reverts to its
+   unanimated position -- a static accent segment on the left of the rule. It
+   degrades to a mark, not to a blank. */
+.teaser-scan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  pointer-events: none;
+  animation: teaser-scan 5s linear infinite;
+}
+
+/* 333% not 100%: translateX percentages resolve against the element's OWN
+   width, and at width: 30% the band is 3.33x wider than the scan. */
+@keyframes teaser-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(333%);
+  }
+}
+
+/* Two classes deep, so it beats .label-tech's --text-muted on specificity
+   rather than on source order. */
+.teaser-card .teaser-label {
+  display: block;
+  margin-bottom: 1rem;
+  color: var(--accent);
+}
+
+.teaser-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.teaser-heading {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.teaser-cta {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.teaser-arrow {
+  display: inline-block;
+  transition: transform 0.25s var(--ease-admin);
+}
+
+.teaser-card:hover .teaser-arrow,
+.teaser-card:focus-visible .teaser-arrow {
+  transform: translateX(5px);
+}
+
+/* The roster is the content the band was missing -- it names the real builds
+   instead of only asserting that there are some. Left rules rather than a
+   boxed grid: a spec-sheet mark, and it needs no extra wrapper element. */
+.teaser-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  margin-top: 2.25rem;
+}
+
+.teaser-roster-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--border-strong);
+  transition: border-color 0.25s var(--ease-admin);
+}
+
+.teaser-card:hover .teaser-roster-item,
+.teaser-card:focus-visible .teaser-roster-item {
+  border-left-color: var(--accent);
+}
+
+.teaser-roster-name {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.teaser-roster-domain {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@media (max-width: 639px) {
+  .teaser-card {
+    padding: 2.25rem 1.25rem;
+  }
+
+  .teaser-roster {
+    gap: 1.5rem;
+  }
 }
 
 /* Hero spotlight (src/components/ui/spotlight.tsx).

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { LegalShell } from "@/components/legal/LegalShell";
+
 export const metadata: Metadata = {
   title: "Legal",
   description:
@@ -14,6 +16,10 @@ export const revalidate = 120;
 // the alternative is turning 19 bespoke clauses into data, and the bodies are
 // all one-off prose. Labels carry their own numbering so the contents entry and
 // the heading it points at can never disagree about which clause is which.
+// S69: now passed to LegalShell, which renders it as a sticky sidebar rather
+// than an inline 2-column block, and feeds the same ids to the scroll-spy
+// observer. The list itself is unchanged -- it stays in this server component,
+// so none of the clause prose crosses the client boundary.
 const LEGAL_CONTENTS = [
   {
     title: "Privacy Policy",
@@ -49,29 +55,13 @@ const LEGAL_CONTENTS = [
 export default function LegalPage() {
   return (
     <main className="legal-page">
-      <div className="mx-auto legal-shell">
+      <LegalShell contents={LEGAL_CONTENTS}>
         <p className="legal-updated">Last updated: 1 August 2026</p>
 
         <header className="legal-head">
           <h1 className="legal-title">LEGAL</h1>
           <p className="legal-org">Team Vegavath &middot; PESU ECC</p>
         </header>
-
-        <nav className="legal-toc" aria-label="Contents">
-          <p className="legal-toc-label">Contents</p>
-          <div className="legal-toc-cols">
-            {LEGAL_CONTENTS.map((group) => (
-              <div key={group.title}>
-                <p className="legal-toc-group-label">{group.title}</p>
-                {group.items.map((item) => (
-                  <a key={item.id} href={`#${item.id}`} className="legal-toc-link">
-                    {item.label}
-                  </a>
-                ))}
-              </div>
-            ))}
-          </div>
-        </nav>
 
         <article className="legal-doc">
           <section id="privacy-policy">
@@ -413,7 +403,7 @@ export default function LegalPage() {
             </p>
           </section>
         </article>
-      </div>
+      </LegalShell>
     </main>
   );
 }

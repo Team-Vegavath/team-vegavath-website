@@ -170,11 +170,19 @@ export default async function HomePage() {
             marginTop: "2rem",
           }}
         >
-          {/* S60: Ripple as background texture. The rings are var(--bg-base),
-              not var(--accent) -- this panel's own background IS the accent, so
-              accent rings would be invisible on it. Content sits above at
-              zIndex 1; the ripple takes zIndex 0 and no pointer events. */}
-          <Ripple style={{ zIndex: 0, opacity: 0.3 }} />
+          {/* S60: the rings are var(--bg-base), not var(--accent) -- this
+              panel's own background IS the accent, so accent rings would be
+              invisible on it. Content sits above at zIndex 1; the ripple takes
+              zIndex 0 and no pointer events.
+              S69: the rings now follow the cursor inside this panel's clipped
+              wedge, and Ripple takes no props. The `opacity: 0.3` that used to
+              be here was the bug -- it multiplied against each ring's own
+              opacity and rendered the brightest one at 7%. zIndex and the
+              pointer-events opt-out moved into .ripple-root.
+              The SLANT_PX constant in ripple.tsx must match the 32px in the
+              clipPath above: it is what makes the hit test follow the visible
+              wedge rather than the rectangular bounding box. */}
+          <Ripple />
 
           <div className="mx-auto" style={{ position: "relative", zIndex: 1, maxWidth: "56rem", textAlign: "center" }}>
             <h2 style={{ fontSize: "clamp(2.25rem, 6vw, 3.75rem)", fontWeight: 700, color: "var(--bg-base)", letterSpacing: "0.01em" }}>

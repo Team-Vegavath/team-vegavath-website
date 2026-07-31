@@ -10,9 +10,12 @@ import { useScroll } from "framer-motion";
    overlay. The horizontal desktop link list is gone, which retires the tablet
    crowding flagged in S60 (9 links wanted ~990px of chrome at a 768px
    breakpoint) instead of patching the gap.
-   MENU/CLOSE is a word, not three animated bars -- the bars needed the
-   .nav-hamburger class plus a media query to exist at all, and .btn-outline
-   already carries the border + accent hover this needs.
+   S61 made the toggle the WORD "MENU"/"CLOSE" rather than three animated bars,
+   on the grounds that the bars needed a .nav-hamburger class plus a media query
+   to exist at all while .btn-outline already carried the border and accent
+   hover. S69 reverses that: the ask is no visible text at any width. Half of
+   S61's reasoning no longer applies -- there is one navbar at every width now,
+   so the icon needs no media query, only the class.
 
    S62: the S2 scroll-aware transparent->solid background is back, which S61 had
    deleted along with the link list. It reads off framer-motion's `scrollY`
@@ -113,15 +116,22 @@ export function Navbar() {
           )}
         </Link>
 
+        {/* S69: icon-only. The word MENU/CLOSE is gone at every width, so the
+            accessible name lives entirely on aria-label -- the ask was no
+            VISIBLE text, not no name. Bars are three empty spans driven by
+            data-open in CSS rather than inline transforms, which is what lets
+            them carry a transition and inherit the button's :hover accent. */}
         <button
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
-          className="btn-outline mono"
-          style={{ position: "relative", zIndex: 1, padding: "0.5rem 1.1rem", fontSize: "0.7rem", letterSpacing: "0.16em" }}
+          className="nav-hamburger"
+          data-open={menuOpen}
         >
-          {menuOpen ? "CLOSE" : "MENU"}
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
         </button>
       </nav>
 
