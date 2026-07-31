@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import type { Sponsor } from "@/types/sponsor";
 
 interface SponsorMarqueeProps {
@@ -9,7 +10,9 @@ export function SponsorMarquee({ sponsors }: SponsorMarqueeProps) {
   if (sponsors.length === 0) return null;
 
   return (
-    <div style={{ overflow: "hidden", padding: "1.5rem 0" }}>
+    // overflow: hidden was already here; only position: relative is new, so the
+    // two edge fades below have something to anchor to.
+    <div style={{ position: "relative", overflow: "hidden", padding: "1.5rem 0" }}>
       <div className="marquee-track">
         {[...sponsors, ...sponsors].map((sponsor, index) => {
           const logo = (
@@ -41,6 +44,12 @@ export function SponsorMarquee({ sponsors }: SponsorMarqueeProps) {
           );
         })}
       </div>
+
+      {/* Edge fades so logos dissolve instead of hard-cutting at the clip.
+          Default blurLevels is 4 layers, not upstream's 8 -- each layer is a
+          real backdrop-filter and this strip is on / and /about. */}
+      <ProgressiveBlur position="left" height="120px" />
+      <ProgressiveBlur position="right" height="120px" />
     </div>
   );
 }

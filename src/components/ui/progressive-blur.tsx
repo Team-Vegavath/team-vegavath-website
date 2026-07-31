@@ -2,13 +2,13 @@
 // adapted. Fades the trailing edge of a SCROLLING container so the content
 // dissolves into the background instead of hard-cutting at the edge.
 //
-// NOT WIRED ANYWHERE YET -- see S59 in docs/revamp-log.md. The intended target
-// (/crew) turned out to have no overflow: .crew-grid is a wrapping CSS grid
-// with no fixed height and no scroll container, so every card is already fully
-// visible and there is no hard cut to soften. The one real overflow on the site
-// is SponsorMarquee's horizontal track (globals.css .marquee-track), which does
-// clip at both edges -- that needs a `position: "both"`-style horizontal variant
-// and sign-off, because that component renders on /, /about and /sponsors.
+// Wired in S64 to SponsorMarquee, at position "left" and "right". The original
+// S59 target (/crew) has no overflow: .crew-grid is a wrapping CSS grid with no
+// fixed height and no scroll container, so every card is already fully visible
+// and there is no hard cut to soften. SponsorMarquee's .marquee-track
+// (globals.css) is the one real clipped overflow on the site, and S64 added the
+// horizontal left/right variant for it. That component renders on / and /about
+// (NOT /sponsors -- that page uses the static .sponsor-grid).
 //
 // Adaptations from upstream:
 //  - no cn(): clsx and tailwind-merge are not in package.json (see S58).
@@ -35,9 +35,10 @@ import type { CSSProperties } from "react";
 
 export interface ProgressiveBlurProps {
   className?: string;
-  /** Height of the fade, as any CSS length. Ignored when position is "both". */
+  /** Extent of the fade along its own axis, as any CSS length: height for
+   *  "top"/"bottom", width for "left"/"right". Ignored when position is "both". */
   height?: string;
-  position?: "top" | "bottom" | "both";
+  position?: "top" | "bottom" | "both" | "left" | "right";
   /** Blur radius in px per layer, weakest first. */
   blurLevels?: number[];
   style?: CSSProperties;
@@ -54,7 +55,9 @@ export function ProgressiveBlur({
 }: ProgressiveBlurProps) {
   const layers = blurLevels.length;
   const step = 100 / layers;
-  const axis = position === "top" ? "to top" : "to bottom";
+  const horizontal = position === "left" || position === "right";
+  const axis =
+    position === "top" ? "to top" : position === "left" ? "to left" : position === "right" ? "to right" : "to bottom";
 
   const maskFor = (index: number) => {
     // "both" is a single symmetric ramp, so every layer shares one mask and
@@ -77,16 +80,17 @@ export function ProgressiveBlur({
       className={className}
       style={{
         position: "absolute",
-        left: 0,
-        right: 0,
         zIndex: 10,
         pointerEvents: "none",
-        height: position === "both" ? "100%" : height,
-        ...(position === "top"
-          ? { top: 0 }
-          : position === "bottom"
-            ? { bottom: 0 }
-            : { top: 0, bottom: 0 }),
+        ...(horizontal
+          ? // Horizontal variant spans the full height and is `height` wide.
+            { top: 0, bottom: 0, width: height, ...(position === "left" ? { left: 0 } : { right: 0 }) }
+          : {
+              left: 0,
+              right: 0,
+              height: position === "both" ? "100%" : height,
+              ...(position === "top" ? { top: 0 } : position === "bottom" ? { bottom: 0 } : { top: 0, bottom: 0 }),
+            }),
         ...style,
       }}
     >

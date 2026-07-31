@@ -35,6 +35,11 @@ export default function FileUploadField({
 }: FileUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // dragenter/dragleave fire on every child boundary crossing, so a plain
+  // boolean flickers off the moment the cursor passes over the hint span.
+  // Counting enters minus leaves is the standard fix: only the leave that
+  // brings the count back to 0 is a real exit from the zone.
+  const dragDepth = useRef(0);
 
   function acceptFiles(list: FileList | null) {
     if (uploading) return;
@@ -45,6 +50,7 @@ export default function FileUploadField({
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    dragDepth.current = 0;
     setDragging(false);
     acceptFiles(event.dataTransfer.files);
   }
@@ -97,15 +103,26 @@ export default function FileUploadField({
               inputRef.current?.click();
             }
           }}
-          onDragOver={(event) => {
+          onDragEnter={(event) => {
             event.preventDefault();
+            dragDepth.current += 1;
             if (!uploading) setDragging(true);
           }}
-          onDragLeave={() => setDragging(false)}
+          onDragOver={(event) => {
+            // Required for the drop to be allowed at all. No state change here.
+            event.preventDefault();
+          }}
+          onDragLeave={() => {
+            dragDepth.current -= 1;
+            if (dragDepth.current <= 0) {
+              dragDepth.current = 0;
+              setDragging(false);
+            }
+          }}
           onDrop={handleDrop}
           style={{ flex: 1, opacity: uploading ? 0.5 : 1, cursor: uploading ? "not-allowed" : "pointer" }}
         >
-          {uploading ? "UPLOADING…" : "DRAG FILE OR CLICK TO UPLOAD"}
+          {uploading ? "UPLOADING…" : dragging ? "DROP TO UPLOAD" : "DRAG FILE OR CLICK TO UPLOAD"}
           {hint ? (
             <span style={{ display: "block", marginTop: "0.4rem", fontSize: "0.58rem", color: "var(--text-muted)", textTransform: "none", letterSpacing: "0.08em" }}>
               {hint}
