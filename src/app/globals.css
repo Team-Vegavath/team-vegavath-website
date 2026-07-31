@@ -255,10 +255,14 @@ p, label, input, textarea, select, button {
    collapse onto the middle -- so the public and admin toggles read as one
    family rather than two hand-tuned icons. AdminShell keeps its transforms
    inline; these live in CSS because a class can express the transition and the
-   :hover that inline styles cannot. */
+   :hover that inline styles cannot.
+
+   S70: .nav-overlay / .nav-overlay-link are GONE, replaced by .nav-panel and
+   .nav-panel-link. The trigger geometry above is untouched -- S69's icon was
+   never the complaint. See the .nav-panel block for the full rationale. */
 
 .nav-hamburger {
-  /* z-index: 1 is load-bearing -- see the .nav-overlay note below. */
+  /* z-index: 1 is load-bearing -- see the .nav-panel note below. */
   position: relative;
   z-index: 1;
   display: flex;
@@ -305,35 +309,173 @@ p, label, input, textarea, select, button {
   transform: translateY(-7px) rotate(-45deg);
 }
 
-.nav-overlay {
-  /* No z-index: the overlay is a later sibling of the nav bar inside the
-     header's stacking context, and the hamburger button carries z-index: 1,
-     which beats this element's z-index: auto whatever the DOM order. A negative
-     z-index here would paint the overlay behind the header's own background. */
+/* ── S70 corner nav panel ────────────────────────────────────────────────────
+   Replaces S61's full-screen .nav-overlay. The panel is BOUNDED and welded to
+   the top-right corner the trigger sits in: 360px wide, content-height, no
+   border on its top or right edge because those edges are the viewport's. Every
+   dropdown on the internet is a floating bordered card inset from the edge;
+   this one grew out of the corner and never left it. That is the one risk taken
+   here, and it is what makes "corner-anchored" legible rather than decorative.
+
+   THE REVEAL IS clip-path: inset(), NOT circle(), and not a scale.
+     closed  inset(0 0 100% 100%)  -- zero-area sliver pinned at the top-right
+     open    inset(0 0 0 0)        -- the full panel
+   Every intermediate frame is a rectangle with four square corners, which is
+   the whole point: circle(0% at top right) would sweep a visibly CURVED edge
+   across the panel, and a curved wipe is the literal blob this site bans. A
+   scale() would squash the type on the way in. inset() moves two edges and
+   distorts nothing.
+
+   MOTION: 380ms var(--ease-admin). No Framer spring, and that is a deliberate
+   choice with a second payoff. --ease-admin is cubic-bezier(0.16, 1, 0.3, 1),
+   ease-out-expo: it launches hard and settles long, which is the same
+   perceptual signature a well-tuned spring has and is why "corner nav is smooth
+   but SLOW" and "use spring physics" point at the same fix. Those
+   implementations are slow because they use a linear-ish ease at a conservative
+   duration, not because they lack a solver. The payoff: a CSS transition is
+   covered by the site-wide prefers-reduced-motion block, where a Framer
+   JS-driven spring is not -- so this closes the S67 reduced-motion gap instead
+   of widening it (GlyphMatrix/SmoothCursor/HyperText/KartGame are still open).
+
+   visibility, not display or conditional mounting: the panel must be in the DOM
+   at both ends for clip-path to have two frames to transition between, and
+   visibility: hidden takes it out of the tab order AND the a11y tree for free,
+   so there is no aria-hidden or tabIndex={-1} bookkeeping in the TSX. The 0s
+   delay on close is what lets the clip finish before it vanishes. */
+
+.nav-panel {
+  /* No z-index, same reasoning as S69's .nav-overlay: this is a later sibling
+     of the nav bar inside the header's stacking context, and .nav-hamburger's
+     z-index: 1 beats z-index: auto whatever the DOM order -- which is what
+     keeps the trigger clickable ON TOP of the panel it opened. */
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  width: 360px;
+  max-height: 100vh;
+  overflow-y: auto;
   background: var(--bg-base);
+  border-left: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  /* 5.5rem clears the 64px header so the trigger sits over the panel's own
+     background rather than over the page. */
+  padding: 5.5rem 1.5rem 1.75rem;
+  visibility: hidden;
+  clip-path: inset(0 0 100% 100%);
+  transition:
+    clip-path 380ms var(--ease-admin),
+    visibility 0s linear 380ms;
+}
+
+.nav-panel[data-open="true"] {
+  visibility: visible;
+  clip-path: inset(0 0 0 0);
+  transition:
+    clip-path 380ms var(--ease-admin),
+    visibility 0s linear 0s;
+}
+
+/* Below 420px a 360px panel leaves a ~15px sliver of page down the left edge,
+   which reads as a rendering fault rather than a bounded panel. Commit to
+   full-bleed instead. */
+@media (max-width: 419px) {
+  .nav-panel {
+    width: 100%;
+    border-left: none;
+  }
+}
+
+.nav-panel-list {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 6rem clamp(1.5rem, 6vw, 6rem) 3rem;
-  overflow-y: auto;
+  list-style: none;
 }
 
-.nav-overlay-link {
-  display: block;
+/* The links stagger in AFTER the clip opens (90ms lead-in, 28ms apart). This is
+   what supplies the second axis of motion -- the box unfolds, then its contents
+   arrive -- without keyframing clip-path's components, which a single
+   transitioned property cannot stagger. --i is set inline per link, the same
+   index-as-custom-property pattern ripple.tsx already uses for its ring delays.
+
+   The link carries the REVEAL transform and nothing else. The hover shift lives
+   on the inner span, so no element is ever asked to hold two transforms -- same
+   discipline as .ripple-follow (translate) vs .ripple-ring (scale). */
+.nav-panel-link {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding-left: 0.9rem;
   font-family: var(--font-chakra), sans-serif;
   font-weight: 700;
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
-  transition: color 0.2s;
+  color: var(--text-primary);
+  /* Always present so hover never shifts the row by 2px. */
+  border-left: 2px solid transparent;
+  opacity: 0;
+  transform: translateX(14px);
+  transition:
+    opacity 260ms var(--ease-admin),
+    transform 260ms var(--ease-admin),
+    background 200ms var(--ease-admin),
+    border-color 200ms var(--ease-admin),
+    color 200ms var(--ease-admin);
 }
 
-.nav-overlay-link:hover {
+.nav-panel[data-open="true"] .nav-panel-link {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--i, 0) * 28ms + 90ms);
+}
+
+.nav-panel-link > span {
+  transition: transform 200ms var(--ease-admin);
+}
+
+/* Hover language is .admin-nav-item's, transplanted to public type scale rather
+   than invented: 2px accent left edge, an 8% accent row tint, label to accent.
+   The 6px label shift is the one addition -- at 1.1rem the row is tall enough
+   that the edge alone reads as static, and the shift is what makes it a sweep.
+   Reusing S67's system means the public nav, the admin nav and the domain tiles
+   all say "lit from the left edge" in one voice. */
+.nav-panel-link:hover,
+.nav-panel-link[data-active="true"] {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-left-color: var(--accent);
   color: var(--accent);
+}
+
+.nav-panel-link:hover > span,
+.nav-panel-link[data-active="true"] > span {
+  transform: translateX(6px);
+}
+
+.nav-panel-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Hairline rules between rows only, never after the last -- the same 1px
+   lattice .domain-grid and .footer-row-1 already use. */
+.nav-panel-list li + li .nav-panel-link {
+  border-top: 1px solid var(--border);
+}
+
+.nav-panel-cta {
+  margin-top: 1.5rem;
+  opacity: 0;
+  transform: translateX(14px);
+  transition:
+    opacity 260ms var(--ease-admin),
+    transform 260ms var(--ease-admin);
+}
+
+.nav-panel[data-open="true"] .nav-panel-cta {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: calc(var(--i, 0) * 28ms + 90ms);
 }
 
 /* ── Footer ── */
@@ -455,6 +597,19 @@ p, label, input, textarea, select, button {
   perspective: 1000px;
 }
 
+/* S70: the screenshot showed a plain white rectangle around a tile -- the UA's
+   default focus ring on the <button> S69 introduced, never styled. Replaced, not
+   removed: `outline: none` with no substitute would make the tile keyboard-
+   invisible, which is a regression dressed as a fix. :focus-visible (not :focus)
+   so a mouse click does not leave a ring behind.
+   outline-offset is NEGATIVE so the ring draws inside the tile: the grid is a 1px
+   lattice with no gaps, and a positive offset would overlap the neighbouring
+   tiles' edges. Sharp, no radius, accent from the token set. */
+.domain-flip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .domain-flip-inner {
   position: absolute;
   inset: 0;
@@ -500,11 +655,27 @@ p, label, input, textarea, select, button {
   pointer-events: none;
 }
 
+/* S70: 0.85rem -> 1.05rem, and 1.05 is a ceiling found by arithmetic, not a
+   guess. The front face only ever holds the domain name, so S69's back-face
+   constraint (123 characters of description) does not apply -- but a different
+   one does, and it is the longest single WORD, not the longest name.
+
+   Narrowest tile is the 2-column 375px case: ~343px of container across 2
+   columns, less the lattice, less 1rem of face padding each side = ~138px of text
+   width. "SPONSORSHIP & FINANCE" wraps to two lines at any size, which is fine
+   (justify-content: flex-end grows it upward into the 180px tile's ~45px of
+   spare). What is NOT fine is the word SPONSORSHIP itself overflowing, and that
+   is what sets the ceiling: 11 characters of uppercase Chakra Petch 700 at
+   ~0.62em average advance plus 0.08em tracking is ~0.70em per character.
+     1.05rem -> 16.8px x 0.70 x 11 = ~129px. Fits 138px.
+     1.15rem -> 18.4px x 0.70 x 11 = ~142px. Overflows. Rejected.
+   So 1.05rem, a 24% increase, with ~9px of margin on the worst case. */
 .domain-face-front .domain-name {
   position: relative;
   font-family: var(--font-chakra), sans-serif;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
+  line-height: 1.25;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-primary);
@@ -1355,15 +1526,28 @@ p, label, input, textarea, select, button {
   z-index: 40;
 }
 
-/* S65: brand and footer are flex-shrink:0 so only .admin-nav scrolls. */
+/* S65: brand and footer are flex-shrink:0 so only .admin-nav scrolls.
+   S70: this stopped being the <Link> and became a wrapper around it -- the
+   collapse toggle is a <button>, and a button nested inside an anchor is invalid
+   HTML. The logo-plus-wordmark flex row moved down to .admin-sidebar-brand-link,
+   which is also the element the collapsed state hides. */
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.7rem;
   min-height: 72px;
   padding: 24px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.admin-sidebar-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  text-decoration: none;
 }
 
 .admin-sidebar-brand-name {
@@ -1553,7 +1737,148 @@ p, label, input, textarea, select, button {
   display: none;
 }
 
+/* ── S70 sidebar collapse ────────────────────────────────────────────────────
+   EVERY rule is inside @media (min-width: 768px), and that is load-bearing, not
+   tidiness. The collapse selectors are (0,3,0) -- `.admin-shell[data-collapsed]
+   .admin-sidebar` -- while the mobile overlay's is `.admin-sidebar[data-open]`
+   at (0,2,0). Unscoped, a 68px collapse would outrank the overlay's width: 100%
+   and the mobile nav would open as a useless icon strip. The media query is what
+   keeps the two systems from ever meeting; F1 asked for desktop-only anyway, so
+   the correct scope and the safe scope are the same scope.
+
+   The state lives on .admin-shell, not on .admin-sidebar, because .admin-content
+   is the sidebar's SIBLING and needs the same signal for its margin-left. One
+   attribute on the common parent beats threading a second one onto the content.
+
+   data-ready is the hydration-flash guard. The server cannot read localStorage,
+   so it always renders expanded and the client corrects on mount. Without a
+   guard that correction would ANIMATE -- a 300px-to-68px slide on every cold
+   load. Withholding the transition until data-ready="true" makes the correction a
+   single silent frame instead, which is the honest fix: the reflow still happens,
+   it just is not dressed up as an intentional animation. AdminShell lives in the
+   (admin) layout, so its state survives client navigation and the frame is paid
+   once per cold load, not per route. */
+@media (min-width: 768px) {
+  .admin-shell[data-ready="true"] .admin-sidebar {
+    transition: width var(--duration-base) var(--ease-admin);
+  }
+
+  .admin-shell[data-ready="true"] .admin-content {
+    transition: margin-left var(--duration-base) var(--ease-admin);
+  }
+
+  /* 68px = 2px active border + 16px icon + 25px of centring either side. */
+  .admin-shell[data-collapsed="true"] .admin-sidebar {
+    width: 68px;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-content {
+    margin-left: 68px;
+  }
+
+  /* Collapsed, the brand zone is the toggle and nothing else. The shield and
+     wordmark go: at 68px there is not room for a 24px logo AND the expand
+     control, and of the two the one you cannot do without is the one that gets
+     you back. Dashboard sits directly below as the de facto home link, and the
+     shield still appears on the mobile topbar. */
+  .admin-shell[data-collapsed="true"] .admin-sidebar-brand-link {
+    display: none;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-sidebar-brand {
+    justify-content: center;
+    padding: 24px 0;
+  }
+
+  /* Section labels go rather than becoming hairlines: a rail of 13 icons IS the
+     collapsed shape, and a divider system nobody asked for is easier to add
+     later than to remove. */
+  .admin-shell[data-collapsed="true"] .admin-nav-section-label {
+    display: none;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-nav-label {
+    display: none;
+  }
+
+  /* padding-left to 0 and centre. The 2px active border offsets the icon by 1px
+     from true centre, which is invisible and is the price of keeping S65's left
+     bar exactly where it is -- the active item still reads as lit from its left
+     edge, and S67's inset glow decays inward over 16px, well inside 68px, so it
+     lands the same way it does at 300px. */
+  .admin-shell[data-collapsed="true"] .admin-nav-item {
+    padding-left: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  /* Footer keeps sign-out and drops the rest. Name, role and the CTRL+K hint are
+     all text that cannot survive 52px of content width; sign-out is the only one
+     that is a CONTROL, and leaving it unreachable behind an expand click would be
+     a real regression. Tracking is cancelled and the size drops so "Sign Out"
+     stays on one line. Ctrl+K itself is a document listener in CommandPalette and
+     is unaffected by losing its hint. */
+  .admin-shell[data-collapsed="true"] .admin-sidebar-user-name,
+  .admin-shell[data-collapsed="true"] .admin-sidebar-user-role,
+  .admin-shell[data-collapsed="true"] .admin-sidebar-ctrlk {
+    display: none;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-sidebar-footer {
+    padding: 16px 8px;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-sidebar-footer-row {
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  .admin-shell[data-collapsed="true"] .admin-signout {
+    font-size: 0.55rem;
+    letter-spacing: 0;
+  }
+}
+
+.admin-sidebar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-admin),
+    border-color var(--duration-fast) var(--ease-admin);
+}
+
+.admin-sidebar-collapse:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* One icon, not two. The bar-plus-chevron reads as "collapse toward the left";
+   rotating it 180deg puts the bar on the right and the chevron pointing right,
+   which reads as "expand toward the right". A second SVG would say the same thing
+   with more markup. */
+.admin-sidebar-collapse svg {
+  transition: transform var(--duration-base) var(--ease-admin);
+}
+
+.admin-shell[data-collapsed="true"] .admin-sidebar-collapse svg {
+  transform: rotate(180deg);
+}
+
 @media (max-width: 767px) {
+  /* The collapse control is meaningless in the overlay nav -- there is no rail
+     to collapse to. */
+  .admin-sidebar-collapse {
+    display: none;
+  }
   .admin-sidebar {
     display: none;
     width: 240px;
@@ -3238,7 +3563,29 @@ textarea.admin-input {
    reads as a jitter, and a device with no pointer has nothing to track. Which
    mode is live is decided in JS (matchMedia) and expressed here as
    data-tracking, rather than duplicating the query as a CSS @media -- one
-   source of truth for the gate. */
+   source of truth for the gate.
+
+   S70: THE PULSE IS BACK ON .ripple-ring UNCONDITIONALLY. S69's "reads as a
+   jitter" prediction was wrong in practice, and the structure it was worried
+   about turns out to make the conflict impossible: the two transforms are on two
+   DIFFERENT elements. .ripple-follow carries the position (translate3d, written
+   imperatively from the pointermove handler), .ripple-ring carries the pulse
+   (translate(-50%,-50%) scale() from the keyframe below). A parent translate and
+   a child scale compose -- neither can overwrite the other, because
+   `transform` is per-element.
+
+   Two things verified rather than assumed, both being the ways this WOULD have
+   broken had the keyframe been written carelessly:
+     1. The keyframe re-states translate(-50%, -50%) in every step. Without it
+        the animation would clobber .ripple-ring's static centering transform and
+        each ring would jump down-right by half its own size on frame one. That
+        line was already correct -- it is why the touch fallback never looked
+        off-centre -- and it is what makes promoting the rule to every mode safe.
+     2. The keyframe touches transform ONLY. Ring size is inline width/height per
+        ring, so scale() multiplies the rendered box and leaves the size cascade
+        alone. Nothing competes for width/height.
+   data-tracking is still the mode gate -- it now decides only the resting
+   POSITION and the opacity, not whether the rings animate. */
 @keyframes ripple-scale {
   0%,
   100% {
@@ -3284,26 +3631,46 @@ textarea.admin-input {
   opacity: 1;
 }
 
-/* Touch fallback: no pointer to follow, so park at the panel centre and keep
-   S60's static pulse rather than showing nothing. */
+/* Touch fallback: no pointer to follow, so the rings park -- and S70 moves where.
+   S69 parked them at the panel's geometric centre, which is nowhere in
+   particular: .ripple-root spans the whole CTA section, so the rings sat in the
+   gap between the heading and the paragraph. They should emanate from the APPLY
+   NOW button.
+
+   COMPUTED IN CSS, NOT MEASURED, and the reason is that the button's offset from
+   the section's BOTTOM edge is a constant while its offset from the top is not.
+   Everything above the button (an h2 at clamp(2.25rem, 6vw, 3.75rem) and a
+   paragraph that wraps to 2 lines at desktop and 4 at 375px) flexes with the
+   viewport; everything below it is the section's fixed padding-bottom. So:
+     left: 50%   -- the button is centred in a `text-align: center` .mx-auto
+                    container inside a section with equal side padding. Exact.
+     bottom: 7rem -- 5.5rem section padding-bottom (88px, fixed at every width)
+                    plus half the button's 48px height (14.4px padding x2 + 1px
+                    border x2 + a 17.3px Chakra line box at 0.9rem) = 112px.
+   top: auto is required to release S69's `top: 0` from .ripple-follow, or the
+   over-constrained pair resolves in top's favour on a 0-height box and bottom is
+   ignored. A getBoundingClientRect on a ref would work too, but it would add a
+   layout read plus a resize listener to a purely decorative effect for a number
+   that arithmetic already pins exactly. */
 .ripple-follow[data-tracking="false"] {
-  top: 50%;
+  top: auto;
+  bottom: 7rem;
   left: 50%;
   opacity: 1;
 }
 
-.ripple-follow[data-tracking="false"] .ripple-ring {
-  animation: ripple-scale var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
-}
-
 /* 1.5px, up from 1px: the rings are less than a third of their S60 size now,
-   so the stroke is carrying the visibility that sheer area used to. */
+   so the stroke is carrying the visibility that sheer area used to.
+   S70: the animation lives here, so it runs in BOTH modes -- on a fine pointer
+   the rings pulse while the parent follows the cursor. See the header note for
+   why the two transforms cannot fight. */
 .ripple-ring {
   position: absolute;
   top: 0;
   left: 0;
   border: 1.5px solid var(--bg-base);
   transform: translate(-50%, -50%);
+  animation: ripple-scale var(--duration, 2s) ease calc(var(--i, 0) * 0.2s) infinite;
 }
 
 /* ── Projects teaser (src/components/home/ProjectsTeaser.tsx) -- S69 ─────────

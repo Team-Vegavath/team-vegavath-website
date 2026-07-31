@@ -11,18 +11,22 @@ import { useState } from "react";
  * from. framer-motion is no longer imported here at all; a CSS rotateY needs no
  * JS timeline.
  *
- * Two decisions worth knowing:
+ * THE TILE IS A REAL <button>. S20 had role="button" + tabIndex + a manual
+ * Enter/Space handler on a div; a native button deletes all three and gets
+ * focus-visible for free. The UA styles it brings are neutralised in
+ * .domain-flip. Both faces stay in the DOM, so assistive tech reads the
+ * description whether or not the tile is flipped -- better than the modal, where
+ * it did not exist until opened.
  *
- * 1. FLIPS ARE INDEPENDENT, not radio-style. `flipped` is a Set, so several
- *    tiles can be open at once. A single-active string would be one line
- *    shorter but would re-create the modal's one-at-a-time behaviour, which is
- *    the thing being removed.
- * 2. THE TILE IS A REAL <button>. S20 had role="button" + tabIndex + a manual
- *    Enter/Space handler on a div; a native button deletes all three and gets
- *    focus-visible for free. The UA styles it brings are neutralised in
- *    .domain-flip. Both faces stay in the DOM, so assistive tech reads the
- *    description whether or not the tile is flipped -- better than the modal,
- *    where it did not exist until opened.
+ * S70: FLIPS ARE SINGLE-ACTIVE. This reverses S69's deliberate choice, not a
+ * bug. S69 made `flipped` a Set so several tiles could be open at once, on the
+ * grounds that a single active value "would re-create the modal's one-at-a-time
+ * behaviour, which is the thing being removed." That reasoning is overridden by
+ * direct visual feedback: the objection to the modal was the modal -- the fixed
+ * backdrop, the scroll lock, the Escape listener -- not one-at-a-time reading.
+ * Six tiles flipped at once is a wall of body copy where the grid used to be.
+ * `string | null` also deletes the Set-clone-per-toggle, so the reversal is
+ * strictly less code than the thing it replaces.
  */
 
 const DOMAINS = [
@@ -62,21 +66,16 @@ const DOMAINS = [
 ] as const;
 
 export function DomainGrid() {
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  const [flipped, setFlipped] = useState<string | null>(null);
 
-  // Set.delete returns whether it removed anything, so it doubles as the
-  // "was it already open" test and the toggle is one branch.
-  const toggle = (name: string) =>
-    setFlipped((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(name)) next.add(name);
-      return next;
-    });
+  // Flipping a new tile closes whichever one was open: assigning the name IS the
+  // close, so there is nothing to clear first.
+  const toggle = (name: string) => setFlipped((prev) => (prev === name ? null : name));
 
   return (
     <div className="domain-grid">
       {DOMAINS.map((domain) => {
-        const isFlipped = flipped.has(domain.name);
+        const isFlipped = flipped === domain.name;
 
         return (
           <button

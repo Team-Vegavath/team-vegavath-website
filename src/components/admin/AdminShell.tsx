@@ -10,6 +10,10 @@ import { CommandPalette } from "@/components/admin/CommandPalette";
 // Same R2 shield as the public Navbar (constant duplicated; Navbar doesn't export it).
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 
+// S70. "1"/"0" rather than JSON so a corrupted value can only ever read as
+// false, which is the safe default (expanded).
+const SIDEBAR_KEY = "vegavath-admin-sidebar-collapsed";
+
 // S65: `section` groups the sidebar into labelled zones. Kept on NAV_ITEMS
 // itself rather than in a parallel list of hrefs, so the grouping can't drift
 // from the nav (same reason CommandPalette is fed from this array).
@@ -199,6 +203,26 @@ export default function AdminShell({
 }: AdminShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  // S70. Server-rendered as expanded (it cannot read localStorage), corrected on
+  // mount. `ready` is what stops that correction from animating -- see the S70
+  // sidebar-collapse block in globals.css for why the flash is a frame, not a
+  // slide.
+  const [collapsed, setCollapsed] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration guard, mount-only
+    setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "1");
+    setReady(true);
+  }, []);
+
+  // Written outside the updater on purpose: a setState updater must be pure, and
+  // React double-invokes it in dev.
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- close mobile nav on route change
@@ -235,7 +259,14 @@ export default function AdminShell({
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
+    // data-collapsed lives here, not on the sidebar: .admin-content is the
+    // sidebar's SIBLING and needs the same signal for its margin-left.
+    <div
+      className="admin-shell"
+      data-collapsed={collapsed}
+      data-ready={ready}
+      style={{ minHeight: "100vh", background: "var(--bg-base)" }}
+    >
       <div className="admin-topbar">
         <Link href="/admin/dashboard" style={{ display: "flex", alignItems: "center", gap: "0.7rem", textDecoration: "none" }}>
           {brand}
@@ -254,9 +285,28 @@ export default function AdminShell({
       </div>
 
       <aside className="admin-sidebar" data-open={menuOpen}>
-        <Link href="/admin/dashboard" className="admin-sidebar-brand" style={{ textDecoration: "none" }}>
-          {brand}
-        </Link>
+        {/* S70: the brand row is a wrapper now -- the collapse toggle is a
+            <button>, and nesting one inside the anchor would be invalid HTML. */}
+        <div className="admin-sidebar-brand">
+          <Link href="/admin/dashboard" className="admin-sidebar-brand-link">
+            {brand}
+          </Link>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="admin-sidebar-collapse"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+          >
+            {/* Bar plus chevron: "collapse toward the left". CSS rotates it 180deg
+                when collapsed, which turns it into "expand toward the right"
+                without a second icon. */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <line x1="4" y1="4" x2="4" y2="20" />
+              <path d="M20 8l-4 4 4 4" />
+            </svg>
+          </button>
+        </div>
 
         <nav className="admin-nav" aria-label="Admin sections">
           {SECTIONS.map((section) => (
@@ -272,6 +322,13 @@ export default function AdminShell({
                       ? "admin-nav-item active"
                       : "admin-nav-item"
                   }
+                  /* S70: the accessible name comes from the label span when
+                     expanded and from `title` when collapsed (the span is
+                     display:none then, so it leaves the a11y tree with it) --
+                     exactly one name in each state, never two. `title` is also the
+                     tooltip: no tooltip component exists in this codebase, and
+                     inventing one for a 13-item rail is not worth the surface. */
+                  title={collapsed ? label : undefined}
                 >
                   {href === "/admin/accounts" && hasPendingAccounts ? (
                     <span style={{ position: "relative", display: "inline-flex" }}>
@@ -291,7 +348,10 @@ export default function AdminShell({
                   ) : (
                     icon
                   )}
-                  {label}
+                  {/* Wrapped so CSS can hide it. A bare text node is unselectable,
+                      and font-size: 0 on the item would be the clever version of
+                      this that someone has to decode later. */}
+                  <span className="admin-nav-label">{label}</span>
                 </Link>
               ))}
             </Fragment>

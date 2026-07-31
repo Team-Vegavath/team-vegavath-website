@@ -191,26 +191,23 @@ export default async function HomePage() {
             <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
               Build karts, ship code, and run the biggest events on campus, with 47 students who take it seriously.
             </p>
+            {/* S70/C2: the same InteractiveHoverButton mechanic as the hero, in
+                its inverted colour mapping. S60 left this a plain Link because
+                this panel's background IS var(--accent), so the default variant
+                would vanish into it -- that constraint is why `variant` exists
+                rather than a second default call site. Rest is --bg-base fill
+                with an --accent label; hover slides an --accent block across and
+                the label flips to --bg-base. The border stays --bg-base in both
+                states, so at full hover the button is still outlined against the
+                accent panel instead of dissolving into it. */}
             <div style={{ marginTop: "2.25rem" }}>
-              <Link
+              <InteractiveHoverButton
                 href="/join"
-                className="heading"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "var(--bg-base)",
-                  color: "var(--text-primary)",
-                  fontWeight: 700,
-                  fontSize: "0.9rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  padding: "0.9rem 2.5rem",
-                  textDecoration: "none",
-                }}
+                variant="inverted"
+                style={{ fontSize: "0.9rem", letterSpacing: "0.1em", padding: "0.9rem 2.5rem" }}
               >
                 APPLY NOW
-              </Link>
+              </InteractiveHoverButton>
             </div>
           </div>
         </section>

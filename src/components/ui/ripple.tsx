@@ -55,6 +55,17 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
  * in page.tsx stays a SERVER component and simply mounts this, which is the
  * same boundary S62 drew for ProjectsTeaser rather than converting a whole
  * section.
+ *
+ * ── S70: track AND pulse, and the touch anchor moves to the button ───────────
+ *
+ * No JS changed. Both fixes are CSS, because the structure S69 built already
+ * separates the two transforms onto two elements -- .ripple-follow translates,
+ * .ripple-ring scales -- so re-enabling the pulse in cursor mode needed the
+ * keyframe rule promoted off the touch-fallback selector, not a rewrite. S69's
+ * claim that the two modes were "mutually exclusive by design" was a prediction
+ * about how it would look, not a constraint the code imposed. Full reasoning and
+ * the two things that had to be verified are in globals.css above
+ * @keyframes ripple-scale.
  */
 
 /* Same query smooth-cursor.tsx gates on. `any-*` rather than plain `hover` so a
@@ -129,9 +140,11 @@ export function Ripple() {
     <div ref={rootRef} aria-hidden="true" className="ripple-root">
       {/* A 0x0 anchor. The rings centre themselves on it with
           translate(-50%, -50%), so moving this one element moves all four. On
-          touch, CSS parks it at the panel centre and restores the S60 pulse
-          instead -- there is no pointer to follow, and showing nothing would be
-          worse than showing the original animation. */}
+          touch there is no pointer to follow, so CSS parks it -- S70 parks it on
+          the APPLY NOW button (left: 50%; bottom: 7rem) rather than S69's panel
+          centre, which was in the gap between the heading and the paragraph. The
+          coordinate is arithmetic, not a measurement; the reasoning is in
+          .ripple-follow[data-tracking="false"]. */}
       <div
         ref={followRef}
         className="ripple-follow"
