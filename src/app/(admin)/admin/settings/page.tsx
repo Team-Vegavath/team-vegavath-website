@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { auth } from "@/lib/auth";
 import { getAllSettings } from "@/lib/services/settings";
 import SettingsForm from "@/components/admin/SettingsForm";
@@ -42,9 +43,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Settings</h1>
-      </header>
+      <AdminPageHeader title="Settings" />
 
       {/* S58: the Recent Applications table that used to sit below this form was
           removed. /admin/applications is the canonical view. A viewer has nothing

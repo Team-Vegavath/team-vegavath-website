@@ -1163,20 +1163,42 @@ p, label, input, textarea, select, button {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
+  width: 300px;
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
+  overflow-x: hidden;
   z-index: 40;
 }
 
+/* S65: brand and footer are flex-shrink:0 so only .admin-nav scrolls. */
 .admin-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  min-height: 64px;
-  padding: 0 1.5rem;
+  min-height: 72px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.admin-sidebar-brand-name {
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.admin-sidebar-brand-sub {
+  margin-top: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .admin-nav {
@@ -1184,50 +1206,109 @@ p, label, input, textarea, select, button {
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
 }
 
-.admin-nav-link {
+.admin-nav-section-label {
+  display: block;
+  padding: 8px 0 4px 24px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The transparent border-left is always present so hover/active never
+   shifts the label by 2px. */
+.admin-nav-item {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: 0.7rem;
-  min-height: 48px;
-  padding: 0.6rem 1.5rem;
-  font-family: var(--font-space), sans-serif;
-  font-size: 0.875rem;
-  font-weight: 500;
+  gap: 10px;
+  height: 48px;
+  padding-left: 24px;
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 600;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   text-decoration: none;
   border-left: 2px solid transparent;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
-.admin-nav-link svg {
-  color: var(--text-muted);
+.admin-nav-item svg {
+  width: 16px;
+  height: 16px;
+  color: inherit;
   flex-shrink: 0;
-  transition: color 0.15s;
 }
 
-.admin-nav-link:hover {
-  color: var(--text-primary);
-}
-
-.admin-nav-link:hover svg {
-  color: var(--text-secondary);
-}
-
-.admin-nav-link[data-active="true"] {
-  color: var(--text-primary);
+.admin-nav-item:hover {
   background: var(--bg-elevated);
-  border-left-color: var(--accent);
-}
-
-.admin-nav-link[data-active="true"] svg {
+  border-left-color: var(--border-strong);
   color: var(--text-primary);
 }
 
-.admin-sidebar-foot {
-  padding: 1rem 1.5rem;
+.admin-nav-item.active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+.admin-sidebar-footer {
   border-top: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.admin-sidebar-user-name {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sidebar-user-role {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.admin-sidebar-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.admin-sidebar-signout,
+.admin-sidebar-signout .admin-signout {
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 0.12s;
+}
+
+.admin-sidebar-signout .admin-signout:hover {
+  color: var(--error);
+}
+
+.admin-sidebar-ctrlk {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  color: var(--text-muted);
 }
 
 .admin-signout {
@@ -1248,7 +1329,7 @@ p, label, input, textarea, select, button {
 }
 
 .admin-content {
-  margin-left: 280px;
+  margin-left: 300px;
   padding: 2.5rem 3rem 4rem;
   min-width: 0;
   background: var(--bg-base);
@@ -1262,8 +1343,10 @@ p, label, input, textarea, select, button {
 @media (max-width: 767px) {
   .admin-sidebar {
     display: none;
+    width: 240px;
   }
-  /* Full-screen overlay nav under the 56px top bar */
+  /* Full-screen overlay nav under the 56px top bar. The width:100% here beats
+     the 240px above, so the overlay layout path is unaffected by S65. */
   .admin-sidebar[data-open="true"] {
     display: flex;
     top: 56px;
@@ -1278,21 +1361,17 @@ p, label, input, textarea, select, button {
   .admin-sidebar[data-open="true"] .admin-nav {
     padding-top: 1rem;
   }
-  .admin-sidebar[data-open="true"] .admin-nav-link {
+  .admin-sidebar[data-open="true"] .admin-nav-item {
+    height: auto;
     min-height: 48px;
     padding: 0.75rem 1.5rem;
-    font-family: var(--font-chakra), sans-serif;
     font-size: 1rem;
-    font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
   }
-  .admin-sidebar[data-open="true"] .admin-nav-link[data-active="true"] {
+  .admin-sidebar[data-open="true"] .admin-nav-item.active {
     color: var(--accent);
     background: transparent;
-  }
-  .admin-sidebar[data-open="true"] .admin-nav-link[data-active="true"] svg {
-    color: var(--accent);
   }
   .admin-sidebar[data-open="true"] .admin-signout {
     display: block;
@@ -1321,6 +1400,67 @@ p, label, input, textarea, select, button {
 
 /* Admin page chrome */
 
+/* S65 AdminPageHeader. The brief's `padding: 24px 32px 0` assumed a container
+   with no padding of its own; .admin-content already supplies 2.5rem/3rem, so
+   both axes are dropped -- 32px left would inset the header past the table
+   below it, and 24px top would sit new-style titles 24px lower than the legacy
+   headers they coexist with. Only the gap to the content below is ours. */
+.admin-page-head {
+  margin-bottom: 28px;
+}
+
+.admin-page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-page-header-title {
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.admin-page-header-sub {
+  margin-top: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.admin-page-header-action {
+  flex-shrink: 0;
+}
+
+/* The 32px accent tick on the rule is the mark that anchors every admin page
+   to the same product. */
+.admin-page-header-rule {
+  position: relative;
+  margin-top: 16px;
+  height: 1px;
+  background: var(--border);
+}
+
+.admin-page-header-rule::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -0.5px;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* Legacy header (S10). S66 migrated all nine new/edit sub-page call sites to
+   AdminPageHeader, so the ONLY remaining users are BootstrapCreateSession (2),
+   BootstrapAdminDashboard (1) and EventRegistrationsTable (1) -- plus
+   .admin-page-title alone in the SponsorsTable slide-in panel. Bootstrap-only
+   from here: delete both rules when those four components migrate. Kept, not
+   deleted, because they are still rendered today. */
 .admin-page-header {
   display: flex;
   align-items: center;
@@ -1366,24 +1506,31 @@ p, label, input, textarea, select, button {
   font-size: 0.85rem;
 }
 
+/* S65: fixed row rhythm (40px header / 56px body) and 16px gutters. */
 .admin-table th {
   font-family: var(--font-mono), monospace;
   font-weight: 400;
-  font-size: 0.6875rem;
+  font-size: 0.65rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
   text-align: left;
-  padding: 0.75rem 1rem;
+  height: 40px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
 }
 
 .admin-table td {
-  padding: 0.875rem 1rem;
+  height: 56px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
   vertical-align: middle;
+}
+
+.admin-table tr:hover td {
+  background: var(--bg-elevated);
 }
 
 .admin-table tbody tr {
@@ -1434,16 +1581,20 @@ p, label, input, textarea, select, button {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   background: transparent;
-  border: none;
-  padding: 0;
+  /* S66: transparent border rather than none, so the hover state can reveal it
+     without the row reflowing by 2px. */
+  border: 1px solid transparent;
+  padding: 3px 8px;
   cursor: pointer;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .admin-row-action:hover {
   color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
 }
 
 .admin-row-action-danger {
@@ -1459,14 +1610,82 @@ p, label, input, textarea, select, button {
   cursor: not-allowed;
 }
 
+/* S66: every empty table in the panel already carried this class, so the whole
+   treatment is one rule. The `-- ` prefix is the same tick-and-rule language as
+   the page header, at text scale. */
 .admin-empty {
   font-family: var(--font-mono), monospace;
   font-size: 0.75rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
   text-align: center;
-  padding: 2.5rem 1rem;
+  padding: 3rem 1rem;
+}
+
+.admin-empty::before {
+  content: "-- ";
+  color: var(--text-muted);
+}
+
+/* S65 status badges. Border and the leading square both read `currentColor`,
+   so a modifier only has to set `color`. Wired into tables in S66. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+
+.status-badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* S66 additions to each group: the raw DB strings the tables actually hold.
+   events.status is upcoming|past|archived; sponsors/team/bootstrap-sessions are
+   booleans rendered ACTIVE|INACTIVE; applications keeps the pre-S19 'reviewed'
+   and 'accepted' rows. Same colour as their nearest sibling, no new tokens. */
+.status-pending,
+.status-draft,
+.status-archived,
+.status-past,
+.status-inactive,
+.status-reviewed {
+  color: var(--text-muted);
+}
+
+.status-active,
+.status-interview,
+.status-upcoming {
+  color: var(--accent);
+}
+
+/* .status-shortlisted aliased: the DB status value is "shortlisted", so S66
+   can key off the raw value without a lookup table. */
+.status-shortlist,
+.status-shortlisted {
+  color: var(--gold);
+}
+
+/* Brief called for #4ade80 on the grounds that no success token exists.
+   --success (#22c55e) does exist, and CLAUDE.md forbids hardcoded hex. */
+.status-selected,
+.status-published,
+.status-accepted {
+  color: var(--success);
+}
+
+.status-rejected {
+  color: var(--error);
 }
 
 /* Mobile: each table row becomes a card. `!important` because row cells
@@ -1496,7 +1715,12 @@ p, label, input, textarea, select, button {
   .admin-table tbody tr:hover {
     background: var(--bg-card);
   }
+  /* Cards have no hover state; cancels the S65 desktop td:hover tint. */
+  .admin-table tr:hover td {
+    background: transparent;
+  }
   .admin-table td {
+    height: auto;
     padding: 0.2rem 0;
     border-bottom: none;
     white-space: normal !important;
@@ -1544,6 +1768,35 @@ p, label, input, textarea, select, button {
 
 .admin-form .admin-section-label:first-child {
   margin-top: 0;
+}
+
+/* S66: adds the page-header's 32px accent tick to a form section label. The
+   full-width rule is already .admin-section-label's own border-bottom, so this
+   only contributes the tick -- same language as .admin-page-header-rule::after,
+   sitting on a border that exists rather than drawing a second one. */
+.admin-form-section {
+  position: relative;
+}
+
+.admin-form-section::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* S66: right-aligned submit row with its own boundary, so a long form ends on a
+   deliberate edge instead of a button floating in whitespace. */
+.admin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
 }
 
 .admin-label {
@@ -1605,7 +1858,9 @@ textarea.admin-input {
   display: block;
   width: 100%;
   border: 1px dashed var(--border-strong);
-  background: var(--bg-card);
+  /* S66: bg-elevated, so the drop zone reads as a container inside .admin-form
+     (bg-surface) rather than sitting at almost the same value as it. */
+  background: var(--bg-elevated);
   padding: 1.6rem 1rem;
   text-align: center;
   cursor: pointer;
@@ -1685,28 +1940,52 @@ textarea.admin-input {
   opacity: 1;
 }
 
-/* Admin segmented ON/OFF toggle (sharp, keyboard-accessible) */
+/* Admin sliding toggle (sharp, keyboard-accessible).
+   S66: replaced the S-era segmented ON/OFF button pair. The checkbox is the
+   only state -- the thumb slides on :checked with no JS, so the control cannot
+   disagree with the input it reports. Sibling selectors, not Tailwind
+   `has-checked:` utilities: utilities live in @layer utilities and would lose
+   to the ~447 unlayered rules in this file (see CLAUDE.md). */
 
 .admin-toggle {
   display: inline-flex;
-  border: 1px solid var(--border-strong);
-}
-
-.admin-toggle button {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.14em;
-  padding: 0.4rem 0.95rem;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
+  align-items: center;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
 }
 
-.admin-toggle button[data-active="true"] {
+.admin-toggle-track {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 22px;
+  background: var(--border-strong);
+  border: 1px solid var(--border);
+  transition: background 150ms;
+}
+
+.admin-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-secondary);
+  transition: left 150ms, background 150ms;
+}
+
+.admin-toggle input:checked + .admin-toggle-track {
   background: var(--accent);
-  color: var(--bg-base);
+}
+
+.admin-toggle input:checked + .admin-toggle-track .admin-toggle-thumb {
+  left: 23px;
+  background: var(--text-primary);
+}
+
+/* Keyboard focus has to be visible on the track: the input itself is sr-only. */
+.admin-toggle input:focus-visible + .admin-toggle-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Admin danger zone */
@@ -1780,25 +2059,38 @@ textarea.admin-input {
 
 /* Admin dashboard stat cards */
 
+/* S65: values retuned for AdminStatCard. border-left-width is 3px and its
+   colour comes from the component (accent or border-strong). */
 .admin-stat-card {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
-  padding: 1.75rem;
-}
-
-.admin-stat-value {
-  font-family: var(--font-mono), monospace;
-  font-size: clamp(2.5rem, 5vw, 3.5rem);
-  font-weight: 700;
-  line-height: 1;
-  color: var(--text-primary);
+  border-left-width: 3px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .admin-stat-label {
-  margin-top: 0.6rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.admin-stat-value {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: clamp(1.6rem, 2.5vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.admin-stat-sub {
+  margin-top: 2px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
   color: var(--text-secondary);
 }
 

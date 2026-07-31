@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fragment } from "react";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import CopyButton from "@/components/admin/CopyButton";
 import GalleryUploadForm from "@/components/admin/GalleryUploadForm";
 import InlineDelete from "@/components/admin/InlineDelete";
@@ -38,9 +39,10 @@ export default async function AdminGalleryPage() {
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Gallery</h1>
-      </header>
+      <AdminPageHeader
+        title="Gallery"
+        subtitle={`${items.length} items across ${groups.size} ${groups.size === 1 ? "event" : "events"}`}
+      />
 
       {!isViewer ? (
         <div style={{ maxWidth: "52rem", marginBottom: "2rem" }}>

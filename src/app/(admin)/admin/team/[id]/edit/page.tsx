@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import DeleteMemberButton from "@/components/admin/DeleteMemberButton";
 import MemberForm from "@/components/admin/MemberForm";
 import { auth } from "@/lib/auth";
@@ -42,9 +43,9 @@ export default async function EditMemberPage({
         ← Back to team
       </Link>
 
-      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">Edit Member</h1>
-      </header>
+      <div style={{ marginTop: "1rem" }}>
+        <AdminPageHeader title="Edit Member" subtitle={member.role} />
+      </div>
 
       <MemberForm
         mode="edit"

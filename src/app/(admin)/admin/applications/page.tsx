@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ApplicationsTable from "@/components/admin/ApplicationsTable";
 import { auth } from "@/lib/auth";
 import { getApplications } from "@/lib/services/applications";
@@ -61,34 +62,33 @@ export default async function AdminApplicationsPage({
 
   return (
     <>
-      <header className="admin-page-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-        <h1 className="admin-page-title">
-          Applications{" "}
-          <span
-            className="mono"
-            style={{ fontSize: "0.8rem", letterSpacing: "0.12em", color: "var(--text-muted)", fontWeight: 400 }}
+      {/* S65 moved the count out of the h1; S66 states what is being counted,
+          since every tab below narrows it. */}
+      <AdminPageHeader
+        title="Applications"
+        subtitle={`${applications.length} ${applications.length === 1 ? "application" : "applications"} in ${
+          activeGroup ? `interview group ${activeGroup}` : activeStatus ?? "all statuses"
+        }`}
+        action={
+          // Plain <a>: must be a real navigation so the browser downloads the file.
+          <a
+            href={`/api/admin/applications/export${activeStatus ? `?status=${activeStatus}` : ""}`}
+            download
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.72rem",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)",
+              padding: "6px 14px",
+              textDecoration: "none",
+            }}
           >
-            {applications.length}
-          </span>
-        </h1>
-        {/* Plain <a>: must be a real navigation so the browser downloads the file. */}
-        <a
-          href={`/api/admin/applications/export${activeStatus ? `?status=${activeStatus}` : ""}`}
-          download
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.72rem",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
-            border: "1px solid var(--border)",
-            padding: "6px 14px",
-            textDecoration: "none",
-          }}
-        >
-          EXPORT CSV
-        </a>
-      </header>
+            EXPORT CSV
+          </a>
+        }
+      />
 
       {/* Filter tabs: sharp underline treatment (same as the public gallery) */}
       <div

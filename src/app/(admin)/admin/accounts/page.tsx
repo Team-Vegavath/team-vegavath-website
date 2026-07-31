@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import {
   GenerateInviteButton,
   OpenViewerLink,
@@ -115,9 +116,10 @@ export default async function AdminAccountsPage() {
         </section>
       )}
 
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Accounts</h1>
-      </header>
+      <AdminPageHeader
+        title="Team Accounts"
+        subtitle={`${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`}
+      />
 
       {isGodfather && (
         <div style={{ marginBottom: "2rem" }}>

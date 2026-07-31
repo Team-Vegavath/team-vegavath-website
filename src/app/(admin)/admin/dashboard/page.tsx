@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import AdminStatCard from "@/components/admin/AdminStatCard";
 import { auth } from "@/lib/auth";
 import { getRecentLogins } from "@/lib/services/admin";
 import type { AdminLoginEntry } from "@/lib/services/admin";
@@ -88,22 +90,21 @@ export default async function AdminDashboardPage() {
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Dashboard</h1>
-        <p className="mono" style={{ fontSize: "0.68rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
-          Recruitment{" "}
-          <span style={{ color: settings.recruitment_open ? "var(--success)" : "var(--error)" }}>
-            {settings.recruitment_open ? "OPEN" : "CLOSED"}
-          </span>
-        </p>
-      </header>
+      <AdminPageHeader
+        title="Dashboard"
+        action={
+          <p className="mono" style={{ fontSize: "0.68rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-secondary)" }}>
+            Recruitment{" "}
+            <span style={{ color: settings.recruitment_open ? "var(--success)" : "var(--error)" }}>
+              {settings.recruitment_open ? "OPEN" : "CLOSED"}
+            </span>
+          </p>
+        }
+      />
 
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 11rem), 1fr))", gap: "1rem", marginBottom: "2rem" }}>
         {stats.map(({ label, value }) => (
-          <article key={label} className="admin-stat-card">
-            <p className="admin-stat-value">{value}</p>
-            <p className="admin-stat-label">{label}</p>
-          </article>
+          <AdminStatCard key={label} label={label} value={value} accent={label === "Events"} />
         ))}
       </section>
 
@@ -187,8 +188,10 @@ export default async function AdminDashboardPage() {
                   <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>{application.name}</td>
                   <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.email}</td>
                   <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.domain_interest}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    {application.status}
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <span className={`status-badge status-${application.status}`}>
+                      {application.status}
+                    </span>
                   </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                     {formatDate(application.submitted_at)}

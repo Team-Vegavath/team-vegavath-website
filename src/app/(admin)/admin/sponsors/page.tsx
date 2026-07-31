@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import SponsorForm from "@/components/admin/SponsorForm";
 import SponsorsTable from "@/components/admin/SponsorsTable";
 import { auth } from "@/lib/auth";
@@ -35,9 +36,9 @@ export default async function AdminSponsorsPage({
           ← Back to sponsors
         </Link>
 
-        <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-          <h1 className="admin-page-title">New Sponsor</h1>
-        </header>
+        <div style={{ marginTop: "1rem" }}>
+          <AdminPageHeader title="New Sponsor" />
+        </div>
 
         <SponsorForm mode="create" />
       </div>
@@ -48,14 +49,17 @@ export default async function AdminSponsorsPage({
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Sponsors</h1>
-        {!isViewer ? (
-          <Link href="/admin/sponsors?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-            ADD SPONSOR
-          </Link>
-        ) : null}
-      </header>
+      <AdminPageHeader
+        title="Sponsors"
+        subtitle={`${sponsors.length} sponsors`}
+        action={
+          !isViewer ? (
+            <Link href="/admin/sponsors?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+              ADD SPONSOR
+            </Link>
+          ) : null
+        }
+      />
 
       {/* S62: the table and its row actions moved into a client component so
           EDIT can open a slide-in panel instead of navigating. The

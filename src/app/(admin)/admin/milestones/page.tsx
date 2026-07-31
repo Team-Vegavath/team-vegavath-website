@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import MilestonesTable from "@/components/admin/MilestonesTable";
 import { auth } from "@/lib/auth";
 import { getMilestones, type Milestone } from "@/lib/services/about";
@@ -22,9 +23,10 @@ export default async function AdminMilestonesPage() {
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Road So Far</h1>
-      </header>
+      <AdminPageHeader
+        title="Road So Far"
+        subtitle={`${milestones.length} milestones`}
+      />
 
       <MilestonesTable initialData={milestones} isViewer={session.user.isViewer} />
     </>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import DeleteEventButton from "@/components/admin/DeleteEventButton";
 import EventForm from "@/components/admin/EventForm";
 import EventRegistrationsTable from "@/components/admin/EventRegistrationsTable";
@@ -54,12 +55,17 @@ export default async function EditEventPage({
         ← Back to events
       </Link>
 
-      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">{isViewer ? event.title as string : "Edit Event"}</h1>
-        {!isViewer ? (
-          <ToggleEventStatusButton id={event.id as string} currentStatus={event.status as string} />
-        ) : null}
-      </header>
+      <div style={{ marginTop: "1rem" }}>
+        <AdminPageHeader
+          title={isViewer ? (event.title as string) : "Edit Event"}
+          subtitle={event.slug as string}
+          action={
+            !isViewer ? (
+              <ToggleEventStatusButton id={event.id as string} currentStatus={event.status as string} />
+            ) : null
+          }
+        />
+      </div>
 
       {!isViewer ? (
         <EventForm

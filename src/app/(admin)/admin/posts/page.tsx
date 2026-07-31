@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import InlineDelete from "@/components/admin/InlineDelete";
 import { auth } from "@/lib/auth";
 import { getAllPostsAdmin, type Post } from "@/lib/services/posts";
@@ -25,18 +26,21 @@ export default async function AdminPostsPage() {
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Posts</h1>
-        {!isViewer ? (
-          <Link
-            href="/admin/posts/new"
-            className="btn-primary"
-            style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}
-          >
-            ADD POST
-          </Link>
-        ) : null}
-      </header>
+      <AdminPageHeader
+        title="Posts"
+        subtitle={`${posts.length} posts`}
+        action={
+          !isViewer ? (
+            <Link
+              href="/admin/posts/new"
+              className="btn-primary"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}
+            >
+              ADD POST
+            </Link>
+          ) : null
+        }
+      />
 
       <section className="admin-table-wrap">
         <table className="admin-table">
@@ -64,20 +68,12 @@ export default async function AdminPostsPage() {
                   >
                     {post.category}
                   </td>
-                  <td
-                    className="admin-cell-mono"
-                    style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}
-                  >
+                  <td style={{ whiteSpace: "nowrap" }}>
                     <span
-                      className="admin-dot"
-                      style={{
-                        background: post.published
-                          ? "var(--success)"
-                          : "var(--text-muted)",
-                      }}
-                      aria-hidden="true"
-                    />
-                    {post.published ? "PUBLISHED" : "DRAFT"}
+                      className={`status-badge status-${post.published ? "published" : "draft"}`}
+                    >
+                      {post.published ? "PUBLISHED" : "DRAFT"}
+                    </span>
                   </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                     {formatDate(post.published_at ?? post.created_at)}

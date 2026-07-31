@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import BulkImportTeam from "@/components/admin/BulkImportTeam";
 import BulkTeamPhotoUpload from "@/components/admin/BulkTeamPhotoUpload";
 import MemberForm from "@/components/admin/MemberForm";
@@ -42,9 +43,9 @@ export default async function AdminTeamPage({
           ← Back to team
         </Link>
 
-        <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-          <h1 className="admin-page-title">Import Members</h1>
-        </header>
+        <div style={{ marginTop: "1rem" }}>
+          <AdminPageHeader title="Import Members" />
+        </div>
 
         <BulkImportTeam />
       </div>
@@ -58,9 +59,9 @@ export default async function AdminTeamPage({
           ← Back to team
         </Link>
 
-        <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-          <h1 className="admin-page-title">New Member</h1>
-        </header>
+        <div style={{ marginTop: "1rem" }}>
+          <AdminPageHeader title="New Member" />
+        </div>
 
         <MemberForm mode="create" />
       </div>
@@ -69,19 +70,22 @@ export default async function AdminTeamPage({
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Team</h1>
-        {!isViewer ? (
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <Link href="/admin/team?import=true" className="btn-outline" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-              IMPORT CSV
-            </Link>
-            <Link href="/admin/team?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-              ADD MEMBER
-            </Link>
-          </div>
-        ) : null}
-      </header>
+      <AdminPageHeader
+        title="Team"
+        subtitle={`${members.length} members`}
+        action={
+          !isViewer ? (
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+              <Link href="/admin/team?import=true" className="btn-outline" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+                IMPORT CSV
+              </Link>
+              <Link href="/admin/team?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+                ADD MEMBER
+              </Link>
+            </div>
+          ) : null
+        }
+      />
 
       {!isViewer ? (
         <BulkTeamPhotoUpload

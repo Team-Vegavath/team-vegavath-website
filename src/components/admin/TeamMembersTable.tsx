@@ -166,23 +166,33 @@ export default function TeamMembersTable({ initialData, isViewer = false }: Prop
                 <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{member.role}</td>
                 <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>{member.tier}</td>
                 <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{member.domain ?? "-"}</td>
-                <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                  <span
-                    className="admin-dot"
-                    style={{ background: member.is_active ? "var(--success)" : "var(--text-muted)" }}
-                    aria-hidden="true"
-                  />
+                {/* S66: the badge is the affordance for both tiers -- a viewer
+                    reads it, an admin clicks it. The button is stripped to a
+                    bare wrapper (same inline reset SponsorsTable uses) so the
+                    badge's own border is the only frame in the cell. */}
+                <td style={{ whiteSpace: "nowrap" }}>
                   {isViewer ? (
-                    member.is_active ? "YES" : "NO"
+                    <span className={`status-badge status-${member.is_active ? "active" : "inactive"}`}>
+                      {member.is_active ? "ACTIVE" : "INACTIVE"}
+                    </span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => toggleActive(member)}
                       disabled={pendingId === member.id}
-                      className="admin-row-action"
                       aria-pressed={member.is_active}
+                      aria-label={`${member.is_active ? "Deactivate" : "Activate"} ${member.name}`}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        cursor: pendingId === member.id ? "wait" : "pointer",
+                        font: "inherit",
+                      }}
                     >
-                      {member.is_active ? "YES" : "NO"}
+                      <span className={`status-badge status-${member.is_active ? "active" : "inactive"}`}>
+                        {member.is_active ? "ACTIVE" : "INACTIVE"}
+                      </span>
                     </button>
                   )}
                 </td>

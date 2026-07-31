@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import PostForm from "@/components/admin/PostForm";
 import { auth } from "@/lib/auth";
 import { getPostByIdAdmin } from "@/lib/services/posts";
@@ -41,9 +42,9 @@ export default async function EditPostPage({
         ← Back to posts
       </Link>
 
-      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">Edit Post</h1>
-      </header>
+      <div style={{ marginTop: "1rem" }}>
+        <AdminPageHeader title="Edit Post" subtitle={post.slug} />
+      </div>
 
       <PostForm
         mode="edit"

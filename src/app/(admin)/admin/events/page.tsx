@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import EventForm from "@/components/admin/EventForm";
 import InlineDelete from "@/components/admin/InlineDelete";
 import { auth } from "@/lib/auth";
@@ -49,9 +50,9 @@ export default async function AdminEventsPage({
           ← Back to events
         </Link>
 
-        <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-          <h1 className="admin-page-title">New Event</h1>
-        </header>
+        <div style={{ marginTop: "1rem" }}>
+          <AdminPageHeader title="New Event" />
+        </div>
 
         <EventForm mode="create" />
       </div>
@@ -60,14 +61,17 @@ export default async function AdminEventsPage({
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Events</h1>
-        {!isViewer ? (
-          <Link href="/admin/events?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
-            ADD EVENT
-          </Link>
-        ) : null}
-      </header>
+      <AdminPageHeader
+        title="Events"
+        subtitle={`${events.length} events`}
+        action={
+          !isViewer ? (
+            <Link href="/admin/events?new=true" className="btn-primary" style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem" }}>
+              ADD EVENT
+            </Link>
+          ) : null
+        }
+      />
 
       <section className="admin-table-wrap">
         <table className="admin-table">
@@ -94,13 +98,8 @@ export default async function AdminEventsPage({
                       {event.title}
                     </Link>
                   </td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    <span
-                      className="admin-dot"
-                      style={{ background: event.status === "upcoming" ? "var(--accent)" : "var(--text-muted)" }}
-                      aria-hidden="true"
-                    />
-                    {event.status}
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <span className={`status-badge status-${event.status}`}>{event.status}</span>
                   </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{formatDate(event.event_date)}</td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>

@@ -77,7 +77,7 @@ export default function GalleryUploadForm() {
     }
 
     // Event label is optional: unlabelled uploads go into a "General" bucket
-    // (event_id stays null unless pasted — no lookup from the label).
+    // (event_id stays null unless pasted -- no lookup from the label).
     const trimmedEventLabel = eventLabel.trim() || "General";
     const eventSlug = trimmedEventLabel
       .toLowerCase()
@@ -93,7 +93,7 @@ export default function GalleryUploadForm() {
     setStatuses(batchFiles.map(() => "queued"));
 
     // New items sort after existing ones: the gallery lists display_order ASC,
-    // so start the batch at current max + 1 (best effort — falls back to 0).
+    // so start the batch at current max + 1 (best effort -- falls back to 0).
     let baseOrder = 0;
     try {
       const listResponse = await fetch("/api/admin/gallery");
@@ -119,7 +119,7 @@ export default function GalleryUploadForm() {
 
       setStatusAtIndex(index, "uploading");
 
-      // Per-file try/catch: one bad file logs and moves on — partial success
+      // Per-file try/catch: one bad file logs and moves on -- partial success
       // is expected behaviour for a bulk upload.
       try {
         const filename = file.name.toLowerCase().replace(/\s+/g, "-");
@@ -235,7 +235,7 @@ export default function GalleryUploadForm() {
   return (
     <section className="admin-form">
       <form onSubmit={handleImageUpload} style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
-        <span className="admin-section-label">Upload Images</span>
+        <span className="admin-section-label admin-form-section">Upload Images</span>
 
         <div>
           <label htmlFor="eventLabel" className="admin-label">
@@ -339,19 +339,21 @@ export default function GalleryUploadForm() {
           </p>
         )}
 
-        {summary ? (
-          <button type="button" onClick={resetImageForm} className="btn-outline" style={{ width: "fit-content" }}>
-            DONE
-          </button>
-        ) : (
-          <button type="submit" disabled={uploading} className="btn-primary" style={{ width: "fit-content", opacity: uploading ? 0.6 : 1 }}>
-            {uploading ? "UPLOADING…" : "UPLOAD"}
-          </button>
-        )}
+        <div className="admin-form-actions">
+          {summary ? (
+            <button type="button" onClick={resetImageForm} className="btn-outline">
+              DONE
+            </button>
+          ) : (
+            <button type="submit" disabled={uploading} className="btn-primary" style={{ opacity: uploading ? 0.6 : 1 }}>
+              {uploading ? "UPLOADING..." : "UPLOAD"}
+            </button>
+          )}
+        </div>
       </form>
 
       <form onSubmit={handleVideoSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.4rem", marginTop: "1.4rem" }}>
-        <span className="admin-section-label">Add YouTube Video</span>
+        <span className="admin-section-label admin-form-section">Add YouTube Video</span>
 
         <div>
           <label htmlFor="videoEventLabel" className="admin-label">
@@ -394,9 +396,11 @@ export default function GalleryUploadForm() {
           />
         </div>
 
-        <button type="submit" className="btn-primary" style={{ width: "fit-content" }}>
-          ADD VIDEO
-        </button>
+        <div className="admin-form-actions">
+          <button type="submit" className="btn-primary">
+            ADD VIDEO
+          </button>
+        </div>
       </form>
 
       {error && (

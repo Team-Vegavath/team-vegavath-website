@@ -3,6 +3,7 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import BootstrapCreateSession from "@/components/admin/BootstrapCreateSession";
 import type { BootstrapSession, PoolVolunteer } from "@/lib/services/bootstrap";
 
@@ -320,18 +321,20 @@ export default function BootstrapSessions({
 
   return (
     <>
-      <header className="admin-page-header">
-        <h1 className="admin-page-title">Bootstrap</h1>
-        {!isViewer ? (
-          <button
-            className="btn-primary"
-            style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
-            onClick={() => setCreating(true)}
-          >
-            CREATE SESSION
-          </button>
-        ) : null}
-      </header>
+      <AdminPageHeader
+        title="Bootstrap"
+        action={
+          !isViewer ? (
+            <button
+              className="btn-primary"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
+              onClick={() => setCreating(true)}
+            >
+              CREATE SESSION
+            </button>
+          ) : null
+        }
+      />
 
       <section className="admin-table-wrap">
         <table className="admin-table">
@@ -371,13 +374,10 @@ export default function BootstrapSessions({
                       {shortDate(s.created_at)}
                     </td>
                     <td className="admin-cell-mono">{s.stall_count ?? 0}</td>
-                    <td className="admin-cell-mono" style={{ textTransform: "uppercase" }}>
-                      <span
-                        className="admin-dot"
-                        style={{ background: s.is_active ? "var(--success)" : "var(--text-muted)" }}
-                        aria-hidden="true"
-                      />
-                      {s.is_active ? "ACTIVE" : "INACTIVE"}
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span className={`status-badge status-${s.is_active ? "active" : "inactive"}`}>
+                        {s.is_active ? "ACTIVE" : "INACTIVE"}
+                      </span>
                     </td>
                     <td>
                       {!isViewer && (
@@ -507,7 +507,13 @@ export default function BootstrapSessions({
                 <th>Prefers</th>
                 <th>Login code</th>
                 <th>Registered</th>
-                <th>Actions</th>
+                {/* S66: the actions column is pinned right, and its cells carry
+                    a left border. At 25+ pre-registrations the identity block
+                    and the four action buttons need a visible seam, otherwise
+                    the row reads as one undifferentiated line of mono text. */}
+                <th style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -515,28 +521,35 @@ export default function BootstrapSessions({
                 pool.map((v) => (
                   <Fragment key={v.id}>
                     <tr>
-                      <td className="admin-td-primary" style={{ fontWeight: 500 }}>
+                      <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
                         {v.display_name}
                       </td>
-                      <td className="admin-cell-mono">{v.username}</td>
-                      <td className="admin-cell-mono">{v.phone ?? "-"}</td>
+                      <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{v.username}</td>
+                      <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{v.phone ?? "-"}</td>
                       <td style={{ color: "var(--text-secondary)" }}>
                         {v.preferred_stall_name ?? "-"}
                       </td>
                       {/* S55C: plaintext by design, same as the active-session
                           tables -- these accounts only reach /bootstrap. */}
-                      <td className="admin-cell-mono">{v.login_code ?? "-"}</td>
+                      <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
+                        {v.login_code ?? "-"}
+                      </td>
                       <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                         {shortDate(v.created_at)}
                       </td>
-                      <td>
+                      <td style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>
                         {isViewer ? (
                           <span className="admin-cell-mono" style={{ color: "var(--text-muted)" }}>
                             -
                           </span>
                         ) : (
                           <span
-                            style={{ display: "inline-flex", gap: "0.5rem", flexWrap: "wrap" }}
+                            style={{
+                              display: "inline-flex",
+                              justifyContent: "flex-end",
+                              gap: "0.25rem",
+                              flexWrap: "wrap",
+                            }}
                           >
                             <button
                               className="admin-row-action"

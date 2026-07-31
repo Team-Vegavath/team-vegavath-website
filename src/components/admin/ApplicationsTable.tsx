@@ -6,16 +6,8 @@ import InlineDelete from "@/components/admin/InlineDelete";
 import type { Application, ApplicationStatus, InterviewGroup } from "@/types/settings";
 import { APPLICATION_STATUSES, INTERVIEW_GROUPS } from "@/types/settings";
 
-// Dot colors per pipeline stage; 'reviewed'/'accepted' are legacy rows.
-const STATUS_COLORS: Record<ApplicationStatus, string> = {
-  pending: "var(--text-muted)",
-  shortlisted: "var(--gold)",
-  interview: "var(--accent)",
-  selected: "var(--success)",
-  rejected: "var(--error)",
-  reviewed: "var(--text-muted)",
-  accepted: "var(--success)",
-};
+// S66: the per-stage dot colours that used to live here are now the
+// .status-* modifier rules in globals.css, keyed off the raw DB value.
 
 const detailLabelStyle: React.CSSProperties = {
   fontFamily: "var(--font-mono)",
@@ -309,13 +301,13 @@ export default function ApplicationsTable({
                     <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>
                       {formatDate(app.submitted_at)}
                     </td>
-                    <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                      <span
-                        className="admin-dot"
-                        style={{ background: STATUS_COLORS[status] }}
-                        aria-hidden="true"
-                      />
-                      {updatingId === app.id ? "..." : status}
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {/* Modifier keys off the raw DB value: every one of the 7
+                          APPLICATION_STATUSES has a .status-* rule, legacy
+                          'reviewed'/'accepted' included. */}
+                      <span className={`status-badge status-${status}`}>
+                        {updatingId === app.id ? "..." : status}
+                      </span>
                     </td>
                     {/* Group tiles - only meaningful once an applicant reaches interview. */}
                     <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap" }}>

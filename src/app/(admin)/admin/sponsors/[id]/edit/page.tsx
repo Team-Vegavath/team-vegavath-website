@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import DeleteSponsorButton from "@/components/admin/DeleteSponsorButton";
 import SponsorForm from "@/components/admin/SponsorForm";
 import { auth } from "@/lib/auth";
@@ -41,9 +42,9 @@ export default async function EditSponsorPage({
         ← Back to sponsors
       </Link>
 
-      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">Edit Sponsor</h1>
-      </header>
+      <div style={{ marginTop: "1rem" }}>
+        <AdminPageHeader title="Edit Sponsor" subtitle={sponsor.name} />
+      </div>
 
       <SponsorForm
         mode="edit"

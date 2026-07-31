@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import PostForm from "@/components/admin/PostForm";
 import { auth } from "@/lib/auth";
 
@@ -28,9 +29,9 @@ export default async function NewPostPage() {
         ← Back to posts
       </Link>
 
-      <header className="admin-page-header" style={{ marginTop: "1rem" }}>
-        <h1 className="admin-page-title">New Post</h1>
-      </header>
+      <div style={{ marginTop: "1rem" }}>
+        <AdminPageHeader title="New Post" />
+      </div>
 
       <PostForm mode="create" />
     </div>

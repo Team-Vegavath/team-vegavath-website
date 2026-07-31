@@ -67,13 +67,10 @@ export default function SponsorsTable({ sponsors, isViewer }: Props) {
                 <tr key={sponsor.id}>
                   <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>{sponsor.name}</td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>{sponsor.tier}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    <span
-                      className="admin-dot"
-                      style={{ background: sponsor.is_active ? "var(--success)" : "var(--text-muted)" }}
-                      aria-hidden="true"
-                    />
-                    {sponsor.is_active ? "ACTIVE" : "INACTIVE"}
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <span className={`status-badge status-${sponsor.is_active ? "active" : "inactive"}`}>
+                      {sponsor.is_active ? "ACTIVE" : "INACTIVE"}
+                    </span>
                   </td>
                   <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{sponsor.display_order}</td>
                   <td className="admin-cell-mono">{truncateText(sponsor.logo_url, 40)}</td>

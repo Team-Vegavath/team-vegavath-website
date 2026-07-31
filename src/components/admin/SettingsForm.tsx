@@ -38,7 +38,10 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
       className="admin-form"
       style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}
     >
-      <span className="admin-section-label">Site Status</span>
+      {/* S66: .admin-form-section adds the page-header accent tick to the rule
+          .admin-section-label already draws, tying form sections to the page
+          header language. */}
+      <span className="admin-section-label admin-form-section">Site Status</span>
 
       <input type="hidden" name="recruitment_open" value={recruitmentOpen ? "true" : "false"} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
@@ -83,7 +86,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         />
       </div>
 
-      <span className="admin-section-label">Contact</span>
+      <span className="admin-section-label admin-form-section">Contact</span>
 
       <div>
         <label htmlFor="contact_email" className="admin-label">
@@ -127,7 +130,7 @@ export default function SettingsForm({ settings }: SettingsFormProps) {
         />
       </div>
 
-      <span className="admin-section-label">Social Media</span>
+      <span className="admin-section-label admin-form-section">Social Media</span>
 
       <div>
         <label htmlFor="instagram_url" className="admin-label">

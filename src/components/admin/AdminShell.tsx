@@ -3,17 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 
 import { CommandPalette } from "@/components/admin/CommandPalette";
 
 // Same R2 shield as the public Navbar (constant duplicated; Navbar doesn't export it).
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 
+// S65: `section` groups the sidebar into labelled zones. Kept on NAV_ITEMS
+// itself rather than in a parallel list of hrefs, so the grouping can't drift
+// from the nav (same reason CommandPalette is fed from this array).
+const SECTIONS = ["Overview", "Content", "Recruitment", "System"] as const;
+
 const NAV_ITEMS = [
   {
     href: "/admin/dashboard",
     label: "Dashboard",
+    section: "Overview",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <rect x="3" y="3" width="7" height="7" />
@@ -26,6 +32,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/events",
     label: "Events",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <rect x="3" y="5" width="18" height="16" />
@@ -38,6 +45,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/posts",
     label: "Posts",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <rect x="4" y="3" width="16" height="18" />
@@ -50,6 +58,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/team",
     label: "Team",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <circle cx="9" cy="8" r="3.5" />
@@ -62,6 +71,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/applications",
     label: "Applications",
+    section: "Recruitment",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="2" y="1" width="12" height="14" rx="0" stroke="currentColor" strokeWidth="1.3" />
@@ -74,6 +84,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/bootstrap",
     label: "Bootstrap",
+    section: "System",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="1" y="4" width="14" height="9" rx="0" stroke="currentColor" strokeWidth="1.3" />
@@ -86,6 +97,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/gallery",
     label: "Gallery",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <rect x="3" y="4" width="18" height="16" />
@@ -97,6 +109,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/milestones",
     label: "Road So Far",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <line x1="5" y1="3" x2="5" y2="21" />
@@ -112,6 +125,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/sponsors",
     label: "Sponsors",
+    section: "Content",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <path d="M3 3h8l10 10-8 8L3 11z" />
@@ -122,6 +136,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/settings",
     label: "Settings",
+    section: "System",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <line x1="4" y1="8" x2="20" y2="8" />
@@ -134,6 +149,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/accounts",
     label: "Accounts",
+    section: "System",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <circle cx="8" cy="8" r="3.5" />
@@ -154,9 +170,20 @@ interface AdminShellProps {
   signOutSlot: ReactNode;
   // Orange dot on the Accounts link when registration requests await approval.
   hasPendingAccounts?: boolean;
+  // S65 sidebar footer. Passed down rather than read here: this is a client
+  // component with no SessionProvider above it, and the layout is already
+  // async, so it can await auth() for free.
+  userName?: string;
+  userRole?: string;
 }
 
-export default function AdminShell({ children, signOutSlot, hasPendingAccounts = false }: AdminShellProps) {
+export default function AdminShell({
+  children,
+  signOutSlot,
+  hasPendingAccounts = false,
+  userName,
+  userRole,
+}: AdminShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -188,18 +215,8 @@ export default function AdminShell({ children, signOutSlot, hasPendingAccounts =
         style={{ height: "24px", width: "24px", objectFit: "contain" }}
       />
       <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-        <span
-          className="heading"
-          style={{ fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.14em", color: "var(--text-primary)" }}
-        >
-          VEGAVATH
-        </span>
-        <span
-          className="mono"
-          style={{ fontSize: "0.55rem", letterSpacing: "0.24em", textTransform: "uppercase", color: "var(--text-muted)" }}
-        >
-          ADMIN
-        </span>
+        <span className="admin-sidebar-brand-name">VEGAVATH</span>
+        <span className="admin-sidebar-brand-sub">ADMIN PANEL</span>
       </span>
     </>
   );
@@ -229,53 +246,57 @@ export default function AdminShell({ children, signOutSlot, hasPendingAccounts =
         </Link>
 
         <nav className="admin-nav" aria-label="Admin sections">
-          {NAV_ITEMS.map(({ href, label, icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="admin-nav-link"
-              data-active={pathname === href || pathname.startsWith(`${href}/`)}
-            >
-              {href === "/admin/accounts" && hasPendingAccounts ? (
-                <span style={{ position: "relative", display: "inline-flex" }}>
-                  {icon}
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      top: "-2px",
-                      right: "-3px",
-                      width: "6px",
-                      height: "6px",
-                      background: "var(--accent)",
-                    }}
-                  />
-                </span>
-              ) : (
-                icon
-              )}
-              {label}
-            </Link>
+          {SECTIONS.map((section) => (
+            <Fragment key={section}>
+              <span className="admin-nav-section-label">{section}</span>
+              {NAV_ITEMS.filter((item) => item.section === section).map(({ href, label, icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  // startsWith keeps the parent lit on sub-routes (/admin/events/new).
+                  className={
+                    pathname === href || pathname.startsWith(`${href}/`)
+                      ? "admin-nav-item active"
+                      : "admin-nav-item"
+                  }
+                >
+                  {href === "/admin/accounts" && hasPendingAccounts ? (
+                    <span style={{ position: "relative", display: "inline-flex" }}>
+                      {icon}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: "absolute",
+                          top: "-2px",
+                          right: "-3px",
+                          width: "6px",
+                          height: "6px",
+                          background: "var(--accent)",
+                        }}
+                      />
+                    </span>
+                  ) : (
+                    icon
+                  )}
+                  {label}
+                </Link>
+              ))}
+            </Fragment>
           ))}
         </nav>
 
-        {/* S62: the palette's only discoverability affordance. It is a <p>, not a
-            button -- the shortcut is the interface, and a clickable hint would
-            need its own open handler threaded down from here for no gain. */}
-        <p
-          className="mono"
-          style={{
-            padding: "0.9rem 1.25rem 0",
-            fontSize: "0.6rem",
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
-          }}
-        >
-          Ctrl+K to search
-        </p>
-
-        <div className="admin-sidebar-foot">{signOutSlot}</div>
+        <div className="admin-sidebar-footer">
+          {userName ? <span className="admin-sidebar-user-name">{userName}</span> : null}
+          {userRole ? <span className="admin-sidebar-user-role">{userRole}</span> : null}
+          <div className="admin-sidebar-footer-row">
+            {/* SignOutButton takes no className, so the style hangs off a wrapper. */}
+            <span className="admin-sidebar-signout">{signOutSlot}</span>
+            {/* S62: the palette's only discoverability affordance. Text, not a
+                button -- the shortcut is the interface, and a clickable hint
+                would need its own open handler threaded down for no gain. */}
+            <span className="admin-sidebar-ctrlk">CTRL+K</span>
+          </div>
+        </div>
       </aside>
 
       <main className="admin-content">{children}</main>
