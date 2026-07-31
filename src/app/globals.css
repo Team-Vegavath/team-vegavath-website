@@ -2323,7 +2323,227 @@ textarea.admin-input {
   }
 }
 
-/* Legal page links */
+/* ══════════════════════════════════════════════════════════════════
+   Legal page -- S68
+   ══════════════════════════════════════════════════════════════════
+
+   /legal is public, so the type scale answers to the public site rather than
+   the admin panel -- but it is a reference document, read by lookup, not read
+   through. The structural language (accent gradient tick, mono labels, no
+   radii) is S67's; the h1 keeps the public pages' clamp.
+
+   Every style here was an inline object repeated per element before S68 -- 19
+   identical h3 objects and 19 identical p objects -- so a rhythm change meant
+   19 edits and ::after was unreachable. */
+
+.legal-page {
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+.legal-shell {
+  width: 100%;
+  max-width: 780px;
+  padding: 8rem 1.5rem 5rem;
+  box-sizing: border-box;
+}
+
+.legal-updated,
+.legal-org {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.legal-head {
+  margin: 1.25rem 0 2.5rem;
+}
+
+.legal-title {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: clamp(2.2rem, 6vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.legal-org {
+  margin-top: 0.6rem;
+  letter-spacing: 0.16em;
+}
+
+/* ── Contents ───────────────────────────────────────────────────────────────
+   S68: plain jump links, no scroll-spy. A 19-clause legal page is used by
+   lookup -- you arrive, find the clause, read it and leave -- and this block
+   scrolls away the moment you jump, so an active highlight would be tracking
+   state nobody can see. Scroll-spy only earns its keep against a STICKY
+   contents rail, which a 780px centred column has no room for. */
+
+.legal-toc {
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 1.5rem 0 1.75rem;
+  margin-bottom: 3.5rem;
+}
+
+.legal-toc-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.25rem;
+}
+
+.legal-toc-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.legal-toc-group-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-toc-link {
+  display: block;
+  padding: 0.28rem 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-admin);
+}
+
+.legal-toc-link:hover,
+.legal-toc-link:focus-visible {
+  color: var(--accent);
+}
+
+@media (max-width: 639px) {
+  .legal-toc-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Document body ──────────────────────────────────────────────────────── */
+
+.legal-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 4.5rem;
+}
+
+/* S68 (B3): 1.4rem put the two document divisions in the same visual band as
+   the clause headings under them, so the page read as one undifferentiated
+   block. Uppercase Chakra with the accent tick on its rule is the same mark
+   the admin page headers carry, and it is what makes PRIVACY POLICY and TERMS
+   OF SERVICE legible as divisions rather than as another numbered clause. */
+.legal-h2 {
+  position: relative;
+  font-family: var(--font-chakra), sans-serif;
+  font-size: clamp(1.7rem, 3.5vw, 2.05rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  padding-bottom: 0.85rem;
+  margin-bottom: 2.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.5px;
+  width: 48px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.legal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  color: var(--text-secondary);
+}
+
+/* The fixed navbar is 72px; without this every TOC jump lands the clause
+   heading underneath it. */
+.legal-clause {
+  scroll-margin-top: 96px;
+}
+
+.legal-h3 {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 0.7rem;
+}
+
+.legal-p {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.legal-p + .legal-p,
+.legal-list + .legal-p,
+.legal-p + .legal-list {
+  margin-top: 0.75rem;
+}
+
+.legal-list {
+  list-style: disc;
+  list-style-position: outside;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.legal-list strong,
+.legal-p strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.legal-foot {
+  border-top: 1px solid var(--border-strong);
+  padding-top: 1.75rem;
+}
+
+.legal-foot-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.legal-foot-text {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
 
 .legal-link {
   color: var(--accent);
@@ -2334,7 +2554,22 @@ textarea.admin-input {
   text-decoration: underline;
 }
 
-/* Docs layout (Session 44) */
+/* ══════════════════════════════════════════════════════════════════
+   Docs layout (S44) -- brought onto the S67 admin vocabulary in S68
+   ══════════════════════════════════════════════════════════════════
+
+   /docs is password-gated, unlinked and read-heavy: the same kind of surface
+   as the admin panel, so it obeys the same elevation hierarchy documented
+   above .admin-sidebar rather than a third system of its own.
+
+     --bg-base      chrome     .docs-sidebar-wrapper, .docs-mobile-bar
+     --bg-surface   content    .docs-content-wrapper
+     --bg-card      at rest    code blocks, table headers, inline code
+     --bg-elevated  raised     sidebar link hover
+
+   Before S68 both the sidebar and the content inherited the body's --bg-base,
+   so the chrome/content seam was carried by a single 1px border. This is the
+   same inversion S67 fixed in the admin panel. */
 
 .docs-layout {
   display: flex;
@@ -2349,6 +2584,7 @@ textarea.admin-input {
   top: 72px;
   height: calc(100vh - 72px);
   overflow-y: auto;
+  background: var(--bg-base);
   border-right: 1px solid var(--border);
 }
 
@@ -2357,10 +2593,279 @@ textarea.admin-input {
   min-width: 0;
   max-width: 860px;
   padding: 2.5rem 3rem;
+  background: var(--bg-surface);
 }
 
 .docs-mobile-bar {
   display: none;
+}
+
+/* ── Docs sidebar nav ───────────────────────────────────────────────────────
+   S68: moved off DocsSidebar.tsx's inline style objects. The move is what
+   buys the hover state -- an inline style cannot express :hover, so before
+   S68 the only feedback a doc link gave was the active state on the page you
+   were already on. Language matched to .admin-nav-item throughout. */
+
+.docs-nav {
+  padding: 1.5rem 1rem;
+}
+
+.docs-nav-brand {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 0 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.docs-nav-section {
+  margin-bottom: 1.5rem;
+}
+
+.docs-nav-section-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.docs-nav-item {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: transparent;
+  border-left: 2px solid transparent;
+  transition:
+    color var(--duration-fast) var(--ease-admin),
+    background var(--duration-fast) var(--ease-admin),
+    border-color var(--duration-fast) var(--ease-admin);
+}
+
+.docs-nav-item:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border-left-color: var(--border-strong);
+}
+
+/* S67's active nav language: accent tint plus a glow pulled back off the right
+   edge by the negative spread, so it decays inside the item instead of washing
+   the row. Listed after :hover so the active page does not lose its accent
+   when the pointer crosses it. */
+.docs-nav-item.active,
+.docs-nav-item.active:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+  position: relative;
+  box-shadow: inset 6px 0 16px -10px var(--accent);
+}
+
+/* ── Docs prose ─────────────────────────────────────────────────────────────
+   S68: DocsContent.tsx kept a style object per markdown element, which meant
+   no ::after, no :hover and no media queries were reachable. Only the two
+   pieces of real logic stay in the component (heading ids, and the inline-vs-
+   block code test); everything else is a descendant selector here. */
+
+.docs-prose {
+  font-family: var(--font-space), sans-serif;
+  color: var(--text-secondary);
+}
+
+/* Measure is set on the text elements, NOT on .docs-content-wrapper: at 860px
+   less 3rem of padding the column runs to roughly 100 characters, well past
+   comfortable. Constraining the wrapper instead would have dragged the tables
+   in with it -- database.md alone is 200+ table rows, and those want every
+   pixel. Prose reads narrow; tables and code blocks stay full width. */
+.docs-prose p,
+.docs-prose li {
+  max-width: 68ch;
+}
+
+/* Repeated h1s are load-bearing here: routes.md, files-api.md and
+   files-pages.md all use `#` as a mid-document divider, so this is a section
+   mark and not only a page title. Same gradient tick as
+   .admin-page-header-rule::after, sitting on the heading's own bottom border.
+   Deliberately NOT text-transform: uppercase, unlike the admin title -- these
+   strings come from authored markdown ("API -- Admin auth (token-gated)") and
+   set in caps they read as shouting and wrap badly. */
+.docs-prose h1 {
+  position: relative;
+  font-family: var(--font-chakra), sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Every h1 after the first is a division inside the page, so it gets air above
+   it that the page title must not have. */
+.docs-prose h1 ~ h1 {
+  margin-top: 4rem;
+}
+
+.docs-prose h1::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.5px;
+  width: 48px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.docs-prose h2 {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  margin-top: 2.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.docs-prose h3 {
+  font-family: var(--font-chakra), sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-top: 1.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.docs-prose p {
+  font-size: 0.95rem;
+  line-height: 1.75;
+  margin-bottom: 1rem;
+}
+
+.docs-prose ul,
+.docs-prose ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.docs-prose ul {
+  list-style: disc;
+}
+
+.docs-prose ol {
+  list-style: decimal;
+}
+
+.docs-prose li {
+  font-size: 0.95rem;
+  line-height: 1.75;
+  margin-bottom: 0.25rem;
+}
+
+.docs-prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.docs-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--duration-fast) var(--ease-admin);
+}
+
+.docs-prose a:hover {
+  color: var(--accent-hover);
+}
+
+.docs-prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Code is card-coloured -- one material for code across the page. Only the
+   BLOCK is raised: a fenced block is a reference object you read out of, so it
+   carries --shadow-elevation the way an admin table wrap does. An inline chip
+   is a word inside a sentence, not a lifted object, so it takes the same
+   colour and no shadow; the accent text is what makes it legible. */
+.docs-prose :not(pre) > code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  background: var(--bg-card);
+  color: var(--accent);
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+}
+
+.docs-prose pre {
+  margin: 1.5rem 0;
+  background: none;
+  padding: 0;
+}
+
+.docs-prose pre > code {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-elevation);
+  overflow-x: auto;
+}
+
+.docs-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.docs-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.docs-prose th {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.docs-prose td {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The fixed 72px navbar would otherwise eat any heading an in-page #anchor
+   jumps to -- and DocsContent stamps an id on every heading precisely so
+   those links work. */
+.docs-prose h1,
+.docs-prose h2,
+.docs-prose h3 {
+  scroll-margin-top: 96px;
 }
 
 @media (max-width: 767px) {
@@ -2380,7 +2885,9 @@ textarea.admin-input {
     border-right: none;
     overflow-y: auto;
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
+    /* S68: was a hand-specified `0.2s ease`. --duration-base is the token for
+       things that actually move, same as the admin slide-in panel. */
+    transition: transform var(--duration-base) var(--ease-admin);
   }
 
   .docs-sidebar-wrapper[data-open="true"] {
@@ -2390,6 +2897,12 @@ textarea.admin-input {
   .docs-content-wrapper {
     padding: 1.5rem 1rem;
     max-width: 100%;
+  }
+
+  /* The block's own padding is the frame at this width; a 1.25rem inset inside
+     a 1rem page margin left the code almost no room for a long line. */
+  .docs-prose pre > code {
+    padding: 1rem;
   }
 
   .docs-mobile-bar {
@@ -2422,6 +2935,12 @@ textarea.admin-input {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+  }
+
+  .docs-hamburger {
+    transition:
+      color var(--duration-fast) var(--ease-admin),
+      border-color var(--duration-fast) var(--ease-admin);
   }
 
   .docs-hamburger:hover {

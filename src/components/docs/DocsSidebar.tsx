@@ -7,40 +7,20 @@ interface DocsSidebarProps {
   onNavigate?: () => void;
 }
 
+// S68: the inline style objects moved to `.docs-nav-*` in globals.css. The point
+// was not tidiness -- an inline style cannot express :hover, so until now the
+// only feedback these links gave was the active state on the page you were
+// already looking at. Styling matched to .admin-nav-item.
 export default function DocsSidebar({ onNavigate }: DocsSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <nav style={{ padding: "0 1rem" }}>
-      <div
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: "0.65rem",
-          letterSpacing: "0.15em",
-          color: "var(--accent)",
-          textTransform: "uppercase",
-          marginBottom: "1.5rem",
-          padding: "0 0.5rem",
-        }}
-      >
-        Documentation
-      </div>
+    <nav className="docs-nav">
+      <div className="docs-nav-brand">Documentation</div>
 
       {DOC_SECTIONS.map((section) => (
-        <div key={section.title} style={{ marginBottom: "1.5rem" }}>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.65rem",
-              letterSpacing: "0.12em",
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              padding: "0 0.5rem",
-              marginBottom: "0.4rem",
-            }}
-          >
-            {section.title}
-          </div>
+        <div key={section.title} className="docs-nav-section">
+          <div className="docs-nav-section-label">{section.title}</div>
           {section.pages.map((page) => {
             const href = page.slug === "" ? "/docs" : `/docs/${page.slug}`;
             // startsWith (not ===) so an in-page anchor URL like
@@ -54,21 +34,8 @@ export default function DocsSidebar({ onNavigate }: DocsSidebarProps) {
                 key={page.slug}
                 href={href}
                 onClick={onNavigate}
-                style={{
-                  display: "block",
-                  padding: "0.4rem 0.75rem",
-                  fontFamily: "var(--font-space)",
-                  fontSize: "0.875rem",
-                  color: active
-                    ? "var(--accent)"
-                    : "var(--text-secondary)",
-                  background: active ? "var(--accent-dim)" : "transparent",
-                  borderLeft: active
-                    ? "2px solid var(--accent)"
-                    : "2px solid transparent",
-                  textDecoration: "none",
-                  transition: "color 0.15s",
-                }}
+                aria-current={active ? "page" : undefined}
+                className={active ? "docs-nav-item active" : "docs-nav-item"}
               >
                 {page.title}
               </Link>

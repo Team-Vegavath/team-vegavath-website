@@ -57,6 +57,17 @@ export default auth(async (req) => {
     if (pathname === "/docs/login") return NextResponse.next();
 
     const docsPassword = process.env.DOCS_PASSWORD;
+    // S68: the fail-open above is deliberate and UNCHANGED -- failing closed
+    // would lock the docs out if the var went transiently missing mid-deploy.
+    // What it lacked was a signal: an env cleanup that dropped DOCS_PASSWORD
+    // republished the internal architecture docs with no error and no trace.
+    // This makes that state loud in Vercel's function logs. Only the absence is
+    // logged, never the value.
+    if (!docsPassword) {
+      console.error(
+        "[docs] DOCS_PASSWORD is not set -- the /docs password gate is OPEN and every request is being served. Set it in the environment; robots.ts is the only remaining layer.",
+      );
+    }
     if (docsPassword && req.cookies.get("docs_session")?.value !== docsPassword) {
       return NextResponse.redirect(new URL("/docs/login", req.url));
     }

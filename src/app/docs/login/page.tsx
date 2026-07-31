@@ -38,7 +38,12 @@ export default function DocsLoginPage() {
         <h1 className="heading" style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-primary)" }}>
           INTERNAL DOCS
         </h1>
-        <p className="mono" style={{ marginTop: "0.5rem", marginBottom: "2rem", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>
+        {/* S68: .admin-page-header-rule reused verbatim -- it is a 1px rule plus
+            the accent gradient tick and nothing else, so it needs no docs-
+            variant. This is the gate in front of the docs pages; without the
+            tick it was the one docs surface with no mark on it. */}
+        <div className="admin-page-header-rule" />
+        <p className="mono" style={{ marginTop: "0.75rem", marginBottom: "2rem", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.2em", color: "var(--text-muted)" }}>
           Team access only
         </p>
 
