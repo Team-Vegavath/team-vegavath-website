@@ -28,7 +28,7 @@ import { useState } from "react";
  * `string | null` also deletes the Set-clone-per-toggle, so the reversal is
  * strictly less code than the thing it replaces.
  *
- * S72A: EACH DOMAIN HAS AN ICON, AND IT IS INLINE RATHER THAN AN <Image>.
+ * S71A: EACH DOMAIN HAS AN ICON, AND IT IS INLINE RATHER THAN AN <Image>.
  *
  * The same six marks are also uploaded to R2 at icons/domain-*.svg, kept as the
  * source of truth if anything outside this bundle ever needs them (a deck, an

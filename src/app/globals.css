@@ -784,7 +784,7 @@ p, label, input, textarea, select, button {
      1.05rem -> 16.8px x 0.70 x 11 = ~129px. Fits 138px.
      1.15rem -> 18.4px x 0.70 x 11 = ~142px. Overflows. Rejected.
    So 1.05rem, a 24% increase, with ~9px of margin on the worst case. */
-/* S72A. `color`, not `stroke` -- every path inside the SVG is
+/* S71A. `color`, not `stroke` -- every path inside the SVG is
    stroke: currentColor, so one property drives the whole mark and the hover
    rule below is a single line instead of one per path.
 

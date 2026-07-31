@@ -11,6 +11,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { InteractiveHoverButton } from "@/components/ui/interactive-hover-button";
 import { TypewriterSubtitle } from "@/components/home/TypewriterSubtitle";
+import HeroKartWrapper from "@/components/home/HeroKartWrapper";
 import { Ripple } from "@/components/ui/ripple";
 import { Spotlight } from "@/components/ui/spotlight";
 
@@ -57,6 +58,15 @@ export default async function HomePage() {
             (position + z-index) to stay on top -- otherwise the cone would
             render over the VEGAVATH h1. pointer-events: none lives in the
             .spotlight-cone class, so the CTAs stay clickable through it. */}
+        {/* S71B: the real kart, revolving on scroll behind the wordmark. First
+            child so it paints furthest back -- behind the Spotlight cone as well
+            as the copy. It is absolutely positioned with pointer-events: none
+            internally, so it changes nothing about this section's layout or its
+            click targets. The h1 below is still server-rendered HTML and still
+            paints before any of this loads; see HeroKart.tsx for why the S60
+            no-WebGL-on-/ gate is deliberately reversed. */}
+        <HeroKartWrapper />
+
         <Spotlight />
 
         <div className="mx-auto" style={{ maxWidth: "72rem", textAlign: "center", position: "relative", zIndex: 1 }}>
