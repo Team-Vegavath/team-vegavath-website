@@ -317,6 +317,35 @@ export default function BootstrapAdminDashboard({
     poll();
   }
 
+  // S72C (Section B4): resolve a volunteer's pending stall-switch request.
+  // APPROVE routes through resolveStallSwitch, which calls the SAME
+  // suggestStallToVolunteer the MOVE STALL dropdown above uses - one
+  // implementation of "change someone's assigned stall", not two. It also takes
+  // them off their old stall, since after the reassignment they can no longer do
+  // that themselves (S72B's ownership gate).
+  async function resolveSwitch(v: BootstrapVolunteer, action: "approve" | "deny") {
+    const target = v.switch_requested_stall_name ?? "the requested stall";
+    if (
+      !window.confirm(
+        action === "approve"
+          ? `Move ${v.display_name} to ${target}? They are taken off their current stall, which goes FREE if nobody else is on it.`
+          : `Deny ${v.display_name}'s request to move to ${target}?`
+      )
+    )
+      return;
+    setVolBusy(v.id);
+    try {
+      await fetch(`/api/admin/bootstrap/volunteers/${v.id}/switch-request`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      }).catch(() => {});
+      await poll();
+    } finally {
+      setVolBusy(null);
+    }
+  }
+
   // S55B: move a volunteer between the two tables mid-event. The /role route
   // and setVolunteerRole both predate this session; only the UI was missing.
   // Confirmed rather than one-click because it moves the row to another table
@@ -427,6 +456,53 @@ export default function BootstrapAdminDashboard({
         ))}
       </select>
     );
+
+  // S72C (Section B4): a pending switch request lives on the volunteer's own row
+  // rather than in a separate list - the row already carries their name, their
+  // current stall and a MOVE STALL control, which is everything the decision
+  // needs, and it is a two-line insertion instead of a new table. Rendered in both
+  // volunteer tables: a stall volunteer flipped TO GROUP keeps any pending
+  // request, and an invisible request nobody can deny is worse than a stray row.
+  //
+  // Gated on the ID, never switch_requested_at - migration 025's FK nulls the id
+  // alone, so the timestamp outlives a request whose target stall was deleted.
+  const switchRequestCell = (v: BootstrapVolunteer) =>
+    v.switch_requested_stall_id ? (
+      <>
+        <span
+          style={{
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "11px",
+            color: "var(--accent)",
+            letterSpacing: "0.05em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {"WANTS: "}
+          {v.switch_requested_stall_name ?? "?"}
+        </span>
+        {isViewer ? null : (
+          <>
+            <button
+              className="admin-row-action"
+              disabled={volBusy === v.id}
+              title={`Approve the move to ${v.switch_requested_stall_name ?? "the requested stall"}`}
+              onClick={() => resolveSwitch(v, "approve")}
+            >
+              APPROVE
+            </button>
+            <button
+              className="admin-row-action admin-row-action-danger"
+              disabled={volBusy === v.id}
+              title="Drop the request; nothing is reassigned"
+              onClick={() => resolveSwitch(v, "deny")}
+            >
+              DENY
+            </button>
+          </>
+        )}
+      </>
+    ) : null;
 
   const roleButton = (v: BootstrapVolunteer) =>
     isViewer ? null : (
@@ -955,6 +1031,7 @@ export default function BootstrapAdminDashboard({
                         <div
                           style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}
                         >
+                          {switchRequestCell(v)}
                           {stallSelect(v)}
                           {unlockButton(v)}
                           {editButton(v)}
@@ -1045,6 +1122,7 @@ export default function BootstrapAdminDashboard({
                             {v.suggested_stall_name}
                           </span>
                         )}
+                        {switchRequestCell(v)}
                         {stallSelect(v)}
                         {unlockButton(v)}
                         {editButton(v)}
@@ -1291,7 +1369,13 @@ export default function BootstrapAdminDashboard({
           >
             {/* S33 pin-drop: pick a stall below, then click the map to place
                 its pin - no more typing X/Y percentages by trial and error */}
-            <div style={{ position: "relative", height: "300px", overflow: "hidden" }}>
+            {/* S72C (Section C): was a hard-coded height: 300px against an
+                aspect-ratio-locked child. On a narrow panel the map came out
+                shorter than 300px (gap below it); on a wide one it came out taller
+                and overflow: hidden silently clipped the bottom of the map. The
+                SVG's own viewBox is 1024 x 419, so matching that ratio makes the
+                wrapper exactly as tall as its content at every width. */}
+            <div style={{ position: "relative", aspectRatio: "1024 / 419", overflow: "hidden" }}>
               <BootstrapMapSVG
                 stalls={stalls}
                 onClose={() => {}}

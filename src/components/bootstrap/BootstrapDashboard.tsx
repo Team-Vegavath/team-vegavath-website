@@ -26,6 +26,18 @@ export default function BootstrapDashboard({
   // claim/release regardless; this is what lets the UI avoid offering a tap that
   // would only come back 403.
   const [mySuggestionId, setMySuggestionId] = useState<string | null>(null);
+  // S72C - the volunteer's own pending stall-switch request (migration 025).
+  // The ID is the pending predicate, never the timestamp: the FK is ON DELETE SET
+  // NULL and clears the id alone, so switch_requested_at can outlive a request
+  // whose target stall was deleted.
+  const [switchRequestStallId, setSwitchRequestStallId] = useState<string | null>(null);
+  const [switchRequestStallName, setSwitchRequestStallName] = useState<string | null>(null);
+  // S72C (Section D1) - username -> display_name for this session, so the release
+  // confirmation can name a person instead of showing an SRN. Deliberately narrow:
+  // the endpoint that supplies it selects these two columns only.
+  const [volunteerNames, setVolunteerNames] = useState<
+    { username: string; display_name: string }[]
+  >([]);
   // S72B - last rejected action, shown briefly. A silent 403 reads as a broken
   // app at a stall; these are permission answers and should say so.
   const [actionError, setActionError] = useState<string | null>(null);
@@ -49,7 +61,10 @@ export default function BootstrapDashboard({
   const [connectionIssue, setConnectionIssue] = useState(false);
 
   // previous poll snapshot - freed-stall detection reads queued_by from here,
-  // because release clears queued_by in the DB (the NEW row is always null)
+  // because a stall that has just gone free has had its queued_by cleared, so the
+  // NEW row can no longer tell us who was waiting on it. (S72C narrowed that clear
+  // to "the caller set it, or the stall went fully free" - the second arm is
+  // exactly this case, so reading from the previous snapshot is still required.)
   const prevStallsRef = useRef<BootstrapStall[]>([]);
   const [freedNotifications, setFreedNotifications] = useState<
     { id: string; name: string; forme: boolean }[]
@@ -72,6 +87,9 @@ export default function BootstrapDashboard({
       setStalls(newStalls);
       setMySuggestion(data.mySuggestion ?? null);
       setMySuggestionId(data.mySuggestionId ?? null);
+      setSwitchRequestStallId(data.switchRequestStallId ?? null);
+      setSwitchRequestStallName(data.switchRequestStallName ?? null);
+      setVolunteerNames(data.volunteerNames ?? []);
       setVolunteerRole(data.volunteerRole ?? "stall");
       setCheckinToken(data.checkinToken ?? null);
       setGroupNumber(data.groupNumber ?? null);
@@ -175,7 +193,46 @@ export default function BootstrapDashboard({
     return () => clearInterval(id);
   }, []);
 
+  /**
+   * S72C (Section D2). Release only ever removes the CALLER from claimed_by, but
+   * it can still touch someone else: another volunteer sharing a
+   * max_occupancy > 1 stall stays on it, and the queue signal belongs to whoever
+   * set it. Returns the warning text, or null when the tap affects nobody but the
+   * caller - releasing your own uncontested stall must stay one tap.
+   *
+   * Names resolve through the narrow username -> display_name list from the poll,
+   * falling back to the username (a lowercased SRN) when it is not in the list.
+   */
+  function releaseWarning(stall: BootstrapStall): string | null {
+    const nameOf = (u: string) =>
+      volunteerNames.find((v) => v.username === u)?.display_name ?? u;
+    const others = (stall.claimed_by ?? []).filter((u) => u !== username);
+
+    const parts: string[] = [];
+    if (others.length > 0) {
+      parts.push(`${others.map(nameOf).join(", ")} currently holds this stall`);
+    }
+    // Narrowed from the brief's "queued_by is set": a queue the CALLER set is not
+    // someone else's, and S72C's release fix clears exactly that one on purpose.
+    // Warning someone about their own queue entry is noise, not a safeguard.
+    if (stall.queued_by && stall.queued_by !== username) {
+      parts.push(`${nameOf(stall.queued_by)} is queued here`);
+    }
+    if (parts.length === 0) return null;
+    return `Are you sure? ${parts.join(", and ")}.`;
+  }
+
   async function sendAction(stallId: string, action: VolunteerStallAction) {
+    // One guard for both views: StallCard's RELEASE (lead dashboard) and
+    // StallVolunteerView's own button both route through here, so this cannot be
+    // half-applied the way two separate call-site checks could drift.
+    if (action === "release") {
+      const stall = stalls.find((s) => s.id === stallId);
+      const warning = stall ? releaseWarning(stall) : null;
+      // window.confirm matches the only other confirmation in the Bootstrap
+      // surface (changeRole in BootstrapAdminDashboard). Native, nothing to build.
+      if (warning && !window.confirm(warning)) return;
+    }
     try {
       const res = await fetch(`/api/bootstrap/stalls/${stallId}`, {
         method: "PATCH",
@@ -201,6 +258,24 @@ export default function BootstrapDashboard({
     }
   }
 
+  // S72C (Section B5): records the ASK only - nothing is reassigned until an admin
+  // approves. Reuses the existing actionError banner for the rejection path.
+  async function requestSwitch(stallId: string) {
+    const res = await fetch("/api/bootstrap/switch-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stall_id: stallId }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      const data = res ? ((await res.json().catch(() => null)) as { error?: string } | null) : null;
+      setActionError(data?.error ?? "Could not send that request.");
+      setTimeout(() => setActionError(null), 5000);
+      return;
+    }
+    // pull the pending state straight back rather than waiting up to 4s for it
+    await poll();
+  }
+
   async function signOut() {
     await fetch("/api/bootstrap/logout", { method: "POST" }).catch(() => {});
     window.location.href = "/bootstrap";
@@ -217,10 +292,13 @@ export default function BootstrapDashboard({
         username={username}
         stalls={stalls}
         assignedStallId={mySuggestionId}
+        switchRequestStallName={switchRequestStallName}
+        hasSwitchRequest={switchRequestStallId !== null}
         actionError={actionError}
         connectionIssue={connectionIssue}
         liveLabel={secondsAgo !== null ? `LIVE · ${secondsAgo}s ago` : "CONNECTING…"}
         onAction={(stallId, action) => void sendAction(stallId, action)}
+        onRequestSwitch={(stallId) => void requestSwitch(stallId)}
         onSignOut={() => void signOut()}
       />
     );

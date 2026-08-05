@@ -51,7 +51,18 @@ export async function POST(
         { status: 409 }
       );
     }
-    return NextResponse.json({ groupName: ctx.group_name, sessionName: ctx.session_name });
+    return NextResponse.json({
+      groupName: ctx.group_name,
+      sessionName: ctx.session_name,
+      // S72C (Section E): the NUMBER is what visitors are shown. group_name stays
+      // "Group A" and remains the internal join key in getCheckinContext.
+      groupNumber: ctx.group_number,
+      // S72C (Section J): name and contact the lead the visitor is standing next
+      // to. `v` (resolved by checkin_token), not g.team_lead_id - the person
+      // holding the QR is the one who should be named. Either may be null.
+      leadName: ctx.lead_name,
+      leadPhone: ctx.lead_phone,
+    });
   } catch (error) {
     console.error("[POST /api/bootstrap/checkin/[token]]", error);
     return NextResponse.json({ error: "Check-in failed" }, { status: 500 });

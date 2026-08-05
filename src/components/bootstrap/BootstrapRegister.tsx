@@ -225,20 +225,32 @@ export default function BootstrapRegister({
               {result.pooled &&
                 " You're in the pre-registration pool. You'll be assigned to a stall when the next session is created, and your login starts working then."}
             </p>
+            {/* S72C (Section H): was 11px muted mono with no border and no
+                min-height, sitting under a 20px-padded card - it read as a caption
+                on that card rather than an action. This is the full-width bordered
+                block BootstrapLogin.tsx uses for its two register links, applied
+                verbatim: register -> login is the exact mirror of login -> register,
+                so matching it beats inventing a third treatment. */}
             <a
               href="/bootstrap"
               style={{
-                fontFamily: "var(--font-mono), monospace",
-                fontSize: "11px",
-                letterSpacing: "0.1em",
-                color: BS.muted,
-                textDecoration: "none",
                 display: "block",
+                width: "100%",
+                padding: "14px",
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontSize: "14px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
                 textAlign: "center",
+                textDecoration: "none",
+                background: "transparent",
+                border: `1px solid ${BS.border}`,
+                borderRadius: "10px",
+                color: BS.text,
                 marginTop: "1.5rem",
               }}
             >
-              ← Back to login
+              Back to login
             </a>
           </div>
         ) : (

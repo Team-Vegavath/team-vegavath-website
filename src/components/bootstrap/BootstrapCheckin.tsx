@@ -29,15 +29,19 @@ const inputStyle: React.CSSProperties = {
 // Visitor check-in form (S32, reworked S33 for per-lead QR links).
 // sessionName === null means the token is unknown or no session is active.
 // isFull is the server-rendered snapshot; the POST re-checks atomically.
+//
+// S72C (Section E): everything visitor-facing shows the group NUMBER. The letter
+// form ("Group A") is bootstrap_groups.name and stays in the DB as the join key
+// getCheckinContext resolves through - it is no longer rendered anywhere.
 export default function BootstrapCheckin({
   token,
   sessionName,
-  groupName: assignedGroup,
+  groupNumber: assignedGroupNumber,
   isFull,
 }: {
   token: string;
   sessionName: string | null;
-  groupName: string | null;
+  groupNumber: number | null;
   isFull: boolean;
 }) {
   const [name, setName] = useState("");
@@ -45,7 +49,17 @@ export default function BootstrapCheckin({
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [groupName, setGroupName] = useState<string | null>(null);
+  // `submitted` rather than "we got a group back": the group number can be null
+  // for a lead resolved through team_lead_id who has not been swept yet, and a
+  // successful check-in must still show the welcome screen.
+  const [submitted, setSubmitted] = useState(false);
+  const [joinedGroupNumber, setJoinedGroupNumber] = useState<number | null>(null);
+  // S72C (Section J): both are nullable - phone predates migration 016 on legacy
+  // rows - so the copy below degrades in two steps rather than printing "null".
+  const [lead, setLead] = useState<{ name: string | null; phone: string | null }>({
+    name: null,
+    phone: null,
+  });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,9 +76,11 @@ export default function BootstrapCheckin({
         setError(data?.error ?? "Check-in failed. Please try again.");
         return;
       }
-      setGroupName(data.groupName);
+      setJoinedGroupNumber(data.groupNumber ?? null);
+      setLead({ name: data.leadName ?? null, phone: data.leadPhone ?? null });
+      setSubmitted(true);
     } catch {
-      setError("Request failed — check your connection.");
+      setError("Request failed -- check your connection.");
     } finally {
       setBusy(false);
     }
@@ -96,7 +112,7 @@ export default function BootstrapCheckin({
           Vegavath · Bootstrap
         </p>
 
-        {groupName ? (
+        {submitted ? (
           <div style={{ marginTop: "1.5rem" }}>
             <h1
               style={{
@@ -109,30 +125,49 @@ export default function BootstrapCheckin({
             >
               Welcome!
             </h1>
-            <div
-              style={{
-                marginTop: "1.25rem",
-                background: BS.surface,
-                border: `1px solid ${BS.accent}`,
-                borderRadius: "8px",
-                padding: "20px",
-              }}
-            >
-              <div style={labelStyle}>You&apos;re in</div>
+            {joinedGroupNumber !== null && (
               <div
                 style={{
-                  fontFamily: "var(--font-chakra), sans-serif",
-                  fontWeight: 700,
-                  fontSize: "2rem",
-                  textTransform: "uppercase",
-                  color: BS.accent,
+                  marginTop: "1.25rem",
+                  background: BS.surface,
+                  border: `1px solid ${BS.accent}`,
+                  borderRadius: "8px",
+                  padding: "20px",
                 }}
               >
-                {groupName}
+                <div style={labelStyle}>You&apos;re in</div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-chakra), sans-serif",
+                    fontWeight: 700,
+                    fontSize: "2rem",
+                    textTransform: "uppercase",
+                    color: BS.accent,
+                  }}
+                >
+                  Group {joinedGroupNumber}
+                </div>
               </div>
-            </div>
+            )}
+            {/* S72C (Section J): "Your team lead will find you shortly" named
+                nobody and gave the visitor nothing to act on. The lead's name and
+                number were already on the row getCheckinContext reads. Publishing
+                the number on this public page is a knowing decision; the two
+                fallbacks below cover the rows where it is missing. */}
             <p style={{ marginTop: "1rem", color: BS.muted, fontSize: "0.9rem", lineHeight: 1.6 }}>
-              Your team lead will find you shortly.
+              {lead.name && lead.phone ? (
+                <>
+                  {lead.name} is your team lead. Contact them at{" "}
+                  <a href={`tel:${lead.phone}`} style={{ color: BS.accent }}>
+                    {lead.phone}
+                  </a>
+                  .
+                </>
+              ) : lead.name ? (
+                `${lead.name} is your team lead -- look for them nearby.`
+              ) : (
+                "Your team lead will find you shortly."
+              )}
             </p>
           </div>
         ) : sessionName === null ? (
@@ -183,7 +218,7 @@ export default function BootstrapCheckin({
             >
               Check in
             </h1>
-            {assignedGroup && (
+            {assignedGroupNumber !== null && (
               <p
                 style={{
                   fontFamily: "var(--font-mono), monospace",
@@ -194,7 +229,7 @@ export default function BootstrapCheckin({
                   margin: "0 0 1.5rem",
                 }}
               >
-                Joining {assignedGroup}
+                Joining Group {assignedGroupNumber}
               </p>
             )}
 

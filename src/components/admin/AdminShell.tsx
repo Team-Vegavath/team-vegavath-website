@@ -151,6 +151,26 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // S72C: a site-wide utility, so System rather than Content, and ahead of the
+    // two identity entries (Profile, Accounts) which the existing ordering keeps
+    // last. CommandPalette is fed this same array, so it appears there too.
+    href: "/admin/qr",
+    label: "QR Codes",
+    section: "System",
+    // three corner finder patterns plus one module square - the QR silhouette,
+    // stroke-only and geometric like the rest of the set
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <rect x="3" y="3" width="6" height="6" />
+        <rect x="15" y="3" width="6" height="6" />
+        <rect x="3" y="15" width="6" height="6" />
+        <line x1="15" y1="15" x2="21" y2="15" />
+        <line x1="15" y1="15" x2="15" y2="21" />
+        <line x1="18" y1="18" x2="21" y2="21" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/profile",
     label: "Profile",
     section: "System",

@@ -101,8 +101,27 @@ export default function BootstrapMapSVG({
         </div>
       )}
 
-      {/* Map - scrollable on very small screens */}
-      <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
+      {/* Map - scrollable on very small screens.
+          S72C (Section C): the SVG is aspect-locked at 1024x419 (width 100%, no
+          height), so on a phone it is ~160px tall inside a ~600px flex box and all
+          440px of slack pooled underneath it, reading as "the map is broken".
+          Centering splits that slack above and below instead. It does NOT make the
+          map bigger - the portrait-rotation fix that would is deliberately out of
+          scope, since it rotates every label and needs a look at the real thing.
+          flexDirection: column is what makes justifyContent centre on the VERTICAL
+          axis (in the default row direction it would centre horizontally, which is
+          not where the slack is), and column's default align-items: stretch keeps
+          the SVG full-width exactly as the old block layout did. */}
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+          position: "relative",
+          display: "flex",
+          justifyContent: "center",
+          flexDirection: "column",
+        }}
+      >
         <svg
           viewBox={`0 0 ${W} ${H}`}
           style={{

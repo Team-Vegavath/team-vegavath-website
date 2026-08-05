@@ -48,6 +48,13 @@ export interface BootstrapVolunteer {
   group_number?: number | null; // migration 016 - assigned FCFS on activation
   in_classroom?: boolean; // migration 016 - classroom-mode flag (leads)
   preferred_stall_name?: string | null; // migration 021 - free text, pool members
+  // migration 025 (S72C) - pending stall-switch request, awaiting an admin.
+  // switch_requested_stall_id IS NOT NULL is the ONLY "is there a request"
+  // predicate: the FK is ON DELETE SET NULL and nulls the id alone, so a deleted
+  // target leaves switch_requested_at behind. Never gate on the timestamp.
+  switch_requested_stall_id?: string | null;
+  switch_requested_stall_name?: string | null;
+  switch_requested_at?: string | null;
 }
 
 // migration 021 - a pre-registered volunteer with no session yet (session_id NULL)
@@ -330,7 +337,8 @@ export type StallAction = "claim" | "release" | "mark_queued" | "unqueue" | "ove
 /**
  * claim:       append username to claimed_by if not already present, status → occupied
  * release:     remove username; stall goes free when nobody is left;
- *              queued_by always clears (releasing the stall clears any queue)
+ *              queued_by/queued_at clear ONLY if the caller set the queue, or the
+ *              stall is going fully free (S72C - see the branch)
  * mark_queued: status → queued, claimed_by untouched, queued_by = username;
  *              ANY volunteer may set it on an occupied stall
  * unqueue:     status → occupied, queued_by cleared (UI gates this to queued_by)
@@ -378,6 +386,18 @@ export async function updateStallStatus(
         )
       RETURNING *`;
   } else if (action === "release") {
+    // S72C: queued_by/queued_at used to clear UNCONDITIONALLY here, for whoever
+    // was queued, whoever called it. Same class of bug as S72B Section A - one
+    // volunteer's tap silently destroying another's state with no check and no
+    // signal. On a max_occupancy > 1 stall, the second volunteer releasing wiped
+    // the first one's queue signal and wait timer.
+    //
+    // Now scoped to the two cases where clearing is correct, mirroring the shape
+    // the `status` CASE right above already uses:
+    //   1. the caller set the queue themselves, or
+    //   2. the stall is going fully free, so any queue on it is moot anyway.
+    // Every SET expression in one UPDATE reads the OLD row, so `queued_by =
+    // ${username}` here tests the pre-release value, which is what we want.
     rows = await sql`
       UPDATE bootstrap_stalls
       SET claimed_by = array_remove(coalesce(claimed_by, '{}'), ${username}),
@@ -385,8 +405,16 @@ export async function updateStallStatus(
             WHEN array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
             THEN 'free' ELSE status
           END,
-          queued_by = NULL,
-          queued_at = NULL,
+          queued_by = CASE
+            WHEN queued_by = ${username}
+              OR array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
+            THEN NULL ELSE queued_by
+          END,
+          queued_at = CASE
+            WHEN queued_by = ${username}
+              OR array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
+            THEN NULL ELSE queued_at
+          END,
           updated_at = now()
       WHERE id = ${stallId}
         AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
@@ -563,9 +591,14 @@ export async function getBootstrapVolunteers(sessionId: string): Promise<Bootstr
     SELECT v.id, v.session_id, v.username, v.display_name, v.role,
            (v.current_session_token IS NOT NULL) AS is_active,
            v.suggested_stall_id, s.stall_name AS suggested_stall_name,
-           v.login_code, v.phone, v.srn, v.group_number, v.in_classroom
+           v.login_code, v.phone, v.srn, v.group_number, v.in_classroom,
+           -- S72C: the pending switch request, so the admin table can offer
+           -- APPROVE / DENY on the volunteer's own row
+           v.switch_requested_stall_id, v.switch_requested_at,
+           rs.stall_name AS switch_requested_stall_name
     FROM bootstrap_volunteers v
     LEFT JOIN bootstrap_stalls s ON s.id = v.suggested_stall_id
+    LEFT JOIN bootstrap_stalls rs ON rs.id = v.switch_requested_stall_id
     WHERE v.session_id = ${sessionId}
       AND v.login_code IS NOT NULL  -- S36: only self-registered volunteers; hides legacy CSV accounts
     ORDER BY v.display_name ASC LIMIT 200`;
@@ -627,10 +660,15 @@ export async function getVolunteerByToken(token: string): Promise<BootstrapVolun
     SELECT v.id, v.session_id, v.username, v.display_name, v.role, v.checkin_token,
            (v.current_session_token IS NOT NULL) AS is_active,
            v.suggested_stall_id, st.stall_name AS suggested_stall_name,
-           v.group_number, v.in_classroom
+           v.group_number, v.in_classroom,
+           -- S72C: the volunteer's own pending switch request, so their dashboard
+           -- can show "switch request pending" instead of offering it again
+           v.switch_requested_stall_id, v.switch_requested_at,
+           rst.stall_name AS switch_requested_stall_name
     FROM bootstrap_volunteers v
     JOIN bootstrap_sessions s ON s.id = v.session_id
     LEFT JOIN bootstrap_stalls st ON st.id = v.suggested_stall_id
+    LEFT JOIN bootstrap_stalls rst ON rst.id = v.switch_requested_stall_id
     WHERE v.current_session_token = ${token} AND s.is_active = true
     LIMIT 1`;
   return (rows[0] as BootstrapVolunteer) ?? null;
@@ -718,6 +756,132 @@ export async function suggestStallToVolunteer(
     UPDATE bootstrap_volunteers
     SET suggested_stall_id = ${stallId}
     WHERE id = ${volunteerId}`;
+}
+
+/**
+ * S72C (migration 025): a stall volunteer asks to be moved to a different stall.
+ *
+ * Every precondition is a WHERE predicate rather than a JS check, for the same
+ * reason S72B pushed session scoping down into updateStallStatus: a future caller
+ * inherits the guards instead of having to remember them. Returns false when any
+ * of them fails, which the route turns into a 403/400.
+ *
+ *   role = 'stall'          - leads have no stall to switch away from
+ *   suggested_stall_id set  - an UNASSIGNED volunteer has nothing to switch FROM,
+ *                             and B1 sends them to "ask an admin" instead
+ *   target <> current       - requesting the stall you already hold is a no-op
+ *   EXISTS (same session)   - the target must be a real stall in the volunteer's
+ *                             OWN session; this is the check that stops a crafted
+ *                             POST pointing at another (or a past) session's UUID
+ */
+export async function requestStallSwitch(
+  volunteerId: string,
+  stallId: string
+): Promise<boolean> {
+  const rows = await sql`
+    UPDATE bootstrap_volunteers v
+    SET switch_requested_stall_id = ${stallId},
+        switch_requested_at = now()
+    WHERE v.id = ${volunteerId}
+      AND v.role = 'stall'
+      AND v.suggested_stall_id IS NOT NULL
+      AND v.suggested_stall_id <> ${stallId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM bootstrap_stalls s
+        WHERE s.id = ${stallId}::uuid AND s.session_id = v.session_id
+      )
+    RETURNING v.id`;
+  return rows.length === 1;
+}
+
+/**
+ * S72C: admin approves or denies a pending switch request.
+ *
+ * Read-then-write on purpose. An "approve" must produce the exact same end state
+ * as the admin's existing MOVE STALL control, so it calls the same
+ * suggestStallToVolunteer rather than writing suggested_stall_id itself - there
+ * is one implementation of "change someone's assigned stall" and this is not a
+ * second one.
+ *
+ * The clearing UPDATE re-asserts the id it read (not just IS NOT NULL), so if the
+ * volunteer swapped their request between the read and the write the admin's tap
+ * matches 0 rows and reassigns nothing, instead of approving a stall the
+ * volunteer no longer wants.
+ *
+ * Returns false when there was no pending request - the route answers 409.
+ */
+export async function resolveStallSwitch(
+  volunteerId: string,
+  action: "approve" | "deny"
+): Promise<boolean> {
+  const pending = await sql`
+    SELECT switch_requested_stall_id, suggested_stall_id, username, session_id
+    FROM bootstrap_volunteers
+    WHERE id = ${volunteerId} AND switch_requested_stall_id IS NOT NULL
+    LIMIT 1`;
+  const row = pending[0] as
+    | {
+        switch_requested_stall_id: string;
+        suggested_stall_id: string | null;
+        username: string;
+        session_id: string | null;
+      }
+    | undefined;
+  const targetId = row?.switch_requested_stall_id;
+  if (!row || !targetId) return false;
+
+  const cleared = await sql`
+    UPDATE bootstrap_volunteers
+    SET switch_requested_stall_id = NULL, switch_requested_at = NULL
+    WHERE id = ${volunteerId} AND switch_requested_stall_id = ${targetId}::uuid
+    RETURNING id`;
+  if (cleared.length === 0) return false;
+
+  if (action === "approve") {
+    // Take them off the OLD stall first. Not in the brief, but required for the
+    // reassignment to be correct: S72B's A3 gate 403s claim/release on any stall
+    // other than the volunteer's assigned one, so the instant the assignment moves
+    // they lose the only control that could remove them from the old stall's
+    // claimed_by - and it would sit there showing OCCUPIED with a volunteer who
+    // has physically walked away, clearable only by an admin override.
+    //
+    // Uses the same updateStallStatus release branch a volunteer's own tap does,
+    // so S72C's queue scoping applies here too: another volunteer's queue signal
+    // on the old stall survives unless the stall actually goes free.
+    if (row.suggested_stall_id) {
+      await updateStallStatus(
+        row.suggested_stall_id,
+        row.username,
+        "release",
+        row.session_id
+      );
+    }
+    await suggestStallToVolunteer(volunteerId, targetId);
+  }
+  return true;
+}
+
+/**
+ * S72C (Section D1): username + display_name for one session's volunteers.
+ * NOTHING else, and that is the entire point of the function.
+ *
+ * getBootstrapVolunteers must NOT be used for this. It selects login_code in
+ * plaintext (S35, admin tables only), and this feeds GET /api/bootstrap/stalls,
+ * which is volunteer-authenticated - reusing it would hand every volunteer every
+ * teammate's password. The narrow SELECT makes that impossible rather than
+ * relying on the caller to strip fields.
+ *
+ * Used to turn the usernames in claimed_by / queued_by (which are lowercased
+ * SRNs) into human names in the release-confirmation dialog.
+ */
+export async function getSessionVolunteerNames(
+  sessionId: string
+): Promise<{ username: string; display_name: string }[]> {
+  const rows = await sql`
+    SELECT username, display_name FROM bootstrap_volunteers
+    WHERE session_id = ${sessionId}
+    ORDER BY display_name ASC LIMIT 200`;
+  return rows as { username: string; display_name: string }[];
 }
 
 // S55: admin fixes a typo in a volunteer's own registration details. Works for
@@ -888,17 +1052,25 @@ export async function assignLeadToGroup(
 export interface CheckinContext {
   volunteer_id: string;
   lead_name: string;
+  // S72C (Section J): the lead's own contact number, so the welcome screen can
+  // name them and be tappable. Nullable - legacy rows predate migration 016.
+  lead_phone: string | null;
   session_id: string;
   session_name: string;
   max_group_size: number;
   group_id: string | null;
   group_name: string | null;
+  // S72C (Section E): bootstrap_groups.name stays "Group A" as the internal join
+  // key; this is the number visitors are actually shown. Nullable, because a lead
+  // resolved through g.team_lead_id may not have been swept yet.
+  group_number: number | null;
   visitor_count: number;
 }
 
 export async function getCheckinContext(token: string): Promise<CheckinContext | null> {
   const rows = await sql`
     SELECT v.id AS volunteer_id, v.display_name AS lead_name,
+           v.phone AS lead_phone, v.group_number,
            v.session_id, s.name AS session_name,
            coalesce(s.max_group_size, 20)::int AS max_group_size,
            g.id AS group_id, g.name AS group_name,

@@ -1,25 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { BootstrapStall } from "@/lib/services/bootstrap";
 import { BS, StallGrid, type VolunteerStallAction } from "./StallCard";
 
 /**
- * Simplified UI for role="stall" volunteers (S32). They stand at one stall
- * all day: pick it once, then toggle OCCUPIED/FREE. No queue actions, no map,
- * no notifications - those belong to group leads. Reuses the existing
- * claim/release PATCH route; data arrives via the parent's 4s poll.
+ * Simplified UI for role="stall" volunteers (S32). They stand at ONE stall all
+ * day - their assigned one - and toggle it OCCUPIED/FREE. No queue actions, no
+ * map, no notifications: those belong to group leads. Data arrives via the
+ * parent's 4s poll.
+ *
+ * S72C (Section B1) finished the lock-in S72B started. There is no longer a
+ * picker over every stall anywhere in this component: an assigned volunteer sees
+ * only their own stall's card, and an unassigned one sees a dead end telling them
+ * to find an admin. The one remaining multi-stall list is the switch-request
+ * picker, which chooses what to ASK for and controls nothing directly.
  */
 export default function StallVolunteerView({
   displayName,
   username,
   stalls,
   assignedStallId,
+  switchRequestStallName,
+  hasSwitchRequest,
   actionError,
   connectionIssue,
   liveLabel,
   onAction,
+  onRequestSwitch,
   onSignOut,
 }: {
   displayName: string;
@@ -27,52 +36,39 @@ export default function StallVolunteerView({
   stalls: BootstrapStall[];
   // S72B - suggested_stall_id, i.e. the stall this volunteer picked at
   // registration or was moved to by an admin. Null means genuinely unassigned
-  // (an unmatched pre-registration pool member). The server 403s claim/release
-  // for any other stall when this is set, so the picker below must not offer them.
+  // (an unmatched pre-registration pool member, or someone whose stall was
+  // deleted). The server 403s claim/release on any other stall when this is set.
   assignedStallId: string | null;
+  // S72C - the pending switch request. hasSwitchRequest is driven by the stall
+  // id, never the timestamp: migration 025's FK nulls the id alone when the
+  // target stall is deleted, so switch_requested_at can outlive a dead request.
+  switchRequestStallName: string | null;
+  hasSwitchRequest: boolean;
   actionError: string | null;
   connectionIssue: boolean;
   liveLabel: string;
   onAction: (stallId: string, action: VolunteerStallAction) => void;
+  onRequestSwitch: (stallId: string) => void;
   onSignOut: () => void;
 }) {
-  // "my stall" survives marking it FREE (release drops me from claimed_by,
-  // so the DB alone can't remember which stall is mine while it sits free)
-  const [myStallId, setMyStallId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Derived, not state. S72B had to seed a myStallId useState from assignedStallId
+  // and then hide "Switch stall" because the effect re-seeded it one render after
+  // the button cleared it. With the picker gone there is nothing left that sets
+  // "my stall" locally, so the state, the effect and its eslint-disable all go:
+  // the server owns which stall is mine. An active claim still wins over the
+  // assignment, so a volunteer standing at a different stall sees the real one.
   const claimedStall = stalls.find((s) => (s.claimed_by ?? []).includes(username));
-
-  // re-sync after a reload while the stall was occupied by me
-  //
-  // S72B (Section G): assignedStallId now seeds this too, and that is the whole
-  // fix. Before, myStallId started null and was recoverable ONLY from claimed_by,
-  // so a volunteer arriving at a free stall was shown the picker and their first
-  // possible action was a "claim" tap - which writes status='occupied'. They read
-  // that tap as "identify myself", the board read it as "a group is here", and the
-  // stall showed OCCUPIED from the moment they logged in. S36A removed the same
-  // premature write from registration but left this one. Seeding from the
-  // assignment means they land straight on their own stall's card while it is
-  // still FREE, and the first thing they can tap is an explicit MARK OCCUPIED.
-  useEffect(() => {
-    // an active claim wins over the assignment: if they are somehow standing at a
-    // different stall, show the one they are actually on
-    const next = claimedStall?.id ?? assignedStallId;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local selection with server state
-    if (next) setMyStallId(next);
-  }, [claimedStall, assignedStallId]);
-
-  const myStall = stalls.find((s) => s.id === myStallId) ?? null;
+  const myStall =
+    claimedStall ?? (assignedStallId ? stalls.find((s) => s.id === assignedStallId) : null) ?? null;
   const iAmOnIt = myStall ? (myStall.claimed_by ?? []).includes(username) : false;
 
-  function claim(stall: BootstrapStall) {
-    setMyStallId(stall.id);
-    onAction(stall.id, "claim");
-  }
-
-  function switchStall() {
-    if (myStall && iAmOnIt) onAction(myStall.id, "release");
-    setMyStallId(null);
-  }
+  // Requesting a switch needs a real assignment to switch AWAY from - the service
+  // enforces that too (suggested_stall_id IS NOT NULL), so offering it without one
+  // would only ever 400.
+  const canRequestSwitch = assignedStallId !== null;
+  const otherStalls = stalls.filter((s) => s.id !== myStall?.id);
 
   const headerBtn: React.CSSProperties = {
     minHeight: "48px",
@@ -87,6 +83,21 @@ export default function StallVolunteerView({
     letterSpacing: "0.06em",
     textTransform: "uppercase",
     cursor: "pointer",
+  };
+
+  // the underlined-muted treatment the removed "Switch stall" link used; shared
+  // by "Request switch" and the picker's "Cancel" so they read as one control
+  const textLink: React.CSSProperties = {
+    marginTop: "16px",
+    background: "none",
+    border: "none",
+    color: BS.muted,
+    fontFamily: "var(--font-mono), monospace",
+    fontSize: "0.8rem",
+    letterSpacing: "0.06em",
+    textDecoration: "underline",
+    cursor: "pointer",
+    padding: "8px 0",
   };
 
   return (
@@ -255,108 +266,150 @@ export default function StallVolunteerView({
                   border: iAmOnIt ? `1px solid ${BS.danger}` : "none",
                 }}
               >
-                {iAmOnIt ? "Mark free" : "Mark occupied"}
+                {/* S72C (Section D3): was "Mark free". "Release" and "Mark free"
+                    were the same action under two labels (this file vs StallCard),
+                    and "Mark free" over-promises - release only removes the caller
+                    from claimed_by, so the stall stays OCCUPIED if anyone else is
+                    still on it. "Release" is the one that is always true. */}
+                {iAmOnIt ? "Release" : "Mark occupied"}
               </button>
             </div>
-            {/* S72B: hidden once the volunteer has a real assignment. The effect
-                above re-seeds myStallId from it, so this button could only clear
-                the selection for one render before bouncing back - a dead tap.
-                Stall switching becomes the admin-approved request flow in 72C;
-                until then an admin re-points people with MOVE STALL. Still shown
-                for the unassigned case, where there is nothing to bounce back to. */}
-            {!assignedStallId && (
-              <button
-                onClick={switchStall}
-                style={{
-                  marginTop: "16px",
-                  background: "none",
-                  border: "none",
-                  color: BS.muted,
-                  fontFamily: "var(--font-mono), monospace",
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.06em",
-                  textDecoration: "underline",
-                  cursor: "pointer",
-                  padding: "8px 0",
-                }}
-              >
-                Switch stall
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <p
-              style={{
-                fontFamily: "var(--font-chakra), sans-serif",
-                fontSize: "1rem",
-                color: BS.muted,
-                margin: "0 0 16px",
-              }}
-            >
-              {/* With an assignment this branch is unreachable - the effect above
-                  seeds myStallId, so an assigned volunteer always lands on their
-                  own card. 72C replaces the grid below with the "ask an admin"
-                  dead end for the unassigned case. */}
-              You have not been assigned a stall yet -- ask an admin, or pick one
-              below to cover it for now.
-            </p>
-            <StallGrid>
-              {stalls.map((stall) => {
-                const claimed = stall.claimed_by ?? [];
-                // S72B: with an assignment, only that stall is tappable - the
-                // server 403s the rest, so offering them was a dead tap. Without
-                // one, behaviour is unchanged (72C replaces this whole screen with
-                // the lock-in + switch-request flow).
-                const isMine = assignedStallId === null || assignedStallId === stall.id;
-                const joinable =
-                  isMine &&
-                  (stall.status === "free" ||
-                    (stall.status === "occupied" && claimed.length < stall.max_occupancy));
-                return (
-                  <button
-                    key={stall.id}
-                    onClick={() => joinable && claim(stall)}
-                    disabled={!joinable}
+
+            {/* S72C (Section B3): the sanctioned replacement for S72B's removed
+                "Switch stall" self-serve button. The volunteer asks, an admin
+                approves. Requires an assignment to switch away from. */}
+            {canRequestSwitch &&
+              (hasSwitchRequest ? (
+                // same accent-tint block the lead dashboard's classroom-mode
+                // banner uses - "this state is active, actions paused" is exactly
+                // what it signals there too
+                <div
+                  style={{
+                    marginTop: "16px",
+                    background: `${BS.accent}14`,
+                    border: `1px solid ${BS.accent}`,
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "12px",
+                    letterSpacing: "0.08em",
+                    color: BS.accent,
+                    textAlign: "center",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  SWITCH REQUEST PENDING
+                  {switchRequestStallName ? ` -- ${switchRequestStallName}` : ""}
+                  <br />
+                  WAITING FOR AN ADMIN TO APPROVE
+                </div>
+              ) : pickerOpen ? (
+                <div style={{ marginTop: "20px" }}>
+                  <p
                     style={{
-                      background: BS.surface,
-                      border: `1px solid ${BS.border}`,
-                      borderRadius: "12px",
-                      padding: "16px",
-                      textAlign: "left",
-                      cursor: joinable ? "pointer" : "default",
-                      opacity: joinable ? 1 : 0.45,
+                      fontFamily: "var(--font-chakra), sans-serif",
+                      fontSize: "0.95rem",
+                      color: BS.muted,
+                      margin: "0 0 12px",
                     }}
                   >
-                    <div
-                      style={{
-                        fontFamily: "var(--font-chakra), sans-serif",
-                        fontWeight: 700,
-                        fontSize: "1.1rem",
-                        textTransform: "uppercase",
-                        color: BS.text,
-                      }}
-                    >
-                      {stall.stall_name}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "6px",
-                        fontFamily: "var(--font-mono), monospace",
-                        fontSize: "0.75rem",
-                        letterSpacing: "0.08em",
-                        color: stall.status === "free" ? BS.free : BS.occupied,
-                      }}
-                    >
-                      {stall.status === "free"
-                        ? "FREE"
-                        : `OCCUPIED${claimed.length ? ` · ${claimed.join(", ")}` : ""}`}
-                    </div>
+                    Which stall do you want to move to? An admin has to approve it.
+                  </p>
+                  <StallGrid>
+                    {otherStalls.map((stall) => (
+                      <button
+                        key={stall.id}
+                        onClick={() => {
+                          setPickerOpen(false);
+                          onRequestSwitch(stall.id);
+                        }}
+                        style={{
+                          background: BS.surface,
+                          border: `1px solid ${BS.border}`,
+                          borderRadius: "12px",
+                          padding: "16px",
+                          textAlign: "left",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontFamily: "var(--font-chakra), sans-serif",
+                            fontWeight: 700,
+                            fontSize: "1.1rem",
+                            textTransform: "uppercase",
+                            color: BS.text,
+                          }}
+                        >
+                          {stall.stall_name}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: "6px",
+                            fontFamily: "var(--font-mono), monospace",
+                            fontSize: "0.75rem",
+                            letterSpacing: "0.08em",
+                            color: stall.status === "free" ? BS.free : BS.occupied,
+                          }}
+                        >
+                          {stall.status === "free" ? "FREE" : "OCCUPIED"}
+                        </div>
+                      </button>
+                    ))}
+                  </StallGrid>
+                  <button onClick={() => setPickerOpen(false)} style={textLink}>
+                    Cancel
                   </button>
-                );
-              })}
-            </StallGrid>
+                </div>
+              ) : (
+                <button onClick={() => setPickerOpen(true)} style={textLink}>
+                  Request switch
+                </button>
+              ))}
           </>
+        ) : (
+          /* S72C (Section B1): this used to be a picker over EVERY stall in the
+             session, with per-stall dimming that S72B added and that was already
+             dead code - the branch is only reachable with no assignment, so
+             `assignedStallId === null` was always true and every stall always
+             tappable. Offering it also meant an unassigned volunteer's first tap
+             wrote status='occupied' on a stall that was not theirs, which is the
+             exact write Section G existed to remove.
+             A dead end is the honest state: there is nothing they can correctly
+             do here, and the fix is an admin using MOVE STALL. */
+          <div
+            style={{
+              background: BS.surface,
+              border: `1px solid ${BS.border}`,
+              borderRadius: "12px",
+              padding: "24px 20px",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontWeight: 700,
+                fontSize: "1.25rem",
+                textTransform: "uppercase",
+                lineHeight: 1.2,
+              }}
+            >
+              No stall assigned
+            </div>
+            <p
+              style={{
+                marginTop: "12px",
+                marginBottom: 0,
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontSize: "0.95rem",
+                color: BS.muted,
+                lineHeight: 1.6,
+              }}
+            >
+              You have not been assigned a stall yet. Ask an admin to assign you
+              one -- your dashboard will show it here within a few seconds.
+            </p>
+          </div>
         )}
       </main>
     </div>

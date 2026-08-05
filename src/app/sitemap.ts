@@ -2,28 +2,11 @@ import type { MetadataRoute } from "next";
 
 import { getEvents } from "@/lib/services/events";
 import { getPublishedPosts } from "@/lib/services/posts";
-
-const siteUrl = "https://vegavath.live";
-
-const STATIC_ROUTES: { path: string; priority: number }[] = [
-  { path: "/", priority: 1.0 },
-  { path: "/about", priority: 0.9 },
-  { path: "/events", priority: 0.9 },
-  // S60/D4. /projects/combat-bot is deliberately absent: it is a
-  // "check back soon" stub, and submitting thin content wins nothing.
-  { path: "/projects", priority: 0.8 },
-  { path: "/projects/kart", priority: 0.8 },
-  { path: "/crew", priority: 0.8 },
-  { path: "/join", priority: 0.8 },
-  { path: "/gallery", priority: 0.7 },
-  { path: "/posts", priority: 0.7 },
-  { path: "/sponsors", priority: 0.6 },
-  { path: "/f1", priority: 0.5 },
-  { path: "/f1/drivers", priority: 0.4 },
-  { path: "/f1/circuits", priority: 0.4 },
-  { path: "/f1/seasons", priority: 0.4 },
-  { path: "/legal", priority: 0.3 },
-];
+// S72C: both moved to src/types/routes.ts so /admin/qr's client component can
+// share the same list without value-importing this file (which would pull the
+// Neon driver into the browser bundle). The exclusions, including S60/D4's
+// /projects/combat-bot stub, are documented there.
+import { SITE_URL as siteUrl, STATIC_ROUTES } from "@/types/routes";
 
 // S52B: async and DB-backed. Event and post slugs were missing entirely, so the
 // pages carrying Event and Article JSON-LD -- the ones most likely to win a

@@ -24,7 +24,10 @@ export default async function BootstrapCheckinPage({
     <BootstrapCheckin
       token={token}
       sessionName={ctx?.session_name ?? null}
-      groupName={ctx?.group_name ?? null}
+      // S72C (Section E): the pre-submit "Joining ..." line renders this number.
+      // group_name ("Group A") is no longer passed - nothing visitor-facing shows
+      // the letter form any more; it stays in the DB as the join key only.
+      groupNumber={ctx?.group_number ?? null}
       isFull={ctx != null && ctx.group_id != null && ctx.visitor_count >= ctx.max_group_size}
     />
   );
