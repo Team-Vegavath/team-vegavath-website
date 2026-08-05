@@ -8,6 +8,23 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // S72B (Section K, second path). suggested_stall_id does double duty: for a
+  // STALL volunteer it is their assignment, written when they picked a stall at
+  // self-registration; for a LEAD it is only the dismissible "ADMIN SUGGESTS"
+  // banner. This route nulls the column, so a volunteer who was flipped TO GROUP,
+  // saw their own registration stall in that banner, tapped x to clear the noise,
+  // and was flipped back to TO STALL came out unassigned - with nothing recording
+  // why. The banner only ever renders on the lead dashboard
+  // (BootstrapDashboard's lead branch), so restricting the route to leads matches
+  // what the UI can actually reach and takes the destructive path off the table
+  // for the role whose assignment it is.
+  if (volunteer.role !== "lead") {
+    return NextResponse.json(
+      { error: "Only group volunteers can dismiss a stall suggestion" },
+      { status: 403 }
+    );
+  }
+
   try {
     await suggestStallToVolunteer(volunteer.id, null);
     return NextResponse.json({ ok: true });

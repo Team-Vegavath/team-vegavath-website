@@ -64,6 +64,17 @@ export async function DELETE(
       if (result.reason === "not_found") {
         return NextResponse.json({ error: "Stall not found" }, { status: 404 });
       }
+      // S72B (Section K): 409 with the names, because deleting this stall would
+      // have silently wiped their registration choice via the FK's
+      // ON DELETE SET NULL. Re-point them with MOVE STALL first.
+      if (result.reason === "assigned") {
+        return NextResponse.json(
+          {
+            error: `${result.volunteers.length} volunteer(s) are assigned to this stall: ${result.volunteers.join(", ")}. Move them to another stall before deleting it.`,
+          },
+          { status: 409 }
+        );
+      }
       // 409: someone is standing at it - free the stall first
       return NextResponse.json(
         { error: "Stall is occupied. Free it before deleting." },

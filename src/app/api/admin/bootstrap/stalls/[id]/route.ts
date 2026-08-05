@@ -37,7 +37,11 @@ export async function PATCH(
     // optional queued_by pass-through - the service clears it when status is "free"
     const queuedBy = body?.queued_by ? String(body.queued_by) : undefined;
 
-    const stall = await updateStallStatus(id, claimedBy, "override", status, queuedBy);
+    // sessionId null = deliberately unscoped. The admin override is the one
+    // caller allowed to reach any stall in any session (S72B added session
+    // scoping to every other path); this route is nested under /admin and
+    // already carries both the isAdmin and the viewer guard above.
+    const stall = await updateStallStatus(id, claimedBy, "override", null, status, queuedBy);
     if (!stall) {
       return NextResponse.json({ error: "Stall not found" }, { status: 404 });
     }

@@ -273,10 +273,25 @@ export async function addStallToSession(
 // Returns a reason instead of throwing so the route can pick 404 vs 409.
 // sessionId scopes the lookup: the route is nested under a session, so a stall id
 // from a different session must read as not-found rather than deleting.
+//
+// S72B (Section K root cause): also refuses while any volunteer is ASSIGNED to
+// the stall via suggested_stall_id, not just while someone has it claimed. That
+// column carries the FK `REFERENCES bootstrap_stalls(id) ON DELETE SET NULL`
+// (migration 009), so deleting the stall made Postgres itself silently wipe the
+// registration choice of every volunteer who picked it - they then showed as
+// unassigned with no trace of why. Because the null-out is enforced in the
+// SCHEMA, the only way to prevent it from application code is to never let the
+// DELETE happen while assignees exist. The old application-level
+// `UPDATE bootstrap_volunteers SET suggested_stall_id = NULL` that used to sit
+// here is gone: it duplicated the FK, and it is now unreachable by construction.
 export async function deleteStall(
   stallId: string,
   sessionId: string
-): Promise<{ ok: true } | { ok: false; reason: "not_found" | "occupied" }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; reason: "not_found" | "occupied" }
+  | { ok: false; reason: "assigned"; volunteers: string[] }
+> {
   const rows = await sql`
     SELECT claimed_by FROM bootstrap_stalls
     WHERE id = ${stallId} AND session_id = ${sessionId} LIMIT 1`;
@@ -284,10 +299,20 @@ export async function deleteStall(
   const claimedBy = (rows[0] as { claimed_by: string[] | null }).claimed_by ?? [];
   if (claimedBy.length > 0) return { ok: false, reason: "occupied" };
 
-  // volunteers pointed at this stall keep their session; only the suggestion goes
-  await sql`
-    UPDATE bootstrap_volunteers SET suggested_stall_id = NULL
-    WHERE suggested_stall_id = ${stallId}`;
+  // Named, not just counted: the admin needs to know WHO to re-point before the
+  // stall can go, and re-pointing is a one-tap MOVE STALL on the same screen.
+  const assigned = await sql`
+    SELECT display_name FROM bootstrap_volunteers
+    WHERE suggested_stall_id = ${stallId}
+    ORDER BY display_name ASC LIMIT 20`;
+  if (assigned.length > 0) {
+    return {
+      ok: false,
+      reason: "assigned",
+      volunteers: (assigned as { display_name: string }[]).map((v) => v.display_name),
+    };
+  }
+
   await sql`DELETE FROM bootstrap_stalls WHERE id = ${stallId}`;
   return { ok: true };
 }
@@ -312,18 +337,31 @@ export type StallAction = "claim" | "release" | "mark_queued" | "unqueue" | "ove
  * override:    admin sets status + claimed_by + queued_by directly (username is a
  *              comma-separated list of usernames here, "" clears it;
  *              queuedBy clears when status is "free" or omitted)
+ *
+ * S72B: sessionId scopes every branch. Pass the caller's own session so a
+ * volunteer cannot reach a stall belonging to a different (or past) session by
+ * UUID - the route's role/ownership checks guard WHO may act, this guards WHERE.
+ * Pass null ONLY from the admin override, which is deliberately unscoped.
+ * Returns null when nothing matched even on re-read, so the route can 404
+ * instead of the old `rows[0] as BootstrapStall` lie about an empty result.
  */
 export async function updateStallStatus(
   stallId: string,
   username: string,
   action: StallAction,
+  sessionId: string | null,
   status?: string, // override only - every other action implies its status
   queuedBy?: string // override only
-): Promise<BootstrapStall> {
+): Promise<BootstrapStall | null> {
   let rows;
   if (action === "claim") {
     // CASE instead of a WHERE guard so a re-claim by a volunteer already
     // in claimed_by still updates the row.
+    //
+    // S72B occupancy cap: the WHERE only lets a NEW claimant in while there is
+    // room. The re-claim arm stays unguarded on purpose - a volunteer already in
+    // claimed_by must still be able to re-tap on a full stall (that is how a
+    // stale card resyncs), and it adds nobody.
     rows = await sql`
       UPDATE bootstrap_stalls
       SET status = 'occupied',
@@ -333,6 +371,11 @@ export async function updateStallStatus(
           END,
           updated_at = now()
       WHERE id = ${stallId}
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
+        AND (
+          ${username} = ANY(coalesce(claimed_by, '{}'))
+          OR coalesce(array_length(claimed_by, 1), 0) < max_occupancy
+        )
       RETURNING *`;
   } else if (action === "release") {
     rows = await sql`
@@ -346,6 +389,7 @@ export async function updateStallStatus(
           queued_at = NULL,
           updated_at = now()
       WHERE id = ${stallId}
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
       RETURNING *`;
   } else if (action === "mark_queued") {
     // status guard: a stale card can't queue a stall that just went free
@@ -353,12 +397,14 @@ export async function updateStallStatus(
       UPDATE bootstrap_stalls
       SET status = 'queued', queued_by = ${username}, queued_at = now(), updated_at = now()
       WHERE id = ${stallId} AND status = 'occupied'
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
       RETURNING *`;
   } else if (action === "unqueue") {
     rows = await sql`
       UPDATE bootstrap_stalls
       SET status = 'occupied', queued_by = NULL, queued_at = NULL, updated_at = now()
       WHERE id = ${stallId} AND status = 'queued'
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
       RETURNING *`;
   } else {
     // never pass a JS array as a driver param (spec rule) - build it in SQL
@@ -371,14 +417,21 @@ export async function updateStallStatus(
           queued_at = CASE WHEN ${status ?? "free"} = 'queued' THEN coalesce(queued_at, now()) ELSE NULL END,
           updated_at = now()
       WHERE id = ${stallId}
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
       RETURNING *`;
   }
   if (rows.length === 0) {
-    // guarded action raced a state change - hand back the current row so
-    // the tapping volunteer's UI resyncs immediately instead of 404ing
-    rows = await sql`SELECT * FROM bootstrap_stalls WHERE id = ${stallId} LIMIT 1`;
+    // guarded action raced a state change (or hit the occupancy cap) - hand back
+    // the current row so the tapping volunteer's UI resyncs immediately instead
+    // of 404ing. Scoped to the same session, so a cross-session id reads as
+    // not-found rather than leaking another session's row.
+    rows = await sql`
+      SELECT * FROM bootstrap_stalls
+      WHERE id = ${stallId}
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
+      LIMIT 1`;
   }
-  return rows[0] as BootstrapStall;
+  return (rows[0] as BootstrapStall) ?? null;
 }
 
 // map positions are percentages (0-100) from the top-left of the map image;
@@ -594,18 +647,60 @@ export async function setVolunteerRole(
   // up; COALESCE keeps an existing token stable across a lead -> stall -> lead
   // round trip, so an already-printed QR code survives a demotion.
   //
-  // group_number is deliberately NOT touched here. assignGroupNumbers only
-  // fills NULLs, so re-activating the session picks a new lead up without
-  // reshuffling anyone who already has a number.
+  // group_number is still not written HERE (assignGroupNumbers owns it, and it
+  // only fills NULLs so re-activation never reshuffles anyone) - but S72B fires
+  // that sweep right after the role write, see below.
   const token = randomBytes(20).toString("hex");
-  await sql`
+  const rows = await sql`
     UPDATE bootstrap_volunteers
     SET role = ${role},
         checkin_token = CASE
           WHEN ${role} = 'lead' THEN COALESCE(checkin_token, ${token})
           ELSE checkin_token
         END
-    WHERE id = ${volunteerId}`;
+    WHERE id = ${volunteerId}
+    RETURNING session_id`;
+  const sessionId = (rows[0] as { session_id: string | null } | undefined)?.session_id ?? null;
+  // No row matched, or a pool member with no session - nothing group-shaped to do.
+  if (!sessionId) return;
+
+  if (role === "lead") {
+    // S72B (Section F root cause): group_number was written by exactly two
+    // callers - session activation and group SELF-registration - so a volunteer
+    // promoted through this function kept group_number = NULL. That reads as
+    // "Not assigned" in the admin table AND on their own dashboard, and it makes
+    // getCheckinContext resolve no group at all, so their check-in QR answers
+    // 400 "no group assigned yet". Idempotent (fills NULLs only), which is why
+    // it is safe to fire on every promotion.
+    await assignGroupNumbers(sessionId);
+
+    // Re-promotion case: assignGroupNumbers only walks leads whose group_number
+    // is NULL, so someone who kept a number from a previous stint is skipped -
+    // including the team_lead_id backfill inside that loop. Without this their
+    // group stays leaderless with a live QR, which is the same failure the
+    // demotion branch below is cleaning up. Targeted, and a no-op when the group
+    // already has a lead.
+    await sql`
+      UPDATE bootstrap_groups g
+      SET team_lead_id = ${volunteerId}
+      FROM bootstrap_volunteers v
+      WHERE v.id = ${volunteerId}
+        AND g.session_id = ${sessionId}
+        AND g.team_lead_id IS NULL
+        AND v.group_number IS NOT NULL
+        AND g.name = 'Group ' || chr(64 + v.group_number)`;
+    return;
+  }
+
+  // Demoted away from lead. A stall volunteer must not stay on the hook as a
+  // group's team_lead_id: getCheckinContext resolves the group through it, so
+  // visitors scanning that (still valid) QR would keep landing in a group whose
+  // lead has walked off to a stall. group_number is left alone deliberately -
+  // same reasoning as the COALESCE on checkin_token, it makes a stall -> lead
+  // round trip put them back in their original group.
+  await sql`
+    UPDATE bootstrap_groups SET team_lead_id = NULL
+    WHERE team_lead_id = ${volunteerId}`;
 }
 
 // S36: leads flip themselves into classroom mode from the dashboard, which

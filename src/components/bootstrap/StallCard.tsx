@@ -119,31 +119,43 @@ const BTN_KINDS = {
  *   queued, I am queued_by   → BACK TO OCCUPIED (+ RELEASE if also in claimed_by)
  *   queued, in claimed_by    → RELEASE only
  *   queued, neither          → no actions, read-only
+ *
+ * S72B (Section A5): those rules were role-blind, so a group lead's dashboard
+ * rendered a full-width CLAIM on every stall card in the session. The server now
+ * 403s claim/release for role 'lead' (see /api/bootstrap/stalls/[id]), and this
+ * stops offering a button that can only fail. Leads keep the queue actions -
+ * signalling a queue IS the group lead's job per docs/bootstrap-spec.md.
  */
 function volunteerButtons(
   stall: BootstrapStall,
-  username: string
+  username: string,
+  role: "stall" | "lead"
 ): { label: string; action: VolunteerStallAction; kind: keyof typeof BTN_KINDS }[] {
   const claimed = stall.claimed_by ?? [];
   const mine = claimed.includes(username);
+  const mayClaim = role === "stall";
 
   if (stall.status === "free") {
-    return [{ label: "Claim", action: "claim", kind: "accent" }];
+    return mayClaim ? [{ label: "Claim", action: "claim", kind: "accent" }] : [];
   }
   if (stall.status === "occupied") {
     const buttons: ReturnType<typeof volunteerButtons> = [];
-    if (mine) {
-      buttons.push({ label: "Release", action: "release", kind: "danger" });
-    } else if (claimed.length < stall.max_occupancy) {
-      // shared-stall entry point (session 22) - kept alongside the new rules
-      buttons.push({ label: "Join", action: "claim", kind: "accent-outline" });
+    if (mayClaim) {
+      if (mine) {
+        buttons.push({ label: "Release", action: "release", kind: "danger" });
+      } else if (claimed.length < stall.max_occupancy) {
+        // shared-stall entry point (session 22) - kept alongside the new rules
+        buttons.push({ label: "Join", action: "claim", kind: "accent-outline" });
+      }
     }
     buttons.push({ label: "Mark queued", action: "mark_queued", kind: "queued" });
     return buttons;
   }
   // queued
   const buttons: ReturnType<typeof volunteerButtons> = [];
-  if (mine) buttons.push({ label: "Release", action: "release", kind: "danger" });
+  if (mayClaim && mine) {
+    buttons.push({ label: "Release", action: "release", kind: "danger" });
+  }
   if (stall.queued_by === username) {
     buttons.push({ label: "Back to occupied", action: "unqueue", kind: "neutral" });
   }
@@ -160,6 +172,7 @@ function volunteerButtons(
 export default function StallCard({
   stall,
   username,
+  role = "stall",
   onAction,
   expanded,
   onToggle,
@@ -167,6 +180,9 @@ export default function StallCard({
 }: {
   stall: BootstrapStall;
   username?: string;
+  // S72B: decides which actions are offered. Defaults to "stall" so the admin
+  // mode (which passes neither username nor role) is unaffected.
+  role?: "stall" | "lead";
   onAction?: (action: VolunteerStallAction) => void;
   expanded?: boolean;
   onToggle?: () => void;
@@ -290,15 +306,29 @@ export default function StallCard({
         )}
       </div>
 
-      {username && onAction && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px" }}>
-          {volunteerButtons(stall, username).map((btn) => (
-            <button key={btn.action} style={BTN_KINDS[btn.kind]} onClick={() => onAction(btn.action)}>
-              {btn.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {username &&
+        onAction &&
+        (() => {
+          // A lead on a free stall now has no actions at all, so skip the
+          // wrapper entirely rather than leaving an empty 14px gap under the card.
+          const buttons = volunteerButtons(stall, username, role);
+          if (buttons.length === 0) return null;
+          return (
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px" }}
+            >
+              {buttons.map((btn) => (
+                <button
+                  key={btn.action}
+                  style={BTN_KINDS[btn.kind]}
+                  onClick={() => onAction(btn.action)}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
       {adminMode && expanded && actions && (
         <div style={{ marginTop: "14px", borderTop: `1px solid ${BS.border}`, paddingTop: "14px" }}>

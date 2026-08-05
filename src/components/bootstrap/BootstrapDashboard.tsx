@@ -22,6 +22,13 @@ export default function BootstrapDashboard({
 }) {
   const [stalls, setStalls] = useState<BootstrapStall[]>([]);
   const [mySuggestion, setMySuggestion] = useState<string | null>(null);
+  // S72B - the assigned stall's id. The server enforces the ownership gate on
+  // claim/release regardless; this is what lets the UI avoid offering a tap that
+  // would only come back 403.
+  const [mySuggestionId, setMySuggestionId] = useState<string | null>(null);
+  // S72B - last rejected action, shown briefly. A silent 403 reads as a broken
+  // app at a stall; these are permission answers and should say so.
+  const [actionError, setActionError] = useState<string | null>(null);
   // server-rendered role avoids flashing the wrong view until the first poll;
   // the poll keeps it live so an admin role flip lands within 4s
   const [volunteerRole, setVolunteerRole] = useState<"stall" | "lead">(initialRole);
@@ -64,6 +71,7 @@ export default function BootstrapDashboard({
       const newStalls = data.stalls as BootstrapStall[];
       setStalls(newStalls);
       setMySuggestion(data.mySuggestion ?? null);
+      setMySuggestionId(data.mySuggestionId ?? null);
       setVolunteerRole(data.volunteerRole ?? "stall");
       setCheckinToken(data.checkinToken ?? null);
       setGroupNumber(data.groupNumber ?? null);
@@ -181,7 +189,13 @@ export default function BootstrapDashboard({
       if (res.ok) {
         const updated = (await res.json()) as BootstrapStall;
         setStalls((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        return;
       }
+      // 403 from the S72B role/ownership gates, or 404 for a stall outside this
+      // session. Surface the server's own message - it already explains why.
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setActionError(data?.error ?? "That action was not allowed.");
+      setTimeout(() => setActionError(null), 5000);
     } catch {
       // next poll self-corrects
     }
@@ -202,6 +216,8 @@ export default function BootstrapDashboard({
         displayName={displayName}
         username={username}
         stalls={stalls}
+        assignedStallId={mySuggestionId}
+        actionError={actionError}
         connectionIssue={connectionIssue}
         liveLabel={secondsAgo !== null ? `LIVE · ${secondsAgo}s ago` : "CONNECTING…"}
         onAction={(stallId, action) => void sendAction(stallId, action)}
@@ -355,6 +371,29 @@ export default function BootstrapDashboard({
           }}
         >
           CONNECTION ISSUES - RETRYING...
+        </div>
+      )}
+
+      {/* S72B - a rejected action (role or ownership gate) says why. Same sticky
+          treatment as the connection banner so it cannot be missed on a phone. */}
+      {actionError && (
+        <div
+          style={{
+            position: "sticky",
+            top: `${TOP_BAR_H}px`,
+            zIndex: 9,
+            background: BS.elevated,
+            borderBottom: `1px solid ${BS.danger}`,
+            color: BS.danger,
+            fontFamily: "var(--font-chakra), sans-serif",
+            fontWeight: 700,
+            fontSize: "0.85rem",
+            letterSpacing: "0.04em",
+            textAlign: "center",
+            padding: "12px 16px",
+          }}
+        >
+          {actionError}
         </div>
       )}
 
@@ -611,6 +650,11 @@ export default function BootstrapDashboard({
               // S36 - in classroom mode the cards go read-only (no onAction),
               // so no CLAIM/QUEUE buttons render while the lead runs a session
               username={inClassroom ? undefined : username}
+              // S72B - this branch only renders for volunteerRole "lead" (the
+              // "stall" case returned StallVolunteerView above), so the card
+              // offers queue actions only. Passed explicitly rather than relying
+              // on the default, which is "stall".
+              role="lead"
               onAction={inClassroom ? undefined : (action) => sendAction(stall.id, action)}
             />
           ))}

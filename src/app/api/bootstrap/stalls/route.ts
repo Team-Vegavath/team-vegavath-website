@@ -19,6 +19,11 @@ export async function GET() {
       stalls,
       session: { map_image_url: session?.map_image_url ?? null },
       mySuggestion: volunteer.suggested_stall_name ?? null,
+      // S72B: the id, not just the name. The server enforces the ownership gate
+      // (A3) either way, but without the id the client cannot tell which stall is
+      // the volunteer's own, so the stall-volunteer picker offered every stall
+      // and every tap but one would 403 silently. 72C's lock-in rewrite uses this.
+      mySuggestionId: volunteer.suggested_stall_id ?? null,
       volunteerRole: volunteer.role ?? "stall", // S32 - picks the dashboard view
       checkinToken: volunteer.checkin_token ?? null, // S33 - lead's stable QR token
       groupNumber: volunteer.group_number ?? null, // S35 - assigned FCFS on activation
