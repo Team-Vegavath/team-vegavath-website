@@ -1,22 +1,29 @@
 # Database Schema
 
+_Current as of Session 72D (2026-08-12). Migrations 001-025 are all applied._
+
 This document describes the full Team Vegavath Postgres schema (Neon), reconstructed
-by applying all 17 migration files in `migrations/` cumulatively, in numeric order.
+by applying all 25 migration files in `migrations/` cumulatively, in numeric order.
 Migrations are the source of truth. None are auto-applied -- each is run manually
 against the live Neon database before the matching code deploys.
+
+Known migration drift: migration 001 does not create `team_members.linkedin_url`,
+which exists in the live database via an un-migrated `ALTER`. A rebuild from the
+migration files alone would therefore NOT match production.
 
 The `pgcrypto` extension is enabled in migration 001 so that `gen_random_uuid()`
 is available for all UUID primary keys.
 
 Tables are grouped into two areas:
-- Core site tables: `events`, `team_members`, `gallery_items`, `sponsors`,
-  `applications`, `site_settings`, `milestones`, `admin_accounts`,
-  `admin_invite_tokens`, `admin_password_reset_tokens`, `admin_login_log`.
+- Core site tables: `events`, `event_registrations`, `posts`, `team_members`,
+  `gallery_items`, `sponsors`, `applications`, `site_settings`, `milestones`,
+  `admin_accounts`, `admin_invite_tokens`, `admin_password_reset_tokens`,
+  `admin_login_log`.
 - Bootstrap event-day tables: `bootstrap_sessions`, `bootstrap_stalls`,
   `bootstrap_volunteers`, `bootstrap_groups`, `bootstrap_visitors`,
   `bootstrap_feedback`.
 
-Total: 17 tables documented.
+Total: 19 tables.
 
 Note: there is no dedicated `about` table. About-page and contact content is
 stored as key/value rows in `site_settings`.
@@ -55,14 +62,96 @@ Trigger: `events_updated_at` runs `update_updated_at()` BEFORE UPDATE to refresh
 Constraints:
 
 ```sql
-CHECK (category IN ('workshops', 'competitions', 'talks', 'other'))
+CHECK (category IN ('workshops', 'competitions', 'talks', 'hackathons', 'other'))
 CHECK (status IN ('upcoming', 'past', 'archived'))
 ```
 
-KNOWN OPEN ITEM: the category CHECK does NOT include `'hackathons'`. The admin
-EventForm offers "hackathons" as a category, but this constraint rejects it, so
-creating a hackathon event returns a 500. No migration ever adds it. Fixing this
-requires a constraint change (approval needed).
+RESOLVED (was a long-standing open item): the original CHECK did not include
+`'hackathons'`, so the admin EventForm offered a category the constraint
+rejected and creating a hackathon event returned a 500.
+`migrations/018_events_hackathons.sql` widens the constraint and is applied.
+The path has not yet been exercised through the UI, so creating one hackathon
+event in `/admin/events` is still worth doing to close it out.
+
+`registration_form_url` also still exists on this table. It is dead in the
+render path -- S47 replaced it with the native `/events/[slug]/register` flow --
+but it is deliberately kept for historical rows. **Do not drop the column.**
+
+---
+
+### event_registrations
+
+Created: 019. Native event sign-ups, replacing the old external Google Form
+link. The data used to land in a spreadsheet nobody owned, outside the admin
+panel and outside the database, so committee handover lost it.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | UUID | PK, `gen_random_uuid()` |
+| event_id | UUID | NOT NULL, FK -> `events(id)` ON DELETE CASCADE |
+| name | TEXT | NOT NULL |
+| email | TEXT | NOT NULL |
+| phone | TEXT | NOT NULL |
+| srn | TEXT | nullable |
+| message | TEXT | nullable |
+| status | TEXT | NOT NULL, default `'pending'` |
+| registered_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+
+```sql
+CHECK (status IN ('pending', 'confirmed', 'rejected', 'waitlisted'))
+```
+
+Indexes: `idx_event_registrations_event(event_id)` and
+`idx_event_registrations_email(event_id, email)`.
+
+Validation happens in the route against real state: an unknown event 404s, a
+closed `registration_open` flag 409s, and a duplicate email 409s **matched
+case-insensitively**, so `A@x.com` cannot re-register as `a@x.com`. The
+registration block is gated on event category, not on the presence of a form
+URL: only `hackathons` and `competitions` show it at all.
+
+---
+
+### posts
+
+Created: 022. Modified: 023 (category CHECK narrowed), 024 (`thumbnail_url`).
+Backs the blog at `/posts`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | UUID | PK, `gen_random_uuid()` |
+| slug | TEXT | UNIQUE, NOT NULL. Generated on create only, so published URLs stay stable across edits |
+| title | TEXT | NOT NULL |
+| author_name | TEXT | NOT NULL |
+| author_role | TEXT | nullable |
+| category | TEXT | NOT NULL, default `'motorsport'` (was `'general'` in 022) |
+| body | TEXT | NOT NULL, markdown |
+| excerpt | TEXT | nullable |
+| source_url | TEXT | nullable. For content cross-posted from LinkedIn |
+| source_label | TEXT | nullable |
+| thumbnail_url | TEXT | nullable. Added in 024; posts without one show a category-colour placeholder |
+| published | BOOLEAN | NOT NULL, default false |
+| published_at | TIMESTAMPTZ | nullable |
+| created_at | TIMESTAMPTZ | NOT NULL, default `now()` |
+| updated_at | TIMESTAMPTZ | NOT NULL, default `now()`, maintained by the `posts_updated_at` trigger |
+
+```sql
+CHECK (category IN ('automotives', 'motorsport', 'robotics'))  -- narrowed in 023
+```
+
+Migration 023 is worth reading as a pattern: it narrowed the CHECK from six
+categories to three, and it had to (a) UPDATE existing rows off the removed
+values first and (b) change the column DEFAULT, because 022's default of
+`'general'` would have been rejected by the new constraint on any INSERT that
+omitted the column.
+
+Indexes: `idx_posts_slug(slug)`, `idx_posts_published(published, published_at DESC)`,
+and a partial `idx_posts_category(category) WHERE published = true`.
+
+`posts.ts` is the reference implementation for two service-layer patterns: the
+read-then-write update shape (because `COALESCE(${value ?? null}, column)` can
+never write a NULL back, and these columns must be clearable), and branching on
+a filter rather than concatenating a dynamic WHERE.
 
 ---
 
@@ -265,7 +354,15 @@ Created: 010. Modified: 012 (added `token_version`).
 | created_at | TIMESTAMPTZ | NOT NULL, default now() |
 | token_version | INT | NOT NULL, default 0. Added in 012. Incremented on password reset to invalidate all live JWTs |
 
-Constraint: `CHECK (role IN ('admin', 'godfather'))`.
+Constraint: `CHECK (role IN ('admin', 'godfather', 'viewer'))` -- `'viewer'` added
+in 019.
+
+The `viewer` tier is read-only and its enforcement is deliberately split:
+`session.user.isAdmin` stays **TRUE** for viewers, because it means "may enter
+the admin panel" and every admin page gates on it. The write gate is the
+separate `isViewer` flag, checked immediately after the `isAdmin` check in
+every mutating route. Do not "fix" `isAdmin` to exclude viewers -- that locks
+the read-only tier out of the panel entirely.
 
 ---
 
@@ -398,12 +495,12 @@ Index: `idx_bootstrap_stalls_session(session_id)`.
 
 Purpose: volunteer/lead login accounts for a session; self-registered from S35 onward.
 
-Created: 007. Modified: 009 (`suggested_stall_id`), 014 (`role`), 015 (`checkin_token`), 016 (`phone`, `srn`, `login_code`, `group_number`, `in_classroom`, `created_at`). The most-modified bootstrap table.
+Created: 007. Modified: 009 (`suggested_stall_id`), 014 (`role`), 015 (`checkin_token`), 016 (`phone`, `srn`, `login_code`, `group_number`, `in_classroom`, `created_at`), 021 (`session_id` made NULLABLE, `preferred_stall_name`), 025 (`switch_requested_stall_id`, `switch_requested_at`). The most-modified bootstrap table.
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | id | UUID | PK, default `gen_random_uuid()` |
-| session_id | UUID | NOT NULL, FK -> bootstrap_sessions(id) ON DELETE CASCADE |
+| session_id | UUID | **NULLABLE since 021**, FK -> bootstrap_sessions(id) ON DELETE CASCADE. NULL = pre-registration pool member |
 | username | TEXT | NOT NULL. e.g. "vol-1"; from S35 the SRN |
 | password_hash | TEXT | NOT NULL. bcryptjs (same lib as auth.ts); hash of login_code from S35 |
 | display_name | TEXT | NOT NULL. e.g. "Volunteer 1" |
@@ -417,8 +514,11 @@ Created: 007. Modified: 009 (`suggested_stall_id`), 014 (`role`), 015 (`checkin_
 | group_number | INTEGER | nullable. Added in 016. Assigned FCFS on activation |
 | in_classroom | BOOLEAN | NOT NULL, default false. Added in 016. Classroom-mode flag for group volunteers |
 | created_at | TIMESTAMPTZ | NOT NULL, default now(). Added in 016 (007 had no timestamp); needed for FCFS group-number ordering |
+| preferred_stall_name | TEXT | nullable. Added in 021. Free text -- pool members register before stalls exist |
+| switch_requested_stall_id | UUID | nullable, FK -> bootstrap_stalls(id) ON DELETE SET NULL. Added in 025. **The sole predicate for "has a pending switch request"** |
+| switch_requested_at | TIMESTAMPTZ | nullable. Added in 025. Display-only ("requested 12 min ago"); must never gate anything |
 
-Relationships: `session_id` -> `bootstrap_sessions(id)` ON DELETE CASCADE; `suggested_stall_id` -> `bootstrap_stalls(id)` ON DELETE SET NULL.
+Relationships: `session_id` -> `bootstrap_sessions(id)` ON DELETE CASCADE; `suggested_stall_id` and `switch_requested_stall_id` -> `bootstrap_stalls(id)` ON DELETE SET NULL.
 
 Constraints:
 
@@ -427,6 +527,20 @@ UNIQUE (session_id, username)
 CHECK (role IN ('stall', 'lead'))     -- added 014
 UNIQUE (checkin_token)                -- added 015
 ```
+
+**`UNIQUE (session_id, username)` does not constrain pool rows.** Postgres
+treats NULLs as distinct, so once 021 made `session_id` nullable this
+constraint stopped covering pre-registration members. The one-account-per-SRN
+rule for the pool is enforced in application code (`getPoolVolunteerBySrn`),
+not by the database. Any further pool-scoped uniqueness rule needs the same
+treatment -- the constraint will not help you.
+
+Assignment out of the pool is a one-way door: `assignVolunteerToSession` guards
+on `WHERE ... AND session_id IS NULL`, so a double-assign is a 409 rather than
+a silent move. Auto-assign by matching `preferred_stall_name` against stall
+names (punctuation and case normalised on both sides) only fires at session
+*creation*; someone who pre-registers while an inactive session already exists
+needs manual assignment.
 
 Index: `idx_bootstrap_volunteers_session(session_id)`.
 
@@ -536,3 +650,31 @@ CHECK (join_likelihood BETWEEN 1 AND 5)  -- added 017
 | 015_bootstrap_stall_leads_groupsize | bootstrap_stalls (lead_names), bootstrap_sessions (max_group_size), bootstrap_volunteers (checkin_token) |
 | 016_volunteer_selfregister | bootstrap_volunteers (phone, srn, login_code, group_number, in_classroom, created_at) |
 | 017_feedback_extra | bootstrap_feedback (overall_rating, memorable_stall, join_likelihood, suggestions) |
+| 018_events_hackathons | events (category CHECK adds 'hackathons') |
+| 019_viewer_role_and_event_registrations | admin_accounts (role CHECK adds 'viewer'), event_registrations (new), admin_invite_tokens (pending_role) |
+| 020_open_invite_tokens | admin_invite_tokens (is_open, reusable open viewer link) |
+| 021_bootstrap_prereg | bootstrap_volunteers (session_id becomes NULLABLE, preferred_stall_name) |
+| 022_posts | posts (new) |
+| 023_posts_categories | posts (category CHECK narrowed to 3, DEFAULT changed to 'motorsport') |
+| 024_post_thumbnails | posts (thumbnail_url) |
+| 025_stall_switch_request | bootstrap_volunteers (switch_requested_stall_id, switch_requested_at) |
+
+### Reading migration 025 before you touch the switch-request code
+
+025 carries a consequence the application code must respect, and it is spelled
+out in the migration header. The FK is `ON DELETE SET NULL`, which nulls
+`switch_requested_stall_id` **only**. `switch_requested_at` is a plain
+TIMESTAMPTZ and survives, so deleting the target stall leaves a half-state:
+NULL id, non-NULL timestamp.
+
+Therefore `switch_requested_stall_id IS NOT NULL` is the **sole** predicate for
+"has a pending request" everywhere in the codebase. `switch_requested_at` is
+display-only ("requested 12 min ago") and must never gate anything.
+
+Note also that this `SET NULL` is NOT a repeat of migration 009's mistake. In
+009, SET NULL erased a volunteer's durable *assignment* -- a load-bearing value
+the application treated as authoritative -- when a stall was deleted. Here the
+value is a *pending request* pointing at a stall that no longer exists, which is
+already meaningless the moment the stall is gone. Clearing it is the correct
+outcome, not data loss. RESTRICT was considered and rejected: a transient
+request would have been able to block an admin from deleting a stall.

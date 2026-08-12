@@ -139,7 +139,7 @@ export default function BootstrapCreateSession({
       setAutoAssigned(Number(data?.autoAssigned) || 0);
       setCreated(true);
     } catch {
-      setError("Request failed — check your connection");
+      setError("Request failed ∙ check your connection");
     } finally {
       setBusy(false);
     }
@@ -189,7 +189,7 @@ export default function BootstrapCreateSession({
           }}
         >
           Share these registration links with your team. Volunteers register
-          themselves and get a username (their SRN) plus a login code — both
+          themselves and get a username (their SRN) plus a login code ∙ both
           visible in the dashboard tables, so nothing to download or lose.
         </p>
 
@@ -244,7 +244,7 @@ export default function BootstrapCreateSession({
         <h1 className="admin-page-title">New Session</h1>
       </header>
 
-      {/* Step indicator — same pattern as JoinClient */}
+      {/* Step indicator ∙ same pattern as JoinClient */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "2rem" }}>
         <p style={monoLabel}>Step {step} of 2</p>
         <div style={{ display: "flex", gap: "6px" }}>
@@ -388,7 +388,7 @@ export default function BootstrapCreateSession({
               maxLength={60}
               style={{ flex: "1 1 12rem" }}
             />
-            {/* max occupancy — 1/2/3 segmented tiles */}
+            {/* max occupancy ∙ 1/2/3 segmented tiles */}
             <div style={{ display: "flex" }}>
               {[1, 2, 3].map((n) => (
                 <button
@@ -436,7 +436,7 @@ export default function BootstrapCreateSession({
               style={{ resize: "vertical", fontFamily: "inherit" }}
             />
             <p className="admin-hint" style={{ marginTop: "0.5rem" }}>
-              Shown on the stall card for reference only — accounts are no
+              Shown on the stall card for reference only ∙ accounts are no
               longer created here. Volunteers register themselves at
               /bootstrap/register/stall.
             </p>

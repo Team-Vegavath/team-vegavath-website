@@ -6,14 +6,24 @@ Everything below is drawn from the source: the service layer
 (`src/lib/services/bootstrap.ts`), the pages under `src/app/bootstrap/`, the
 admin dashboard under `src/app/(admin)/admin/bootstrap/`, the API routes under
 `src/app/api/bootstrap/` and `src/app/api/admin/bootstrap/`, the components in
-`src/components/bootstrap/`, migrations `007`-`017`, and the design record in
-`docs/bootstrap-spec.md`.
+`src/components/bootstrap/`, migrations `007`-`017` plus `021` and `025`, and
+the design record in `docs/bootstrap-spec.md`.
+
+_Current as of Session 72D (2026-08-12)._
 
 > Terminology note: `docs/bootstrap-spec.md` has a "CURRENT STATE (Session 38)"
 > block at the top that supersedes the older "FABLE NOTES" design record below
 > it. The older sections still describe admin-generated `vol-1`/`vol-2`
 > credentials handed out as a CSV. That model is gone. This guide documents
 > what the code actually ships today: volunteer self-registration.
+
+> Correctness pass (S72B / S72C): the stall-mutation rules below were
+> substantially tightened after a live test surfaced a permission gap. Stall
+> volunteers are now locked to their assigned stall and move only via an
+> admin-approved switch request; role, ownership, session and occupancy are
+> all checked server-side rather than only in the UI. See "Stall ownership
+> and the switch-request flow" below. Migration `025` backs this and is
+> applied.
 
 ---
 
@@ -400,6 +410,34 @@ free, the dashboard shows a toast; if the current user was the one queued on it
 CAN HEAD OVER"). Three consecutive failed polls flip a red "CONNECTION ISSUES -
 RETRYING..." banner.
 
+### Stall ownership and the switch-request flow (S72B / S72C)
+
+A live test showed that the stall rules were enforced in the UI but not on the
+server, so a volunteer could mutate a stall that was not theirs. The fix moved
+every rule server-side. What holds now:
+
+- **Role, ownership, session and occupancy are all checked in the route**, not
+  just hidden in the component. Hiding a control is a UX affordance, never a
+  permission.
+- **A stall volunteer is locked to their assigned stall.** The full stall
+  picker they used to get is gone (a net deletion, not a new feature). If they
+  have no stall they see an honest "No stall assigned" dead end with a stated
+  remedy rather than a picker that would let them grab someone else's.
+- **Moving stalls is a request, not an action.** The volunteer raises one via
+  `POST /api/bootstrap/switch-request`; an admin approves or denies it via
+  `PATCH /api/admin/bootstrap/volunteers/[id]/switch-request`. Migration `025`
+  adds `switch_requested_stall_id` and `switch_requested_at` to back it.
+- **Releasing a stall now asks for confirmation**, and the queue wipe that
+  accompanies it is scoped to the actual claimant rather than clearing more
+  than it should.
+- **A stall is auto-marked OCCUPIED when its volunteer logs in**, which
+  removes a manual step that was routinely forgotten on the day.
+
+Known carry-over, unfixed: `assignGroupNumbers` can share a `group_number`
+between two leads when leads outnumber groups, which is why
+`CheckinContext.group_number` is typed nullable. `suggested_stall_id` also
+still does double duty (assignment vs dismissible lead banner).
+
 ---
 
 ## Group Leads and Group Size
@@ -408,6 +446,13 @@ Groups live in `bootstrap_groups` (migration `014`): one row per group per
 session, named "Group A", "Group B", ... with an optional `team_lead_id` and a
 UNIQUE(session_id, name). `createBootstrapGroups(sessionId, count)` creates the
 lettered rows up front (callers clamp count to 1-26).
+
+**Letters are now an internal detail only (S72C).** Volunteers and visitors see
+group *numbers* (1, 2, 3), never "Group A". The lettered `name` column and the
+two `chr(64 + ...)` expressions survive purely as the internal join key ∙ that
+was a deliberate decision, not an oversight. If you are adding UI, render
+`group_number`; if you are writing a query that joins groups, the letter is
+still what matches.
 
 Per-session capacity is `bootstrap_sessions.max_group_size` (migration `015`,
 default 20). It is set at session creation and enforced by the check-in INSERT.
@@ -633,7 +678,7 @@ arrived without scanning a specific lead's QR.
 | --- | --- | --- |
 | `bootstrap_sessions` | `name`, `is_active`, `created_at`, `map_image_url`, `max_group_size` | `007`, `008` (map url), `015` (group size) |
 | `bootstrap_stalls` | `stall_number`, `stall_name`, `status` (free/occupied/queued), `max_occupancy` (1-3), `claimed_by TEXT[]`, `queued_by`, `queued_at`, `map_x`, `map_y`, `lead_names` | `007`, `008`, `009` (queued_at), `015` (lead_names) |
-| `bootstrap_volunteers` | `username`, `password_hash`, `display_name`, `current_session_token`, `role`, `suggested_stall_id`, `checkin_token`, `login_code`, `phone`, `srn`, `group_number`, `in_classroom`, `created_at` | `007`, `009`, `014` (role), `015` (checkin_token), `016` (self-register fields) |
+| `bootstrap_volunteers` | `username`, `password_hash`, `display_name`, `current_session_token`, `role`, `suggested_stall_id`, `checkin_token`, `login_code`, `phone`, `srn`, `group_number`, `in_classroom`, `created_at`, `preferred_stall_name`, `switch_requested_stall_id`, `switch_requested_at` | `007`, `009`, `014` (role), `015` (checkin_token), `016` (self-register fields), `021` (nullable session_id + preferred_stall_name), `025` (switch request pair) |
 | `bootstrap_groups` | `name`, `team_lead_id`, `created_at` | `014` |
 | `bootstrap_visitors` | `name`, `prn`, `phone`, `group_id`, `arrived_at` | `014` |
 | `bootstrap_feedback` | `stall_id`, `rating` (1-5 per-stall), `comment` (legacy), `overall_rating` (1-10), `memorable_stall`, `join_likelihood`, `suggestions`, `submitted_at` | `014`, `017` |
@@ -647,6 +692,14 @@ Notes:
 - `claimed_by` is a Postgres `TEXT[]`, mutated only in SQL via `array_append` /
   `array_remove` / `string_to_array`; a JS array is never passed as a driver
   parameter.
+- `session_id` is **nullable** since migration `021`. A NULL means
+  "pre-registration pool member": they have an account, cannot log in yet, and
+  an admin assigns them later. `UNIQUE(session_id, username)` does NOT
+  constrain pool rows, because Postgres treats NULLs as distinct ∙ the
+  one-account-per-SRN rule for the pool is enforced in application code
+  (`getPoolVolunteerBySrn`), not by the database.
+- Deleting a session still cascades to its assigned volunteers while pool
+  members survive, which is why the `ON DELETE CASCADE` was left untouched.
 
 ---
 

@@ -96,7 +96,7 @@ export default function BootstrapFeedback({
       }
       setDone(true);
     } catch {
-      setError("Request failed — check your connection.");
+      setError("Request failed ∙ check your connection.");
     } finally {
       setBusy(false);
     }

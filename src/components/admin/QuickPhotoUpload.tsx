@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 /* One-click photo upload for the /admin/team list: uploads to R2 under a
-   timestamped key (R2 objects are immutable — never overwrite), then
+   timestamped key (R2 objects are immutable ∙ never overwrite), then
    PATCHes just { id, photo_url }. Skips the full edit form entirely. */
 
 interface Props {

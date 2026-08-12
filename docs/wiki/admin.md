@@ -1,16 +1,44 @@
 # Admin System
 
+_Current as of Session 72D (2026-08-12)._
+
 The admin panel is the protected back-office for the Team Vegavath site.
 It lives under `/admin`, is guarded by NextAuth v5 (beta) plus middleware,
-and is wrapped in the `AdminShell` chrome (sidebar nav on desktop, an
-overlay menu on mobile). This guide describes the auth model, the two
-account types, the invite and password-reset flows, every admin page, and
-the login audit log.
+and is wrapped in the `AdminShell` chrome (collapsible sidebar nav on
+desktop, an overlay menu on mobile). This guide describes the auth model,
+the three account roles, the invite and password-reset flows, every admin
+page, and the login audit log.
 
 All claims below are taken from the code as it stands: `src/lib/auth.ts`,
 `src/lib/services/admin.ts`, `src/middleware.ts`, the `(admin)` route group,
 the token-gated public pages, the account API routes, and migrations 006,
-010, and 012.
+010, 012, 019 and 020.
+
+## The three roles, and the counter-intuitive part
+
+There are three roles: `godfather`, `admin`, and `viewer` (the last added in
+migration 019). A role is exactly one of the three.
+
+**`session.user.isAdmin` is TRUE for viewers, and that is deliberate.** It
+means "may enter the admin panel", and every admin page and every admin GET
+route gates on it. Viewers are supposed to read everything -- that is the
+entire point of the tier -- so making `isAdmin` false for them would lock
+them out of the panel completely. Do not "fix" it.
+
+The write gate is a **separate** flag, `isViewer`, checked immediately after
+the `isAdmin` check in every mutating route, and used to hide write controls
+in the UI (each table takes an optional `isViewer?: boolean` defaulting to
+false, so existing callers are unaffected).
+
+**The rule for anyone adding a route: every new mutating admin handler needs
+the viewer guard.** Forgetting it is a silent privilege escalation, not a
+build error. The only legitimate omissions are the godfather-only account
+handlers (`isGodfather && isViewer` is impossible, so the check would be dead
+code) and the public token-gated routes, which have no session at all.
+
+One judgement call worth knowing: the Bootstrap feedback *summarize* endpoint
+writes nothing to the database but spends paid Gemini quota, so it is gated
+with the writes rather than with the reads.
 
 ## Auth system overview
 
@@ -296,14 +324,44 @@ mode="create"`) and shows all sponsors with `InlineDelete`. The edit page
 edits a single sponsor. `is_active` controls whether a sponsor counts toward
 the dashboard's "Active Sponsors" stat and appears publicly.
 
+### `/admin/posts`, `/admin/posts/new`, `/admin/posts/[id]/edit` -- Posts
+
+Blog post manager backing `/posts`. Markdown body, draft/publish toggle, a
+published-date field, and a thumbnail upload through `FileUploadField`.
+
+Two things to know before editing this code. The slug is generated **on create
+only**, so published URLs stay stable when a title is later edited. And the
+update path uses the read-then-write shape rather than
+`COALESCE(${value ?? null}, column)`, because posts have columns an admin must
+be able to CLEAR and COALESCE can never write a NULL back. `posts.ts` is the
+reference implementation for both.
+
+### `/admin/profile` -- Profile
+
+The signed-in admin's own account record (display name, mobile number, password
+change), backed by `GET`/`PATCH /api/admin/accounts/me`.
+
+### `/admin/qr` -- QR generator
+
+Generates QR codes for the site's public route pages. The dropdown is driven by
+the shared `src/types/routes.ts` list. That file exists precisely so a client
+component can share the route list **without** importing a service -- a value
+import from `src/lib/services/*` drags `lib/db.ts` and the Neon driver into the
+browser bundle, where db.ts's module-level `DATABASE_URL` check throws.
+
 ### `/admin/settings` -- Settings
 
 Edits the `site_settings` key/value store via `SettingsForm`. The
 `SiteSettings` shape covers `recruitment_open`, `maintenance_mode`,
 `maintenance_message`, `contact_email`, `contact_phone`, `contact_address`,
-`instagram_url`, `linkedin_url`, and `github_url`. The `maintenance_mode`
-toggle here is what the middleware reads to rewrite the public site to
-`/maintenance`.
+`instagram_url`, `linkedin_url`, `github_url`, and `f1_enabled`. The
+`maintenance_mode` toggle here is what the middleware reads to rewrite the
+public site to `/maintenance`; `f1_enabled` is the kill switch for every `/f1`
+page, and a missing row reads as OFF by design.
+
+A read-only "Recent Applications" table also still lives on this page. It is
+superseded by `/admin/applications`; removing it needs a decision, so it is
+flagged rather than deleted.
 
 ### `/admin/accounts` -- Accounts
 

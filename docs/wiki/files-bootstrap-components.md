@@ -1,5 +1,12 @@
 # Bootstrap Components
 
+_Current as of Session 72D (2026-08-12). The S72B/S72C correctness pass changed
+`StallVolunteerView` substantially: the full stall picker was removed (a net
+deletion) and replaced by a switch-request picker, so a stall volunteer is
+locked to their assigned stall. `pickerOpen` and `otherStalls` are the
+switch-request state; there is no `myStallId` and no `useEffect` left in that
+component. See `docs/wiki/bootstrap.md` for the flow._
+
 A file-by-file reference for every React component under
 `src/components/bootstrap/`, drawn directly from the source. For how these
 pieces fit into the wider event-day system (sessions, auth, the service layer,

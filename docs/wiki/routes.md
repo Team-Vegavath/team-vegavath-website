@@ -1,5 +1,7 @@
 # All Routes
 
+_Current as of Session 72D (2026-08-12)._
+
 Complete inventory of every page and API route in the Team Vegavath
 Next.js 16 App Router repo.
 
@@ -13,6 +15,12 @@ paths through with no session -- `/admin/invite/*`, `/api/admin/register`,
 and every `/api/admin/*` behind a NextAuth session, redirecting to
 `/admin` when absent. Bootstrap routes (`/bootstrap/*`,
 `/api/bootstrap/*`) are never touched by middleware.
+
+A fourth middleware job was added in S52B: `/docs/*` sits behind a
+shared-secret cookie gate (`DOCS_PASSWORD`), checked **before** the admin
+gate. It **fails OPEN when the env var is unset** -- if `DOCS_PASSWORD` goes
+missing in Vercel the docs are public again with no error and no signal, and
+the robots disallow is the only remaining layer.
 
 Two extra layers matter:
 - **Admin API routes re-check `session.user.isAdmin` in-route** even
@@ -44,6 +52,24 @@ Public events listing. File: src/app/(public)/events/page.tsx. Auth: public.
 ## GET /events/[slug]
 Public single-event detail page (lightbox + YouTube embeds). File: src/app/(public)/events/[slug]/page.tsx. Auth: public.
 
+## GET /events/[slug]/register
+Native event registration form (S47), replacing the old external Google Form link. Only reachable for `hackathons` and `competitions` categories; 404 for other slugs, closed message when the event's `registration_open` flag is off. File: src/app/(public)/events/[slug]/register/page.tsx. Auth: public.
+
+## GET /posts
+Public blog listing. Category filter is a `?category=` searchParam, so each category is its own linkable, cacheable URL (which is also why the page reports dynamic). File: src/app/(public)/posts/page.tsx. Auth: public.
+
+## GET /posts/[slug]
+Single post. Markdown body rendered through the shared DocsContent map; optional source link for content cross-posted from LinkedIn. File: src/app/(public)/posts/[slug]/page.tsx. Auth: public.
+
+## GET /f1
+F1 stats index: next race, driver and constructor standings, last race, calendar. File: src/app/(public)/f1/page.tsx. Auth: public. Gated by the `site_settings.f1_enabled` kill switch; `revalidate = 60` is the kill-switch response time, NOT a freshness setting.
+
+## GET /f1/drivers, /f1/drivers/[driverId], /f1/circuits, /f1/seasons
+Remaining F1 pages, all under the same kill switch and the same `revalidate = 60`. `/f1/seasons` is deliberately N+1 (one champion lookup per season) and capped at the most recent 30. Auth: public.
+
+## GET /projects, /projects/kart, /projects/combat-bot
+Project index plus per-project build pages. File: src/app/(public)/projects/*. Auth: public.
+
 ## GET /gallery
 Public photo gallery with lightbox. File: src/app/(public)/gallery/page.tsx. Auth: public.
 
@@ -63,10 +89,13 @@ Public legal / license page. File: src/app/(public)/legal/page.tsx. Auth: public
 Maintenance splash shown via middleware rewrite when the toggle is on. File: src/app/maintenance/page.tsx. Auth: public.
 
 ## GET /docs
-Docs index. File: src/app/(docs)/docs/page.tsx. Auth: public (not middleware-gated).
+Docs index. File: src/app/(docs)/docs/page.tsx. Auth: **docs password cookie** (S52B) -- gated in middleware, fails OPEN when `DOCS_PASSWORD` is unset.
 
 ## GET /docs/[slug]
-Single docs article by slug. File: src/app/(docs)/docs/[slug]/page.tsx. Auth: public.
+Single docs article by slug. Nav order comes from src/lib/docs-config.ts; a file added to docs/wiki/ is not surfaced until it is registered there. File: src/app/(docs)/docs/[slug]/page.tsx. Auth: docs password cookie.
+
+## GET /docs/login
+Password entry page for the docs gate. Lives at src/app/docs/login/page.tsx, OUTSIDE the `(docs)` route group on purpose: a nested layout.tsx nests inside DocsLayout rather than replacing it, so a page under `(docs)/docs/` cannot escape the sidebar. Do not move it. Auth: public.
 
 **Admin pages (AdminShell, admin session)**
 
@@ -94,6 +123,15 @@ Admin gallery manager (bulk upload). File: src/app/(admin)/admin/gallery/page.ts
 ## GET /admin/milestones
 Admin milestones manager. File: src/app/(admin)/admin/milestones/page.tsx. Auth: admin session.
 
+## GET /admin/posts, /admin/posts/new, /admin/posts/[id]/edit
+Blog post manager (markdown body, draft/publish, thumbnail upload, published-date field). Slug is auto-generated on create only, so published URLs stay stable across edits. Files: src/app/(admin)/admin/posts/*. Auth: admin session.
+
+## GET /admin/profile
+Signed-in admin's own profile page (S67). File: src/app/(admin)/admin/profile/page.tsx. Auth: admin session.
+
+## GET /admin/qr
+QR-code generator for the site's public route pages (S72C). Dropdown is driven by the shared src/types/routes.ts list -- that file exists precisely so a client component can share the route list without importing a service and dragging the Neon driver into the browser bundle. File: src/app/(admin)/admin/qr/page.tsx. Auth: admin session.
+
 ## GET /admin/settings
 Admin site settings (maintenance toggle etc.). File: src/app/(admin)/admin/settings/page.tsx. Auth: admin session.
 
@@ -116,6 +154,9 @@ Bootstrap event-day operations console (sessions, groups, stalls, map, visitors)
 
 ## GET /admin/invite/[name]/[token]
 Invite acceptance / account-setup page. File: src/app/admin/invite/[name]/[token]/page.tsx. Auth: token-gated (middleware lets `/admin/invite/*` bypass session; the one-time token is the gate, S27).
+
+## GET /admin/register
+Open viewer-invite registration page (S48). One reusable link, 30-day expiry, always role `viewer`, still approved per person. The open token is deliberately **never consumed**: registering through it inserts a fresh named row rather than updating the token, so the link stays reusable. File: src/app/admin/register/page.tsx. Auth: token-gated.
 
 ## GET /admin/[username]/credentials/[token]
 Password-reset / credentials page. File: src/app/admin/[username]/credentials/[token]/page.tsx. Auth: token-gated (middleware regex `/admin/<username>/credentials/` bypasses session, S29).
@@ -156,12 +197,21 @@ Returns public team members. File: src/app/api/team/route.ts. Auth: public.
 ## POST /api/join
 Submits a recruitment application. File: src/app/api/join/route.ts. Auth: public.
 
+## POST /api/events/[slug]/register
+Native event registration (S47). Validates against real state: unknown event 404s, closed registration 409s, and a duplicate email 409s matched case-insensitively so `A@x.com` cannot re-register as `a@x.com`. File: src/app/api/events/[slug]/register/route.ts. Auth: public.
+
+## POST /api/docs/auth
+Exchanges the shared `DOCS_PASSWORD` secret for the docs cookie (S52B). Never log or hardcode the value. File: src/app/api/docs/auth/route.ts. Auth: public.
+
 ---
 
 # API -- Admin accounts
 
 ## GET /api/admin/accounts
 Lists admin accounts plus pending requests (never returns password hashes). File: src/app/api/admin/accounts/route.ts. Auth: admin session.
+
+## GET, PATCH /api/admin/accounts/me
+The signed-in admin's own account record, backing /admin/profile. File: src/app/api/admin/accounts/me/route.ts. Auth: admin session.
 
 ## DELETE /api/admin/accounts
 Deletes an admin account by `?id=` (refuses the last remaining admin). File: src/app/api/admin/accounts/route.ts. Auth: godfather-only.
@@ -265,6 +315,18 @@ Deletes a team member. File: src/app/api/admin/team/route.ts. Auth: admin sessio
 ## POST /api/admin/import/team
 Bulk-imports team members. File: src/app/api/admin/import/team/route.ts. Auth: admin session.
 
+## PATCH /api/admin/team/reorder
+Persists drag-to-reorder ordering within a tier. File: src/app/api/admin/team/reorder/route.ts. Auth: admin session.
+
+## GET, POST /api/admin/posts
+Lists and creates blog posts. Slug is generated on create only, so published URLs stay stable. File: src/app/api/admin/posts/route.ts. Auth: admin session.
+
+## PATCH, DELETE /api/admin/posts/[id]
+Updates or deletes a post. Uses the read-then-write shape rather than `COALESCE(${value ?? null}, column)`, because a post has columns the admin must be able to CLEAR and COALESCE can never write a NULL back. File: src/app/api/admin/posts/[id]/route.ts. Auth: admin session.
+
+## PATCH, DELETE /api/admin/events/[id]/registrations/[regId]
+Updates the status of, or deletes, one event registration. File: src/app/api/admin/events/[id]/registrations/[regId]/route.ts. Auth: admin session.
+
 ## GET /api/admin/milestones
 Lists milestones. File: src/app/api/admin/milestones/route.ts. Auth: admin session.
 
@@ -338,6 +400,18 @@ Sets / clears an admin suggestion for a volunteer. File: src/app/api/admin/boots
 ## PATCH /api/admin/bootstrap/volunteers/[id]/unlock
 Unlocks a volunteer's session (releases a claimed login). File: src/app/api/admin/bootstrap/volunteers/[id]/unlock/route.ts. Auth: admin session.
 
+## PATCH /api/admin/bootstrap/volunteers/[id]/assign
+Assigns a pre-registration pool member (NULL `session_id`) to a session. One-way door: the service guards on `WHERE ... AND session_id IS NULL`, so a double-assign is a 409 rather than a silent move. File: src/app/api/admin/bootstrap/volunteers/[id]/assign/route.ts. Auth: admin session.
+
+## PATCH /api/admin/bootstrap/volunteers/[id]/reset-code
+Regenerates a volunteer's plaintext login code (S55C). File: src/app/api/admin/bootstrap/volunteers/[id]/reset-code/route.ts. Auth: admin session.
+
+## PATCH /api/admin/bootstrap/volunteers/[id]/switch-request
+Approves or denies a stall volunteer's switch request, `{action: "approve"|"deny"}` (S72C). File: src/app/api/admin/bootstrap/volunteers/[id]/switch-request/route.ts. Auth: admin session.
+
+## POST, DELETE /api/admin/bootstrap/sessions/[id]/stalls
+Adds or removes stalls on a live session. File: src/app/api/admin/bootstrap/sessions/[id]/stalls/route.ts. Auth: admin session.
+
 ---
 
 # API -- Bootstrap public
@@ -362,6 +436,9 @@ Updates a stall (volunteer-facing edits). File: src/app/api/bootstrap/stalls/[id
 
 ## POST /api/bootstrap/checkin/[token]
 Checks a visitor into a group via the lead's per-lead QR token (enforces group capacity). File: src/app/api/bootstrap/checkin/[token]/route.ts. Auth: token-gated public (S33).
+
+## POST /api/bootstrap/switch-request
+A stall volunteer raises a request to move to a different stall (S72C, migration 025). Stall volunteers are locked to their assigned stall, so this plus the admin approve/deny route is the only way they move. File: src/app/api/bootstrap/switch-request/route.ts. Auth: bootstrap cookie.
 
 ## PATCH /api/bootstrap/classroom
 Updates the logged-in volunteer's classroom assignment. File: src/app/api/bootstrap/classroom/route.ts. Auth: bootstrap cookie.

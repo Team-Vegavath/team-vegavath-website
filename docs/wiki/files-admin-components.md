@@ -1,5 +1,7 @@
 # Admin Components
 
+_Current as of Session 72D (2026-08-12)._
+
 Per-file reference for every React component under `src/components/admin/`.
 These are the client-side building blocks the `(admin)` pages compose: forms,
 tables, upload widgets, toggles, and the sidebar chrome. For the auth model,
@@ -44,6 +46,10 @@ Two conventions recur throughout and are stated once here:
 - [SponsorForm.tsx](#sponsorformtsx)
 - [ToggleEventStatusButton.tsx](#toggleeventstatusbuttontsx)
 - [ToggleSwitch.tsx](#toggleswitchtsx)
+- [Components added after the original sweep (S47-S72C)](#components-added-after-the-original-sweep-s47-s72c)
+  -- AdminPageHeader, AdminStatCard, AdminProfileForm, CommandPalette,
+  CopyButton, EventRegistrationsTable, PostForm, QRGenerator, SponsorsTable,
+  TeamMembersTable, StatefulButton
 
 ## AccountsActions.tsx
 
@@ -943,3 +949,59 @@ buttons that fit the editorial aesthetic (no rounded corners) and are keyboard-
 and screen-reader-usable. Being controlled and stateless, it drops into any form
 that owns the boolean; in `SettingsForm` a hidden input carries its value into
 the server action.
+
+---
+
+## Components added after the original sweep (S47-S72C)
+
+The entries above were written against an earlier snapshot. The components
+below exist on disk and were not covered. Each entry is deliberately short:
+one line on what it is, plus anything non-obvious a maintainer would trip on.
+
+### AdminPageHeader.tsx
+Shared page title + action-slot header for admin pages. Introduced during the
+admin chrome pass so every page stops hand-rolling its own heading block.
+Reuse it rather than adding another title layout.
+
+### AdminStatCard.tsx
+The dashboard stat tile (label, value, optional trend). Pairs with
+`AdminPageHeader` as part of the same chrome vocabulary.
+
+### AdminProfileForm.tsx
+Form behind `/admin/profile`. Edits the signed-in admin's own record via
+`GET`/`PATCH /api/admin/accounts/me` -- display name, mobile number, password.
+
+### CommandPalette.tsx
+Keyboard-driven navigation over the admin routes.
+
+### CopyButton.tsx
+Extracted copy-to-clipboard button, used for invite links and gallery URLs.
+Note the known duplicate: `AccountsActions.tsx` still contains an unexported
+`CopyLinkButton` that does the same job and was left un-refactored. Prefer this
+component; folding the other one in is an open cleanup.
+
+### EventRegistrationsTable.tsx
+Per-event registration list with a status dropdown, backed by
+`PATCH`/`DELETE /api/admin/events/[id]/registrations/[regId]`. Takes the
+optional `isViewer` prop, so write controls disappear for the read-only tier.
+
+### PostForm.tsx
+Create/edit form for blog posts: markdown body, draft/publish, published-date
+field, thumbnail upload via `FileUploadField`. The slug is generated on create
+only, so editing a title never breaks a published URL.
+
+### QRGenerator.tsx
+Client component behind `/admin/qr`. Builds QR codes for the site's public
+routes from the shared `src/types/routes.ts` list. That list lives in
+`src/types/` and not in a service on purpose: a value import from
+`src/lib/services/*` would drag `lib/db.ts` and the Neon driver into the
+browser bundle, where db.ts's module-level `DATABASE_URL` check throws.
+
+### SponsorsTable.tsx / TeamMembersTable.tsx
+Extracted list tables for sponsors and team members. `TeamMembersTable` carries
+drag-to-reorder within a tier, an inline active toggle, and a per-row quick
+photo upload. Both accept `isViewer` to hide write controls.
+
+### StatefulButton.tsx
+Save button with idle / saving / saved states, wired into the admin save paths
+so a submit gives immediate feedback instead of appearing inert.

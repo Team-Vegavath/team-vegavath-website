@@ -1,5 +1,20 @@
 # API Routes
 
+_Current as of Session 72D (2026-08-12). This per-handler reference was written
+against an earlier snapshot and does not yet cover every handler added since:
+`/api/admin/accounts/me`, `/api/admin/posts` (+ `[id]`), `/api/admin/team/reorder`,
+`/api/admin/events/[id]/registrations/[regId]`,
+`/api/admin/bootstrap/sessions/[id]/stalls`,
+`/api/admin/bootstrap/volunteers/[id]/{assign,reset-code,switch-request}`,
+`/api/bootstrap/switch-request`, `/api/events/[slug]/register`, and
+`/api/docs/auth`. **`docs/wiki/routes.md` is complete and verified against the
+filesystem (all 60 API routes), so treat it as authoritative for the
+inventory** and this file as the deeper per-handler notes.
+
+Standing rule for any handler added here: a mutating admin route needs the
+`isViewer` write guard immediately after the `isAdmin` check. Omitting it is a
+silent privilege escalation, not a build error._
+
 Per-handler reference for every `route.ts` under `src/app/api`, documented
 from source. Each entry lists the exact auth check, request/response
 shapes, and status codes as they appear in the code. For a flat one-line

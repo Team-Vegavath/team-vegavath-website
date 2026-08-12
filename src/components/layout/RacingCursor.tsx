@@ -13,7 +13,7 @@ export function RacingCursor({ enabled }: { enabled: boolean }) {
     setMounted(true);
     // Any touch capability counts: Samsung/One UI devices with S Pen or DeX
     // support can report a fine primary pointer, and hiding the cursor there
-    // suppresses taps — so require a genuinely mouse-only environment.
+    // suppresses taps ∙ so require a genuinely mouse-only environment.
     setIsTouch(
       window.matchMedia("(pointer: coarse), (hover: none)").matches ||
         navigator.maxTouchPoints > 0

@@ -8,9 +8,11 @@ Stack: Next.js 16 (App Router, TypeScript strict) on Vercel, Neon Postgres,
 Cloudflare R2 for media, NextAuth v5 for admin auth, and Google Gemini for
 AI summaries.
 
+_Current as of Session 72D (2026-08-12)._
+
 Note on env var naming: the code uses `R2_*` variable names. Any
-`CLOUDFLARE_*` names you may see in the older README are stale -- follow the
-names in this guide and in the code, not the README.
+`CLOUDFLARE_*` names you may see in older docs are stale -- follow the
+names in this guide and in the code.
 
 ## 1. Prerequisites
 
@@ -88,6 +90,7 @@ R2 client is built in `src/lib/r2.ts`; the public hostname is also used by
 | Variable | Purpose | Where to get it |
 | --- | --- | --- |
 | `NEXT_PUBLIC_MAINTENANCE_MODE` | Emergency override in `src/middleware.ts`. When set to the string `true`, all public pages rewrite to `/maintenance` regardless of DB state. Optional -- omit or set anything other than `true` for normal operation. | You set it. Normal DB-driven maintenance is toggled from the admin panel (`site_settings` key `maintenance_mode`); this env flag is the last resort when the DB is down. |
+| `DOCS_PASSWORD` | Shared secret gating `/docs`, enforced in `src/middleware.ts` and `/api/docs/auth`. **WARNING: `/docs` FAILS OPEN when this is unset.** If it goes missing in Vercel the documentation is public again with no error and no signal -- the robots disallow is the only remaining layer. Never hardcode or log the value. | You choose it. Set it in Vercel for every environment you deploy. |
 
 Note: `NODE_ENV` is also referenced in code but is set automatically by
 Next.js and Vercel (`development` locally, `production` on deploy). Do not

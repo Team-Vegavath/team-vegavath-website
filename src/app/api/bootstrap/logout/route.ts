@@ -12,7 +12,7 @@ export async function POST() {
   } catch (error) {
     console.error("[POST /api/bootstrap/logout]", error);
   }
-  // idempotent — always clear the cookie and return 200
+  // idempotent ∙ always clear the cookie and return 200
   const cookieStore = await cookies();
   cookieStore.delete(VOLUNTEER_COOKIE);
   return NextResponse.json({ ok: true });

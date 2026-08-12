@@ -1,5 +1,7 @@
 # Middleware and Config
 
+_Current as of Session 72D (2026-08-12)._
+
 Reference for the Edge middleware, the Next.js build config, and the shared TypeScript type definitions that describe the site's data model.
 
 ## src/middleware.ts

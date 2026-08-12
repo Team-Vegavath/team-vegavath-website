@@ -60,7 +60,7 @@ export async function createMembersBulk(
   if (inputs.length === 0) return { inserted: 0, skipped: 0 };
 
   // team_members has no unique constraint on name (001_initial_schema.sql),
-  // so ON CONFLICT (name) would throw — dedupe by pre-checking existing names.
+  // so ON CONFLICT (name) would throw ∙ dedupe by pre-checking existing names.
   const existing = await sql`SELECT name FROM team_members`;
   const existingNames = new Set(existing.map((row) => (row as { name: string }).name));
 

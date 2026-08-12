@@ -1,5 +1,14 @@
 # Pages
 
+_Current as of Session 72D (2026-08-12). This per-file reference was written
+against an earlier snapshot and does not yet describe every page added since:
+`/posts`, `/posts/[slug]`, the five `/f1` pages, `/projects` and its two
+project pages, `/events/[slug]/register`, `/admin/posts*`, `/admin/profile`,
+`/admin/qr`, `/admin/register`, and `/docs/login`. **`docs/wiki/routes.md` is
+complete and verified against the filesystem (all pages and all 60 API routes),
+so treat it as authoritative for the inventory** and this file as the deeper
+per-file notes for the pages it does cover._
+
 Per-file reference for every Next.js App Router page, layout, and
 special file in the Team Vegavath repo. Documents route, rendering
 mode, data fetching, auth, child components, and any non-delegated

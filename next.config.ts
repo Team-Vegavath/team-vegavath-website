@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
     deviceSizes: [384, 768, 1200],
     // Cache each transformed image on Vercel's CDN for 1 year. Once a given
     // (image, size, format) is transformed it is served from cache indefinitely
-    // — 1000 students loading the same photo cost a single transformation.
+    // ∙ 1000 students loading the same photo cost a single transformation.
     minimumCacheTTL: 31536000, // 60 * 60 * 24 * 365
   },
   // No ignoreBuildErrors. No ignoreDuringBuilds. Ever.

@@ -50,17 +50,17 @@ export default function BootstrapLogin() {
         return;
       }
       if (res.status === 409) {
-        setError("ACCOUNT IN USE — ASK ADMIN TO UNLOCK");
+        setError("ACCOUNT IN USE ∙ ASK ADMIN TO UNLOCK");
       } else {
         const data = await res.json().catch(() => null);
         setError(
           data?.error === "No active session"
-            ? "NO ACTIVE SESSION — ASK ADMIN"
+            ? "NO ACTIVE SESSION ∙ ASK ADMIN"
             : "INVALID CREDENTIALS"
         );
       }
     } catch {
-      setError("CONNECTION FAILED — TRY AGAIN");
+      setError("CONNECTION FAILED ∙ TRY AGAIN");
     } finally {
       setBusy(false);
     }

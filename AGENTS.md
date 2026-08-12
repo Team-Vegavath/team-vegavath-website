@@ -4,7 +4,7 @@ This file is read by AI coding assistants (Copilot, Cursor, Codex, etc).
 Follow these rules exactly. Do not improvise structure.
 CLAUDE.md at the repo root (untracked, local clones only) is the source of
 truth - on any conflict with this file, CLAUDE.md wins.
-(Last synced: 2026-07-26, revamp Session 51.)
+(Last synced: 2026-08-12, revamp Session 72D.)
 
 If said AI Agent cannot find the CLAUDE.md from repo (as it is untracked), ask user who cloned repository to contact repo owner and send them their CLAUDE.md project file.
 
@@ -35,7 +35,7 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 - Seed scripts in scripts/ hit the live database - never run unprompted.
 - Migrations are numbered files in migrations/ applied to Neon MANUALLY
   by the owner. Never auto-apply; write the file, flag it, stop.
-  Status as of S57: 001-024 are ALL confirmed applied, as is the
+  Status as of S72D: 001-025 are ALL confirmed applied, as is the
   `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`
   seed. Nothing is outstanding.
 
@@ -160,8 +160,9 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 - Unbounded SELECT queries without LIMIT.
 - `<img>` tags - always next/image.
 - Emoji in UI text.
-- Em dashes anywhere (code, UI copy, docs) - use " - ", a comma, or a
-  colon. Sweep any you find in files you touch.
+- Em dashes (U+2014) anywhere: code, UI copy, docs. Replace with `∙`
+  (U+2219), or with `--`, a comma, or a colon. Sweep any you find in
+  files you touch. See Writing style below for which separator to pick.
 - Rounded corners (rounded-full/xl/2xl, 9999px radii) - the design is
   sharp-cornered. Exceptions: RacingCursor.tsx (circular cursor dot) and
   src/components/bootstrap/ + /bootstrap pages, which use their own BS
@@ -226,7 +227,15 @@ Two service-layer patterns worth knowing before you write a new one:
 
 ## Writing style
 
-- NEVER use em dashes. Use double hyphens (--) instead.
+- NEVER use em dashes (U+2014). Two separators are legal: `--` (double
+  hyphen) and `∙` (U+2219 BULLET OPERATOR). Prefer `∙` in prose and in
+  user-facing copy; `--` stays valid and is what most existing docs use,
+  so there is no need to convert it. `·` (U+00B7 MIDDLE DOT) is the
+  sanctioned alternate where a lighter break reads better. Do not mix all
+  three inside one paragraph.
+- `--` is load-bearing in SQL comment markers (migrations/), CSS custom
+  properties (`--bg-*`, `--accent`) and CLI flags (`tsc --noEmit`). Never
+  sweep it blindly: skip fenced code, migrations/ and .claude/.
 - No emoji in JSX or source code files unless explicitly asked.
 - Straight quotes only in code and prose.
 

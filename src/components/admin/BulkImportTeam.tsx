@@ -16,7 +16,7 @@ const EXPECTED_HEADER = [
 
 const TEMPLATE_CSV =
   "name,role,tier,domain,quote,linkedin_url,github_url,display_order\n" +
-  // "Programming" per the team_members CHECK constraint — "Coding" is only
+  // "Programming" per the team_members CHECK constraint ∙ "Coding" is only
   // valid for the applications table.
   "Example Name,Member,crew,Programming,,https://linkedin.com/in/example,https://github.com/example,0";
 
@@ -151,7 +151,7 @@ export default function BulkImportTeam() {
       const data = await res.json();
 
       if (!res.ok) {
-        const details = Array.isArray(data.details) ? ` — ${data.details.join(" · ")}` : "";
+        const details = Array.isArray(data.details) ? ` ∙ ${data.details.join(" · ")}` : "";
         setErrorMsg(`${data.error ?? "Import failed"}${details}`);
         setStatus("error");
         return;
@@ -160,7 +160,7 @@ export default function BulkImportTeam() {
       setResult(data as ImportResult);
       setStatus("done");
     } catch {
-      setErrorMsg("Network error — import may not have completed.");
+      setErrorMsg("Network error ∙ import may not have completed.");
       setStatus("error");
     }
   }

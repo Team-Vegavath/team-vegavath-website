@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { createMembersBulk } from "@/lib/services/team";
 import type { CreateMemberInput } from "@/types/member";
 
-// Valid values — must match the team_members CHECK constraints in
+// Valid values ∙ must match the team_members CHECK constraints in
 // migrations/001_initial_schema.sql exactly.
 const VALID_TIERS = ["core", "crew", "legacy"] as const;
 const VALID_DOMAINS = [
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 
   if (rows.length - 1 > MAX_ROWS) {
     return NextResponse.json(
-      { error: `Too many rows — max ${MAX_ROWS} per import` },
+      { error: `Too many rows ∙ max ${MAX_ROWS} per import` },
       { status: 400 }
     );
   }

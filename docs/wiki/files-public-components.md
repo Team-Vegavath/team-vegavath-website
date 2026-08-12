@@ -1,5 +1,7 @@
 # Public Components
 
+_Current as of Session 72D (2026-08-12)._
+
 Per-file reference for the public and shared React components of the Team
 Vegavath website (Next.js 16 App Router, TypeScript strict). These are the
 components that render the public-facing pages (home, about, events, gallery,
@@ -900,3 +902,91 @@ with no dedicated crew components.** Any crew UI is rendered directly by the
 crew route/page rather than by components under this directory. The empty
 directory is likely a leftover placeholder and could be removed, but that is a
 cleanup decision for a human, not part of this documentation task.
+
+---
+
+## Components added after the original sweep (S47-S72C)
+
+The entries above were written against an earlier snapshot. The components
+below exist on disk and were not covered. Each entry is short by design: what
+it is, plus anything non-obvious.
+
+### events/EventRegisterForm.tsx
+The native event registration form behind `/events/[slug]/register`, which
+replaced the old external Google Form link. Validation lives server-side:
+unknown event 404s, closed registration 409s, duplicate email 409s matched
+case-insensitively.
+
+### posts/InstagramEmbed.tsx
+Renders an Instagram post embed inside a blog post body.
+
+### f1/F1Nav.tsx, f1/F1Table.tsx, f1/F1Paused.tsx
+The F1 section's shared chrome: sub-navigation across the five `/f1` pages, the
+table primitive the standings and calendar render into, and the "paused" panel
+shown when the `f1_enabled` kill switch is off. `F1Paused` is what a visitor
+sees whenever the setting is missing or not exactly `'true'` -- a missing row
+reads as OFF by design.
+
+### legal/LegalShell.tsx
+Sidebar table-of-contents shell for the legal pages.
+
+### docs/DocsShell.tsx
+Layout shell for the in-app docs site, pairing with `DocsSidebar` and
+`DocsContent`. Nav order comes from `src/lib/docs-config.ts`, not from the
+filesystem.
+
+### home/HeroKart.tsx, home/HeroKartWrapper.tsx
+The real GLB go-kart on the homepage hero, with a scroll-driven camera revolve.
+The model was compressed from 9MB to 252KB -- do not swap in an uncompressed
+GLB. As with `KartModelWrapper`, this renders on **all** viewports; the mobile
+placeholder was removed deliberately and must not be reintroduced.
+
+### home/ProjectsTeaser.tsx
+Homepage teaser linking into `/projects`, populated dynamically rather than
+from a hardcoded list.
+
+### home/TypewriterSubtitle.tsx
+Typewriter animation for the hero tagline.
+
+### ui/spotlight.tsx
+CSS-only hero spotlight. Deliberately a **server** component -- it needs no
+client JS, so keep it that way rather than adding `"use client"` for
+convenience.
+
+### ui/ripple.tsx
+Cursor-tracking ripple used on the join CTA and domain cards.
+
+### ui/smooth-cursor.tsx
+The custom cursor, which replaced `RacingCursor`. Note that `RacingCursor.tsx`
+still exists and is the **sole** standing exception to the no-rounded-corners
+rule, because it is a circular cursor dot.
+
+### ui/scroll-progress.tsx
+Scroll progress indicator in the navbar.
+
+### ui/progressive-blur.tsx
+Directional progressive blur, used for the sponsor marquee edge fades. Supports
+a horizontal axis.
+
+### ui/blur-fade.tsx
+Scroll-triggered blur/fade reveal, used across the about page sections.
+
+### ui/hyper-text.tsx
+Scramble-in text effect used on the join headline.
+
+### ui/glyph-matrix.tsx
+Animated glyph backdrop on the admin login split screen.
+
+### ui/interactive-hover-button.tsx
+The shared CTA button with a dot-expand hover, used to make call-to-action
+styling consistent across the public site.
+
+### ui/number-ticker.tsx
+Animated count-up used by the homepage stats.
+
+### ui/ConsentNotice.tsx
+DPDP consent notice shown alongside forms that collect personal data.
+
+Reuse note: this `ui/` set is exactly the "reuse before inventing" surface that
+`CLAUDE.md` calls the number-one failure mode. Check here before writing a new
+reveal, button, cursor, or blur.

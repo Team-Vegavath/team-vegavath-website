@@ -1,5 +1,7 @@
 # Architecture
 
+_Current as of Session 72D (2026-08-12)._
+
 This is the system-level orientation for the Team Vegavath website. Read it
 before touching the codebase. It explains what the app is, why each piece of
 the stack was chosen, how the code is laid out, and the two things most likely
@@ -11,12 +13,13 @@ repo is its official site.
 
 ## 1. System overview
 
-The application is one Next.js 16 project that serves three distinct
+The application is one Next.js 16 project that serves four distinct
 audiences from the same deployment:
 
 - **Public site** -- the marketing and information surface: home, about,
-  events, gallery, crew, sponsors, a multi-step "join" application form, and
-  legal pages. Anonymous visitors, read-mostly, heavily cached.
+  events, gallery, crew, sponsors, a blog at `/posts`, an F1 stats section,
+  per-project build pages at `/projects`, a multi-step "join" application
+  form, and legal pages. Anonymous visitors, read-mostly, heavily cached.
 - **Admin panel** -- a protected back office at `/admin` where club staff
   manage events, gallery media, sponsors, team members, milestones, incoming
   applications, admin accounts, and site settings (including a maintenance
@@ -29,9 +32,22 @@ audiences from the same deployment:
   (`bootstrap_*`), and its own visual palette. Admins configure Bootstrap
   sessions from `/admin/bootstrap`, including an AI feedback summary.
 
-All three share the same database (Neon Postgres), the same media store
+- **Docs site** -- `/docs` renders this documentation in-app from
+  `docs/wiki/*.md`, behind a shared-password cookie gate checked in the same
+  middleware. Nav order comes from `src/lib/docs-config.ts`.
+
+All four share the same database (Neon Postgres), the same media store
 (Cloudflare R2), and the same middleware, but they are otherwise separate
 concerns with separate access control.
+
+There are exactly **two outbound egress points**, and both are deliberate:
+`src/lib/services/f1.ts` calls Jolpica for the F1 section (one choke-point
+helper, null on failure, long revalidate windows, and a DB kill switch that
+reads as OFF when the row is missing), and the Bootstrap feedback summarize
+route calls Google Gemini. The Gemini one predates f1.ts, sits in a route
+rather than a service, and therefore has no kill switch and returns 502
+rather than null. It is the exception to copy away from, not toward. A third
+egress point needs approval.
 
 ## 2. Tech stack and why
 
@@ -98,7 +114,7 @@ src/
   types/                 # TypeScript interfaces only
   middleware.ts          # Maintenance rewrite + admin route protection
 
-migrations/              # Numbered SQL (001-017), applied to Neon MANUALLY
+migrations/              # Numbered SQL (001-025), applied to Neon MANUALLY
 ```
 
 **Architecture contract (enforced):**

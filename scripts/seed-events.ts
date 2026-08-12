@@ -17,7 +17,7 @@ const events = [
 
 An 18-hour IoT overnight hackathon hosted by Team Vegavath in partnership with **Ather Energy**.
 
-Teams of up to 4 members designed and demonstrated a wearable telemetry system mountable on a rider's gear — capturing and visualising movement and ride data in real time using hardware sensors paired with a mobile or web application.
+Teams of up to 4 members designed and demonstrated a wearable telemetry system mountable on a rider's gear ∙ capturing and visualising movement and ride data in real time using hardware sensors paired with a mobile or web application.
 
 ### Prize Pool
 - 1st Prize: ₹16,000
@@ -30,7 +30,7 @@ Teams of up to 4 members designed and demonstrated a wearable telemetry system m
 - **Open to:** All engineering students across EC and RR campuses
 
 ### What Teams Built
-Prototypes combining motion sensing (accelerometer, gyroscope, IMU), GPS tracking, wireless data transfer (BLE/Wi-Fi), and live mobile or web dashboards — all mounted on actual riding gear provided at the event.
+Prototypes combining motion sensing (accelerometer, gyroscope, IMU), GPS tracking, wireless data transfer (BLE/Wi-Fi), and live mobile or web dashboards ∙ all mounted on actual riding gear provided at the event.
 
 Winners received cash prizes, certificates, and an opportunity to intern at Ather Energy.`,
   },
@@ -42,9 +42,9 @@ Winners received cash prizes, certificates, and an opportunity to intern at Athe
     event_date: "2020-02-01",
     registration_open: false,
     cover_image_url: null,
-    description: `## IKC '20 — India Kart Championship 2020
+    description: `## IKC '20 ∙ India Kart Championship 2020
 
-Team Vegavath's participation in the **India Kart Championship 2020** — one of the team's earliest competitive outings on a national stage.
+Team Vegavath's participation in the **India Kart Championship 2020** ∙ one of the team's earliest competitive outings on a national stage.
 
 The team designed, built, and raced a go-kart, competing against teams from engineering colleges across India. IKC '20 marked a defining moment in Vegavath's identity as a hands-on, build-first technical club.
 
@@ -62,7 +62,7 @@ This event laid the foundation for the multi-domain club Vegavath has grown into
 
 Vegavath's flagship annual induction and orientation event, welcoming the incoming batch of students to PESU ECC.
 
-Bootstrap 2025 featured live showcases from **BMW Motorrad** — including the BMW CE 02 electric bike with live ride experiences — and **Mahindra**, presenting their flagship EV lineup. The event gave freshers a first look at the club's domains: Automotive, Robotics, Design, Media, Marketing, Programming, and Operations.
+Bootstrap 2025 featured live showcases from **BMW Motorrad** ∙ including the BMW CE 02 electric bike with live ride experiences ∙ and **Mahindra**, presenting their flagship EV lineup. The event gave freshers a first look at the club's domains: Automotive, Robotics, Design, Media, Marketing, Programming, and Operations.
 
 An evening of demos, domain stalls, and hands-on interactions designed to inspire students to join and contribute to Team Vegavath.`,
   },
@@ -134,7 +134,7 @@ async function seed() {
     inserted++
   }
 
-  console.log(`\n✅ Done! Inserted: ${inserted}  Skipped: ${skipped}`)
+  console.log(`\nDONE. Inserted: ${inserted}  Skipped: ${skipped}`)
 }
 
 seed().catch((e) => { console.error(e); process.exit(1) })

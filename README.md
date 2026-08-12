@@ -1,7 +1,5 @@
 # Team Vegavath Official Website
 
-_Last updated: Session 51 (July 2026)_
-
 The official website for Team Vegavath - the student innovation club of PES University, Electronic City Campus (PESU ECC). A dark, editorial, motorsport-inspired public site plus a protected admin panel, built end-to-end. Deployed on the **teamvegavath** Vercel account and live at **[vegavath.live](https://vegavath.live)**.
 
 ## Tech Stack
@@ -29,10 +27,12 @@ The official website for Team Vegavath - the student innovation club of PES Univ
 - **Crew** - Core, Crew, and Legacy tier display with member cards
 - **Sponsors** - Premium and community partner tiers
 - **Join** - 4-step application form (personal info → up to 3 domain picks → motivation → experience), honeypot anti-spam, apply-once cookie, closed state when recruitment is off
+- **Projects** - `/projects` index plus per-project pages (`/projects/kart`, `/projects/combat-bot`) covering the team's builds
+- **Docs** - `/docs` renders the project's own documentation in-app, behind a shared-password cookie gate (`DOCS_PASSWORD`)
 - **Legal** - Privacy policy and terms of service
 - **404** - Playable canvas F1 mini-game
 - **Maintenance mode** - `NEXT_PUBLIC_MAINTENANCE_MODE=true` rewrites every public route to a static `/maintenance` page (admin and API stay reachable)
-- **Bootstrap** - Standalone live event-day system for the Bootstrap showcase. Volunteers self-register at `/bootstrap/register/{stall,group}` (username = SRN, plaintext login code - no CSVs); the `/bootstrap` dashboard (own cookie auth) has a simple OCCUPIED/FREE toggle for stall volunteers and a full dashboard for group leads (SVG campus map, claim/queue/release, freed-stall notifications, queue wait timers, classroom mode, and a per-lead visitor check-in QR). Visitors check in via that QR (`/bootstrap/checkin/[token]`) and submit a 5-question feedback form at `/bootstrap/feedback`. The `/admin/bootstrap` console manages sessions (2-step create that shows the self-registration URLs), overrides, stall suggestions, visitor/group tables, and a feedback summary with an AI (Gemini) leadership summary
+- **Bootstrap** - Standalone live event-day system for the Bootstrap showcase. Volunteers self-register at `/bootstrap/register/{stall,group}` (username = SRN, plaintext login code - no CSVs); the `/bootstrap` dashboard (own cookie auth) has a simple OCCUPIED/FREE toggle for stall volunteers and a full dashboard for group leads (SVG campus map, claim/queue/release with confirmation, freed-stall notifications, queue wait timers, classroom mode, and a per-lead visitor check-in QR). Stall volunteers are locked to their assigned stall and move by raising a switch request that an admin approves or denies. Visitors check in via that QR (`/bootstrap/checkin/[token]`) and submit a 5-question feedback form at `/bootstrap/feedback`. The `/admin/bootstrap` console manages sessions (2-step create that shows the self-registration URLs), overrides, stall suggestions, visitor/group tables, and a feedback summary with an AI (Gemini) leadership summary
 - **Admin Panel** - Full CRUD for events (+ per-event registrations table), team (drag-to-reorder per tier, inline active toggle, CSV bulk import, per-row quick photo upload), posts, gallery (multi-file R2 upload, grouped by event with copyable URLs), sponsors, site settings, milestones (drag-to-reorder "Road So Far" timeline), and application management (filter tabs, status pipeline, interview groups A-D, bulk status, CSV export, delete)
 - **Multi-admin accounts** - DB-backed admin accounts alongside an undeletable env "godfather" account: named invite links (`/admin/invite/[name]/[token]`, 48h, godfather-approved), one reusable open viewer link (`/admin/register?token=...`, 30 days, still approved per person), godfather-issued password reset links (2h, single-use, invalidates all live sessions via token_version), login rate limiting (5 fails per IP per 15 min) and a login audit log on the dashboard
 - **Viewer role** - A read-only admin tier. Viewers see every admin page and every GET route but cannot write: `session.user.isAdmin` means "may enter the panel" and stays true for viewers, while the separate `isViewer` flag gates writes in both the API routes and the UI
@@ -80,6 +80,9 @@ ADMIN_DISPLAY_NAME=    # optional display name for the godfather account
 
 # Ops
 NEXT_PUBLIC_MAINTENANCE_MODE=   # "true" = public site rewrites to /maintenance
+DOCS_PASSWORD=         # shared secret gating /docs. NOTE: /docs fails OPEN
+                       # when this is unset -- the robots disallow is then
+                       # the only layer left
 
 # AI (Bootstrap feedback summary)
 GEMINI_API_KEY=        # server-side; feedback-summary route returns 503 if unset
@@ -122,6 +125,7 @@ src/
 │   │   ├── events/        # incl. [slug]/register (native sign-up form)
 │   │   ├── posts/         # blog list + [slug]
 │   │   ├── f1/            # F1 stats: drivers, circuits, seasons
+│   │   ├── projects/      # index + kart, combat-bot
 │   │   ├── gallery/
 │   │   ├── crew/
 │   │   ├── sponsors/
@@ -139,12 +143,15 @@ src/
 │   │       ├── milestones/
 │   │       ├── accounts/
 │   │       ├── bootstrap/
+│   │       ├── profile/
+│   │       ├── qr/        # QR generator for event-day links
 │   │       └── settings/
 │   ├── admin/             # PUBLIC token-gated pages (no AdminShell):
 │   │   ├── invite/[name]/[token]/          # admin registration via invite
 │   │   ├── register/                       # open viewer invite link
 │   │   └── [username]/credentials/[token]/ # password reset
 │   ├── bootstrap/         # Volunteer stall dashboard (own cookie auth)
+│   ├── docs/              # In-app documentation, password-gated
 │   ├── maintenance/       # Static maintenance page
 │   └── api/               # API routes (re-check admin session themselves)
 ├── components/
@@ -208,9 +215,9 @@ bootstrap_feedback   - visitor feedback: overall_rating (1-10), rating (per-stal
                        join_likelihood (1-5), memorable_stall, suggestions
 ```
 
-Application status pipeline: `pending → shortlisted → interview → selected / rejected` (legacy `reviewed` / `accepted` still valid). Schema changes are recorded as numbered files in `migrations/` and applied to Neon manually - never automatically.
+Application status pipeline: `pending → shortlisted → interview → selected / rejected` (legacy `reviewed` / `accepted` still valid). Schema changes are recorded as numbered files in `migrations/` and applied to Neon manually ∙ never automatically.
 
-Migration status: `001`-`017` are confirmed applied (Session 38). `018`-`020` were written and flagged for manual application but no session records confirming they landed -- check Neon. `021` (Bootstrap pre-registration pool) and `022` (posts) are unapplied. See [docs/push.md](docs/push.md) for the outstanding commands.
+Migration status: `001`-`025` are all applied. A new schema change means a new numbered file; applied migrations are history and are never edited in place.
 
 ## Media Storage (Cloudflare R2)
 
@@ -246,12 +253,12 @@ Features:
 
 ## Known Issues & Notes
 
-- Tailwind v4 utilities DO generate here. The long-standing "`mx-auto` doesn't work in this setup" note was wrong: the class shipped but lost the cascade to globals.css's unlayered `* { margin: 0 }`, since unlayered CSS beats every `@layer`. S52B moved that reset into `@layer base` and S53 converted the 24 inline centering workarounds. Use `className="mx-auto"`. Around 447 globals.css rules are still unlayered, so a utility that silently does nothing is a cascade-layer loss, not a missing class
-- Neon free tier suspends after 5 min inactivity - first request after suspension takes 2-5 seconds to wake
-- The Neon DB and R2 bucket are live production - there is no staging environment
-- Migrations go through numbered files in `migrations/`, applied to Neon manually before the code that depends on them is deployed. `021` and `022` are outstanding, and `018`-`020` are unconfirmed
-- Client components must only `import type` from `src/lib/services/*` -- a value import pulls `lib/db.ts` and the whole Neon driver into the browser bundle, where its module-level `DATABASE_URL` check throws. Shared constants live in `src/types/`. Spot check with `grep -rl "neondatabase" .next/static/chunks/` (must return nothing)
-- `src/lib/services/f1.ts` is the only outbound network dependency in the site. It has no API key and no cost, but the `f1_enabled` setting reads as OFF when the row is missing, so a failed seed can never silently start calling out
+- Tailwind v4 utilities DO generate here. The long-standing "`mx-auto` doesn't work in this setup" note was wrong: the class shipped but lost the cascade to globals.css's unlayered `* { margin: 0 }`, since unlayered CSS beats every `@layer`. That reset now sits in `@layer base` and the inline centering workarounds have been retired. Use `className="mx-auto"`. Around 447 globals.css rules are still unlayered, so a utility that silently does nothing is a cascade-layer loss, not a missing class
+- Neon free tier suspends after 5 min inactivity ∙ first request after suspension takes 2-5 seconds to wake
+- The Neon DB and R2 bucket are live production ∙ there is no staging environment
+- Migrations go through numbered files in `migrations/`, applied to Neon manually before the code that depends on them is deployed
+- Client components must only `import type` from `src/lib/services/*` ∙ a value import pulls `lib/db.ts` and the whole Neon driver into the browser bundle, where its module-level `DATABASE_URL` check throws. Shared constants live in `src/types/`. Spot check with `grep -rl "neondatabase" .next/static/chunks/` (must return nothing)
+- There are exactly two outbound network dependencies, both deliberate. `src/lib/services/f1.ts` calls Jolpica for the F1 section: no API key, no cost, one choke-point helper that returns null on failure, and an `f1_enabled` setting that reads as OFF when the row is missing, so a failed seed can never silently start calling out. The Bootstrap feedback summary route calls Google Gemini: it is gated on `GEMINI_API_KEY`, returns 503 when unset, and unlike f1.ts has no kill switch. A third egress point needs a deliberate decision
 
 ---
 

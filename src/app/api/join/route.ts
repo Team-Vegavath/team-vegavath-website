@@ -5,7 +5,7 @@ import { isValidEmail, isValidUrl } from "@/lib/utils";
 import { normalisePhone } from "@/lib/utils/phone";
 import type { ApplicationDomain } from "@/types/settings";
 
-// FY26 domains — must stay in sync with JoinClient DOMAINS and the CHECK
+// FY26 domains ∙ must stay in sync with JoinClient DOMAINS and the CHECK
 // constraints in migrations/004_application_new_fields.sql.
 const VALID_DOMAINS = [
   "Coding",
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as Record<string, unknown>;
 
-    // Honeypot check — bots fill this, humans don't
+    // Honeypot check ∙ bots fill this, humans don't
     if (body.website) {
       return NextResponse.json({ success: true });
     }

@@ -132,7 +132,7 @@ export default function BulkTeamPhotoUpload({ members }: { members: TeamMember[]
           }}>
             {matchedCount}/{matches.length} MATCHED
             {matchedCount < matches.length &&
-              ` — ${matches.length - matchedCount} need manual assignment`}
+              ` ∙ ${matches.length - matchedCount} need manual assignment`}
           </div>
 
           {/* Preview table */}
@@ -171,7 +171,7 @@ export default function BulkTeamPhotoUpload({ members }: { members: TeamMember[]
                           fontFamily: "var(--font-mono)", fontSize: "0.75rem",
                           color: "var(--success)",
                         }}>
-                          {members.find(x => x.id === (m.override ?? m.member?.id))?.name ?? "—"}
+                          {members.find(x => x.id === (m.override ?? m.member?.id))?.name ?? "∙"}
                         </span>
                       ) : (
                         <span style={{

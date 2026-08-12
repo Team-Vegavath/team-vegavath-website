@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle settings update — iterate key/value pairs
+    // Handle settings update ∙ iterate key/value pairs
     const validKeys = [
       "recruitment_open", "maintenance_mode", "maintenance_message",
       "contact_email", "contact_phone", "contact_address",
