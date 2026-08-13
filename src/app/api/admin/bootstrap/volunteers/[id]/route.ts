@@ -5,6 +5,8 @@ import {
   getPoolVolunteerBySrn,
   updateVolunteer,
 } from "@/lib/services/bootstrap";
+import { normalisePhone } from "@/lib/utils/phone";
+import { normaliseSrnPrn } from "@/lib/utils/srn";
 
 // S55: admin corrects a volunteer's own registration details -- name, phone,
 // SRN. Password (login_code / password_hash) is not touched here; resetting a
@@ -33,11 +35,30 @@ export async function PATCH(
       return s.length > 0 ? s : undefined;
     };
     const display_name = str(body?.display_name);
-    const phone = str(body?.phone);
-    const srn = str(body?.srn);
+    const phone_raw = str(body?.phone);
+    const srn_raw = str(body?.srn);
 
-    if (!display_name && !phone && !srn) {
+    if (!display_name && !phone_raw && !srn_raw) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
+
+    // An admin correcting a typo goes through the same validation as the
+    // volunteer's own registration -- otherwise this route is a hole straight
+    // past it. undefined (field absent) still means "leave alone".
+    const phone = phone_raw === undefined ? undefined : normalisePhone(phone_raw);
+    const srn = srn_raw === undefined ? undefined : normaliseSrnPrn(srn_raw);
+
+    if (phone === null) {
+      return NextResponse.json(
+        { error: "Phone must be 10 digits (optionally prefixed with +91)" },
+        { status: 400 }
+      );
+    }
+    if (srn === null) {
+      return NextResponse.json(
+        { error: "SRN / PRN must look like PES2UG24CS019 or PES2202400960" },
+        { status: 400 }
+      );
     }
 
     // One pool account per SRN (see getPoolVolunteerBySrn -- Postgres treats

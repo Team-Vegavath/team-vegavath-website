@@ -7,6 +7,7 @@ import {
   registerStallVolunteer,
 } from "@/lib/services/bootstrap";
 import { normalisePhone } from "@/lib/utils/phone";
+import { normaliseSrnPrn } from "@/lib/utils/srn";
 
 // PUBLIC endpoint (S35) - stall volunteers register themselves before
 // Bootstrap day and pick the stall they will manage.
@@ -18,11 +19,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const name = String(body?.name ?? "").trim();
     const phone = normalisePhone(String(body?.phone ?? ""));
-    const srn = String(body?.srn ?? "").trim();
+    const srn_raw = String(body?.srn ?? "").trim();
+    // S73F: the real SRN/PRN structure replaces the old alphanumeric-only rule.
+    // Both formats are alphanumeric, so the username stays typeable either way.
+    const srn = normaliseSrnPrn(srn_raw);
     const stallId = String(body?.stall_id ?? "");
     const preferredStallName = String(body?.preferred_stall_name ?? "").trim();
 
-    if (!name || !srn) {
+    if (!name || !srn_raw) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
     if (!phone) {
@@ -31,12 +35,14 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (name.length > 100 || srn.length > 30 || preferredStallName.length > 60) {
+    if (name.length > 100 || preferredStallName.length > 60) {
       return NextResponse.json({ error: "Field too long" }, { status: 400 });
     }
-    // SRN becomes the username - letters/digits only keeps logins typeable
-    if (!/^[a-zA-Z0-9]+$/.test(srn)) {
-      return NextResponse.json({ error: "SRN must be letters and digits only" }, { status: 400 });
+    if (!srn) {
+      return NextResponse.json(
+        { error: "SRN / PRN must look like PES2UG24CS019 or PES2202400960" },
+        { status: 400 }
+      );
     }
 
     const username = srn.toLowerCase();

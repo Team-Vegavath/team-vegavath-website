@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
+import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PRN_PATTERN, SRN_PATTERN } from "@/lib/utils/srn";
 
 import { BS } from "./StallCard";
 
@@ -302,7 +304,9 @@ export default function BootstrapRegister({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                maxLength={20}
+                maxLength={16}
+                pattern={PHONE_PATTERN}
+                title="Exactly 10 digits (a +91 prefix is fine)"
                 autoComplete="tel"
                 placeholder="10-digit number"
                 style={inputStyle}
@@ -329,11 +333,15 @@ export default function BootstrapRegister({
                 className="bs-reg-input"
                 type="text"
                 value={srn}
-                onChange={(e) => setSrn(e.target.value)}
+                // uppercase into state: the SRN is the login username, and the
+                // pattern below is case-sensitive
+                onChange={(e) => setSrn(e.target.value.toUpperCase())}
                 required
-                maxLength={30}
+                maxLength={13}
+                pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
+                title="13 characters, like PES2UG24CS019 or PES2202400960"
                 autoCapitalize="none"
-                placeholder="Your SRN or PRN"
+                placeholder="PES2UG24CS019"
                 style={inputStyle}
               />
             </div>

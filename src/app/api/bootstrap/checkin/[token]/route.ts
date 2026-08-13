@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkinVisitorToGroup, getCheckinContext } from "@/lib/services/bootstrap";
+import { normalisePhone } from "@/lib/utils/phone";
+import { normaliseSrnPrn } from "@/lib/utils/srn";
 
 // PUBLIC endpoint - visitors check in via a group lead's QR link, no account
 // involved. Middleware never auth-gates /api/bootstrap/*, only /api/admin/*.
@@ -13,14 +15,29 @@ export async function POST(
     const { token } = await params;
     const body = await req.json();
     const name = String(body?.name ?? "").trim();
-    const prn = String(body?.prn ?? "").trim();
-    const phone = String(body?.phone ?? "").trim();
+    const prn_raw = String(body?.prn ?? "").trim();
+    const phone_raw = String(body?.phone ?? "").trim();
+    // the field is labelled "PRN / SRN" and has no toggle, so accept either
+    const prn = normaliseSrnPrn(prn_raw);
+    const phone = normalisePhone(phone_raw);
 
-    if (!name || !prn || !phone) {
+    if (!name || !prn_raw || !phone_raw) {
       return NextResponse.json({ error: "Name, PRN and phone are all required" }, { status: 400 });
     }
-    if (name.length > 100 || prn.length > 30 || phone.length > 20) {
+    if (name.length > 100) {
       return NextResponse.json({ error: "Field too long" }, { status: 400 });
+    }
+    if (!prn) {
+      return NextResponse.json(
+        { error: "PRN / SRN must look like PES2202400960 or PES2UG24CS019" },
+        { status: 400 }
+      );
+    }
+    if (!phone) {
+      return NextResponse.json(
+        { error: "Phone must be 10 digits (optionally prefixed with +91)" },
+        { status: 400 }
+      );
     }
 
     const ctx = await getCheckinContext(token);

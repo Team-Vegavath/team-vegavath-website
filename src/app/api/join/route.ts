@@ -3,6 +3,7 @@ import { createApplication } from "@/lib/services/applications";
 import { getSetting } from "@/lib/services/settings";
 import { isValidEmail, isValidUrl } from "@/lib/utils";
 import { normalisePhone } from "@/lib/utils/phone";
+import { normaliseSrnPrn } from "@/lib/utils/srn";
 import type { ApplicationDomain } from "@/types/settings";
 
 // FY26 domains ∙ must stay in sync with JoinClient DOMAINS and the CHECK
@@ -49,7 +50,10 @@ export async function POST(req: NextRequest) {
     const mobile_raw = optionalString(body.mobile_number);
     // normalise when present (strips +91 / spaces); null stays null (optional field)
     const mobile_number = mobile_raw === null ? null : normalisePhone(mobile_raw);
-    const srn_prn = optionalString(body.srn_prn);
+    const srn_prn_raw = optionalString(body.srn_prn);
+    // The /join toggle picks SRN or PRN for the student's benefit; the API takes
+    // either, since both are valid identifiers for the same applicant.
+    const srn_prn = srn_prn_raw === null ? null : normaliseSrnPrn(srn_prn_raw);
     const semester = optionalString(body.semester);
     const why_join = optionalString(body.why_join);
     const value_addition = optionalString(body.value_addition);
@@ -90,6 +94,14 @@ export async function POST(req: NextRequest) {
     if (mobile_raw !== null && mobile_number === null) {
       return NextResponse.json(
         { error: "Mobile number must be 10 digits (optionally prefixed with +91)" },
+        { status: 400 }
+      );
+    }
+
+    // srn_prn_raw present but normaliseSrnPrn rejected it → wrong format
+    if (srn_prn_raw !== null && srn_prn === null) {
+      return NextResponse.json(
+        { error: "SRN / PRN must look like PES2UG24CS019 or PES2202400960" },
         { status: 400 }
       );
     }

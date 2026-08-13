@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
+import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PRN_PATTERN, SRN_PATTERN } from "@/lib/utils/srn";
 
 interface Props {
   slug: string;
@@ -173,8 +175,9 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
           value={form.phone}
           onChange={handleChange}
           required
-          pattern="[+0-9\s-]{10,16}"
-          title="10-digit number (a +91 prefix is fine)"
+          maxLength={16}
+          pattern={PHONE_PATTERN}
+          title="Exactly 10 digits (a +91 prefix is fine)"
           placeholder="10-digit number"
           className="join-input"
         />
@@ -188,9 +191,18 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
           id="reg-srn"
           type="text"
           name="srn"
+          // uppercase into state, not via textTransform -- the state is what
+          // gets submitted, and the pattern below is case-sensitive (S54 does
+          // the same on the /join field).
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, srn: e.target.value.toUpperCase() }))
+          }
           value={form.srn}
-          onChange={handleChange}
-          maxLength={40}
+          maxLength={13}
+          // no toggle on this field: it is optional and labelled "SRN / PRN",
+          // so either structure passes.
+          pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
+          title="13 characters, like PES2UG24CS019 or PES2202400960"
           placeholder="Optional"
           className="join-input"
         />

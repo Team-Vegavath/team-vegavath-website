@@ -8,6 +8,7 @@ import {
   updateOwnAccountDetails,
   updateOwnPassword,
 } from "@/lib/services/admin";
+import { normalisePhone } from "@/lib/utils/phone";
 
 /**
  * Self-service profile update (S67). PATCH only.
@@ -104,7 +105,18 @@ export async function PATCH(req: NextRequest) {
         body.mobileNumber === undefined
           ? account.mobile_number
           : String(body.mobileNumber).trim();
-      const mobile = rawMobile ? rawMobile : null;
+      // Only a value the client actually sent is validated -- an untouched
+      // legacy row must not block a display-name-only save.
+      let mobile = rawMobile ? rawMobile : null;
+      if (body.mobileNumber !== undefined && mobile !== null) {
+        mobile = normalisePhone(mobile);
+        if (mobile === null) {
+          return NextResponse.json(
+            { error: "Mobile must be 10 digits (optionally prefixed with +91)" },
+            { status: 400 }
+          );
+        }
+      }
 
       await updateOwnAccountDetails(accountId, displayName, mobile);
       return NextResponse.json({ success: true, displayName, mobileNumber: mobile });

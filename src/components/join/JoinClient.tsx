@@ -6,6 +6,8 @@ import Link from "next/link";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
 import { HyperText } from "@/components/ui/hyper-text";
+import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PRN_PATTERN, SRN_PATTERN, type SrnPrnKind } from "@/lib/utils/srn";
 
 /* FY26 recruitment domains. These six values are what /api/join and the DB
    CHECK constraints accept (requires migrations/004_application_new_fields.sql
@@ -25,6 +27,15 @@ const SEMESTERS = [
   { value: "3", label: "3rd" },
   { value: "5", label: "5th" },
 ] as const;
+
+/* S73F: SRN and PRN are both 13 characters but different structures, so the
+   student picks which one they are typing and the field validates that one.
+   The API accepts either -- the toggle exists so the browser can give a precise
+   error instead of "one of two formats". */
+const ID_KINDS = [
+  { value: "SRN", label: "SRN", example: "PES2UG24CS019", pattern: SRN_PATTERN },
+  { value: "PRN", label: "PRN", example: "PES2202400960", pattern: PRN_PATTERN },
+] as const satisfies readonly { value: SrnPrnKind; label: string; example: string; pattern: string }[];
 
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";
 const INSTAGRAM_URL = "https://www.instagram.com/teamvegavath_pesu/";
@@ -100,6 +111,8 @@ export default function JoinClient({ recruitmentOpen }: Props) {
     design_portfolio_url: "",
     website: "",
   });
+  const [idKind, setIdKind] = useState<SrnPrnKind>("SRN");
+  const activeIdKind = ID_KINDS.find((k) => k.value === idKind) ?? ID_KINDS[0];
   const [selectedDomains, setSelectedDomains] = useState<Domain[]>([]);
   const [step, setStep] = useState<Step>(1);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -428,8 +441,9 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     value={form.mobile_number}
                     onChange={handleChange}
                     required
-                    pattern="[+0-9\s-]{10,16}"
-                    title="10-digit number (a +91 prefix is fine)"
+                    maxLength={16}
+                    pattern={PHONE_PATTERN}
+                    title="Exactly 10 digits (a +91 prefix is fine)"
                     placeholder="10-digit number"
                     className="join-input"
                   />
@@ -448,8 +462,30 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
                 <div>
                   <label htmlFor="join-srn" style={labelStyle}>
-                    SRN / PRN<Req />
+                    {activeIdKind.label}<Req />
                   </label>
+                  {/* Same tile treatment as the Semester selector -- a mode
+                      switch the student sets before typing, not a second field. */}
+                  <div
+                    role="group"
+                    aria-label="Identifier type"
+                    style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1px", background: "var(--border)", border: "1px solid var(--border)", marginBottom: "0.85rem" }}
+                  >
+                    {ID_KINDS.map((k) => (
+                      <button
+                        key={k.value}
+                        type="button"
+                        className="join-domain-tile"
+                        aria-pressed={idKind === k.value}
+                        onClick={() => {
+                          setIdKind(k.value);
+                          clearError();
+                        }}
+                      >
+                        {k.label}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     id="join-srn"
                     type="text"
@@ -466,7 +502,10 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                       }))
                     }
                     required
-                    placeholder="Your SRN or PRN"
+                    maxLength={13}
+                    pattern={activeIdKind.pattern}
+                    title={`13 characters, like ${activeIdKind.example} -- check the SRN / PRN toggle if this is the other one`}
+                    placeholder={activeIdKind.example}
                     className="join-input"
                   />
                 </div>

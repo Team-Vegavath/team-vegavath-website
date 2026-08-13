@@ -6,6 +6,8 @@ import {
   getEventBySlug,
 } from "@/lib/services/events";
 import { isNoRegistrationEvent, isValidEmail } from "@/lib/utils";
+import { normalisePhone } from "@/lib/utils/phone";
+import { normaliseSrnPrn } from "@/lib/utils/srn";
 
 /** Public: no auth. Native event registration (S47) -- replaces the external
  *  registration_form_url link that the event page used to point at. */
@@ -24,8 +26,11 @@ export async function POST(
     const body = await req.json().catch(() => null);
     const name = String(body?.name ?? "").trim();
     const email = String(body?.email ?? "").trim();
-    const phone = String(body?.phone ?? "").trim();
-    const srn = String(body?.srn ?? "").trim();
+    const phone_raw = String(body?.phone ?? "").trim();
+    const phone = normalisePhone(phone_raw);
+    const srn_raw = String(body?.srn ?? "").trim();
+    // optional field: absent stays absent, present must be a real SRN or PRN
+    const srn = srn_raw ? normaliseSrnPrn(srn_raw) : null;
     const message = String(body?.message ?? "").trim();
 
     if (!name) {
@@ -35,7 +40,16 @@ export async function POST(
       return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
     }
     if (!phone) {
-      return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Phone must be 10 digits (optionally prefixed with +91)" },
+        { status: 400 }
+      );
+    }
+    if (srn_raw && !srn) {
+      return NextResponse.json(
+        { error: "SRN / PRN must look like PES2UG24CS019 or PES2202400960" },
+        { status: 400 }
+      );
     }
 
     const event = await getEventBySlug(slug);

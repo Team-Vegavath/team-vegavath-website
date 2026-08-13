@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PRN_PATTERN, SRN_PATTERN } from "@/lib/utils/srn";
+
 import { BS } from "./StallCard";
 
 const labelStyle: React.CSSProperties = {
@@ -256,8 +259,13 @@ export default function BootstrapCheckin({
                   id="ci-prn"
                   type="text"
                   value={prn}
-                  onChange={(e) => setPrn(e.target.value)}
-                  maxLength={30}
+                  // uppercase into state -- the pattern is case-sensitive
+                  onChange={(e) => setPrn(e.target.value.toUpperCase())}
+                  maxLength={13}
+                  // labelled "PRN/SRN" with no toggle, so either structure passes
+                  pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
+                  title="13 characters, like PES2202400960 or PES2UG24CS019"
+                  placeholder="PES2202400960"
                   style={inputStyle}
                 />
               </div>
@@ -270,7 +278,10 @@ export default function BootstrapCheckin({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  maxLength={20}
+                  maxLength={16}
+                  pattern={PHONE_PATTERN}
+                  title="Exactly 10 digits (a +91 prefix is fine)"
+                  placeholder="10-digit number"
                   autoComplete="tel"
                   style={inputStyle}
                 />
