@@ -339,9 +339,9 @@ export default function BootstrapRegister({
                 required
                 maxLength={13}
                 pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
-                title="13 characters, like PES2UG24CS019 or PES2202400960"
+                title="13 characters, like PES1UG21CS999 or PES1201912345"
                 autoCapitalize="none"
-                placeholder="PES2UG24CS019"
+                placeholder="PES1UG21CS999"
                 style={inputStyle}
               />
             </div>

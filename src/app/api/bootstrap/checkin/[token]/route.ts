@@ -29,7 +29,7 @@ export async function POST(
     }
     if (!prn) {
       return NextResponse.json(
-        { error: "PRN / SRN must look like PES2202400960 or PES2UG24CS019" },
+        { error: "PRN / SRN must look like PES1201912345 or PES1UG21CS999" },
         { status: 400 }
       );
     }

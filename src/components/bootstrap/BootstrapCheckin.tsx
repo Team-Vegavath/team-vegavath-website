@@ -348,8 +348,8 @@ export default function BootstrapCheckin({
                   maxLength={13}
                   // labelled "PRN/SRN" with no toggle, so either structure passes
                   pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
-                  title="13 characters, like PES2202400960 or PES2UG24CS019"
-                  placeholder="PES2202400960"
+                  title="13 characters, like PES1201912345 or PES1UG21CS999"
+                  placeholder="PES1201912345"
                   style={inputStyle}
                 />
               </div>

@@ -33,8 +33,8 @@ const SEMESTERS = [
    The API accepts either -- the toggle exists so the browser can give a precise
    error instead of "one of two formats". */
 const ID_KINDS = [
-  { value: "SRN", label: "SRN", example: "PES2UG24CS019", pattern: SRN_PATTERN },
-  { value: "PRN", label: "PRN", example: "PES2202400960", pattern: PRN_PATTERN },
+  { value: "SRN", label: "SRN", example: "PES1UG21CS999", pattern: SRN_PATTERN },
+  { value: "PRN", label: "PRN", example: "PES1201912345", pattern: PRN_PATTERN },
 ] as const satisfies readonly { value: SrnPrnKind; label: string; example: string; pattern: string }[];
 
 const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo.png";

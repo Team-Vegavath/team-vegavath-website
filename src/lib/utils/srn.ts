@@ -3,8 +3,8 @@
  * different structures -- a length check alone would accept either format in
  * either field, so match the real shape instead.
  *
- *   SRN  PES2UG24CS019 = PES | campus 2 | programme UG | batch 24 | branch CS | roll 019
- *   PRN  PES2202400960 = PES | campus 2 | year 2024 | id 00960
+ *   SRN  PES1UG21CS999 = PES | campus 1 | programme UG | batch 21 | branch CS | roll 999
+ *   PRN  PES1201912345 = PES | campus 1 | year 2019 | id 12345
  *
  * Campus is 1-3 (three PES campuses in Bengaluru). A fourth campus is a
  * one-character edit here rather than a rule spread across six call sites.

@@ -202,7 +202,7 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
           // no toggle on this field: it is optional and labelled "SRN / PRN",
           // so either structure passes.
           pattern={`(${SRN_PATTERN})|(${PRN_PATTERN})`}
-          title="13 characters, like PES2UG24CS019 or PES2202400960"
+          title="13 characters, like PES1UG21CS999 or PES1201912345"
           placeholder="Optional"
           className="join-input"
         />
