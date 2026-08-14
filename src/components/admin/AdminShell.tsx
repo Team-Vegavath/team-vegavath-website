@@ -138,6 +138,21 @@ const NAV_ITEMS = [
     ),
   },
   {
+    // S73E: editable homepage copy, so Content alongside Sponsors/Events/Posts.
+    href: "/admin/announcements",
+    label: "Announcements",
+    section: "Content",
+    // Megaphone: a horn outline plus two emission arcs. Stroke-only 16x16 on
+    // the 24-unit viewBox like the rest of the Content set.
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        <path d="M3 10v4h4l7 4V6l-7 4H3z" />
+        <path d="M17.5 9c.9 1 1.4 2 1.4 3s-.5 2-1.4 3" />
+        <path d="M20 6.5c1.5 1.6 2.2 3.4 2.2 5.5s-.7 3.9-2.2 5.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/settings",
     label: "Settings",
     section: "System",

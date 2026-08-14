@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getActiveAnnouncement } from "@/lib/services/announcements";
 import { getUpcomingEvents, getPastEvents } from "@/lib/services/events";
 import { getActiveSponsors } from "@/lib/services/sponsors";
+import { AnnouncementBanner } from "@/components/home/AnnouncementBanner";
 import { DomainGrid } from "@/components/home/DomainGrid";
 import { StatsTicker } from "@/components/home/StatsTicker";
 import { EventsPreview } from "@/components/home/EventsPreview";
@@ -25,10 +27,13 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [upcomingEvents, pastEvents, sponsors] = await Promise.all([
+  const [upcomingEvents, pastEvents, sponsors, announcement] = await Promise.all([
     getUpcomingEvents(3).catch(() => []),
     getPastEvents(3).catch(() => []),
     getActiveSponsors().catch(() => []),
+    // Same .catch fallback as its siblings: a DB hiccup degrades to no
+    // announcement section, not a broken homepage.
+    getActiveAnnouncement().catch(() => null),
   ]);
 
   return (
@@ -105,6 +110,19 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Announcement.
+          S73E: the only section on this page with an expiry date, so it goes
+          first, directly under the hero. Gated exactly like the sponsors strip
+          below -- with no active row the page is byte-for-byte what it was.
+          `revalidate = 60` above means toggling one off takes up to a minute to
+          disappear; that is the same contract the f1_enabled kill switch runs
+          on and is not to be "fixed" by lowering the revalidate. */}
+      {announcement ? (
+        <BlurFade inView delay={0.1}>
+          <AnnouncementBanner announcement={announcement} />
+        </BlurFade>
+      ) : null}
 
       {/* Stats ticker */}
       {/* S58: `inView` is passed on every BlurFade below. Its default is false,
