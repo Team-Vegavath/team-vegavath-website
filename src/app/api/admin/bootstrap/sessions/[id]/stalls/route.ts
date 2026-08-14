@@ -22,6 +22,9 @@ export async function POST(
     const body = await req.json();
     const stallName = String(body?.stallName ?? "").trim();
     const maxOccupancy = Number(body?.maxOccupancy);
+    // S73B - optional, defaults to 1. Raising it past 3 is the live override
+    // route's job (./stalls/[id]/max-groups), not this form's.
+    const maxGroups = body?.maxGroups === undefined ? 1 : Number(body.maxGroups);
 
     if (!stallName || stallName.length > 60) {
       return NextResponse.json({ error: "Stall name must be 1–60 characters" }, { status: 400 });
@@ -30,8 +33,14 @@ export async function POST(
     if (![1, 2, 3].includes(maxOccupancy)) {
       return NextResponse.json({ error: "Occupancy must be 1, 2 or 3" }, { status: 400 });
     }
+    if (![1, 2, 3].includes(maxGroups)) {
+      return NextResponse.json({ error: "Groups must be 1, 2 or 3" }, { status: 400 });
+    }
 
-    const stall = await addStallToSession(id, stallName, maxOccupancy);
+    const stall = await addStallToSession(id, stallName, maxOccupancy, maxGroups);
+    if (!stall) {
+      return NextResponse.json({ error: "Failed to add stall" }, { status: 500 });
+    }
     return NextResponse.json({ stall });
   } catch (error) {
     console.error("[POST /api/admin/bootstrap/sessions/[id]/stalls]", error);

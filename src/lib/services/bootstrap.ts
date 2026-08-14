@@ -13,16 +13,33 @@ export interface BootstrapSession {
   stall_count?: number; // present on getBootstrapSessions() rows
 }
 
+// S73B (migration 027): one group waiting at one stall. Unordered waiting SET,
+// never a promised position - queued_at exists for the wait timer and as a sort
+// hint, and must never be rendered as an ordinal ("you are 2nd in line").
+export interface StallQueueEntry {
+  group_id: string;
+  group_name: string;
+  lead_name: string | null; // display only; null once the lead who queued is gone
+  queued_at: string;
+  accepted_at: string | null; // S73D advisory placement; unused in S73B
+}
+
 export interface BootstrapStall {
   id: string;
   session_id: string;
   stall_number: number;
   stall_name: string;
+  // S73B: DERIVED on read, not the raw column. See getBootstrapStalls.
   status: "free" | "occupied" | "queued";
   max_occupancy: number;
+  // S73B (migration 027): how many groups may be AT this stall at once, as
+  // opposed to max_occupancy, which caps volunteers standing behind it. Nothing
+  // enforces it yet - the visit table that admits groups lands in S73C.
+  max_groups: number;
   claimed_by: string[] | null;
-  queued_by: string | null; // migration 008 - who set the queue signal
-  queued_at: string | null; // migration 009 - when the queue was set (wait timer)
+  // S73B: the queue that replaced queued_by / queued_at. Always present (empty
+  // array when nobody is waiting), so callers never null-check it.
+  queue: StallQueueEntry[];
   map_x: number | null; // migration 008 - % from left edge of map image
   map_y: number | null; // migration 008 - % from top edge
   lead_names: string | null; // migration 015 - informational, comma-separated
@@ -55,6 +72,10 @@ export interface BootstrapVolunteer {
   switch_requested_stall_id?: string | null;
   switch_requested_stall_name?: string | null;
   switch_requested_at?: string | null;
+  // S73B - the lead's resolved group, set only by getVolunteerByToken. This is
+  // the server-side identity a queue action is scoped to; never accept it from a
+  // request body. Null for stall volunteers, who have no group.
+  group_id?: string | null;
 }
 
 // migration 021 - a pre-registered volunteer with no session yet (session_id NULL)
@@ -231,6 +252,9 @@ export async function createBootstrapStalls(
   stalls: {
     stall_name: string;
     max_occupancy: number;
+    // S73B - optional so existing callers and older seed data keep working; the
+    // column's own DEFAULT 1 is the same answer.
+    max_groups?: number;
     stall_number: number;
     lead_names?: string[];
   }[]
@@ -241,8 +265,9 @@ export async function createBootstrapStalls(
     const pos = defaultPositionFor(s.stall_name);
     const leadNames = (s.lead_names ?? []).map((n) => n.trim()).filter(Boolean);
     const rows = await sql`
-      INSERT INTO bootstrap_stalls (session_id, stall_number, stall_name, max_occupancy, map_x, map_y, lead_names)
+      INSERT INTO bootstrap_stalls (session_id, stall_number, stall_name, max_occupancy, max_groups, map_x, map_y, lead_names)
       VALUES (${sessionId}, ${s.stall_number}, ${s.stall_name}, ${s.max_occupancy},
+              ${s.max_groups ?? 1},
               ${pos?.map_x ?? null}, ${pos?.map_y ?? null},
               ${leadNames.length ? leadNames.join(", ") : null})
       RETURNING id, stall_name`;
@@ -258,8 +283,9 @@ export async function createBootstrapStalls(
 export async function addStallToSession(
   sessionId: string,
   stallName: string,
-  maxOccupancy: number
-): Promise<BootstrapStall> {
+  maxOccupancy: number,
+  maxGroups = 1
+): Promise<BootstrapStall | null> {
   const maxRows = await sql`
     SELECT COALESCE(max(stall_number), 0)::int AS n
     FROM bootstrap_stalls WHERE session_id = ${sessionId}`;
@@ -267,12 +293,17 @@ export async function addStallToSession(
   const pos = defaultPositionFor(stallName);
   const rows = await sql`
     INSERT INTO bootstrap_stalls
-      (session_id, stall_number, stall_name, max_occupancy, map_x, map_y)
+      (session_id, stall_number, stall_name, max_occupancy, max_groups, map_x, map_y)
     VALUES
-      (${sessionId}, ${nextNumber}, ${stallName}, ${maxOccupancy},
+      (${sessionId}, ${nextNumber}, ${stallName}, ${maxOccupancy}, ${maxGroups},
        ${pos?.map_x ?? null}, ${pos?.map_y ?? null})
-    RETURNING *`;
-  return rows[0] as BootstrapStall;
+    RETURNING id`;
+  // S73B: re-read through selectStalls rather than RETURNING *, so the row handed
+  // to the admin table carries the derived status and the (empty) queue array
+  // that every other stall row has. Without this the newly added stall would be
+  // the one row in the table with `queue` undefined.
+  const id = (rows[0] as { id: string }).id;
+  return getStallById(id, sessionId);
 }
 
 // Refuses to delete a stall someone is currently standing at - the admin has to
@@ -324,27 +355,159 @@ export async function deleteStall(
   return { ok: true };
 }
 
-export async function getBootstrapStalls(sessionId: string): Promise<BootstrapStall[]> {
+/**
+ * S73B: the ONE stall SELECT. Every read of a stall goes through here so the
+ * derived `status` and the attached `queue` can never disagree between a polled
+ * list and the single row a mutation hands back.
+ *
+ * Both filters are optional predicates rather than a built WHERE clause: the
+ * neon tagged template interpolates VALUES, not SQL fragments, so a dynamic
+ * clause is not expressible. Passing stallId returns exactly that stall (still
+ * session-scoped when sessionId is given); passing sessionId alone returns the
+ * session's list.
+ *
+ * `status` is DERIVED, not read from the column. Before S73B it was a written
+ * column maintained by four separate branches of updateStallStatus, which is
+ * what let it drift out of step with claimed_by. Now:
+ *   nobody claimed        -> free
+ *   claimed + queue rows  -> queued
+ *   claimed, no queue     -> occupied
+ * The raw column is still written (see updateStallStatus) so a human reading the
+ * table in the Neon console sees something sane, but nothing reads it.
+ *
+ * Note the ordering: an EMPTY stall with groups still queued reads FREE, not
+ * queued. That is the whole point of S73B - a released stall keeps its queue, and
+ * the waiting groups need to see it go free.
+ */
+async function selectStalls(
+  sessionId: string | null,
+  stallId: string | null
+): Promise<BootstrapStall[]> {
   const rows = await sql`
-    SELECT * FROM bootstrap_stalls
-    WHERE session_id = ${sessionId}
-    ORDER BY stall_number ASC LIMIT 50`;
+    SELECT st.id, st.session_id, st.stall_number, st.stall_name,
+           st.max_occupancy, st.max_groups, st.claimed_by,
+           st.map_x, st.map_y, st.lead_names, st.updated_at,
+           CASE
+             WHEN coalesce(array_length(st.claimed_by, 1), 0) = 0 THEN 'free'
+             WHEN EXISTS (
+               SELECT 1 FROM bootstrap_stall_queue bq2 WHERE bq2.stall_id = st.id
+             ) THEN 'queued'
+             ELSE 'occupied'
+           END AS status,
+           COALESCE((
+             SELECT json_agg(
+                      json_build_object(
+                        'group_id',    g.id,
+                        'group_name',  g.name,
+                        'lead_name',   lv.display_name,
+                        'queued_at',   bq.queued_at,
+                        'accepted_at', bq.accepted_at
+                      ) ORDER BY bq.queued_at ASC
+                    )
+             FROM bootstrap_stall_queue bq
+             JOIN bootstrap_groups g ON g.id = bq.group_id
+             LEFT JOIN bootstrap_volunteers lv ON lv.id = bq.volunteer_id
+             WHERE bq.stall_id = st.id
+           ), '[]'::json) AS queue
+    FROM bootstrap_stalls st
+    WHERE (${sessionId}::uuid IS NULL OR st.session_id = ${sessionId}::uuid)
+      AND (${stallId}::uuid IS NULL OR st.id = ${stallId}::uuid)
+    ORDER BY st.stall_number ASC
+    LIMIT 50`;
   return rows as BootstrapStall[];
 }
 
-export type StallAction = "claim" | "release" | "mark_queued" | "unqueue" | "override";
+export async function getBootstrapStalls(sessionId: string): Promise<BootstrapStall[]> {
+  return selectStalls(sessionId, null);
+}
+
+// ------------------------------------------------ stall queue (S73B, mig 027)
 
 /**
- * claim:       append username to claimed_by if not already present, status → occupied
- * release:     remove username; stall goes free when nobody is left;
- *              queued_by/queued_at clear ONLY if the caller set the queue, or the
- *              stall is going fully free (S72C - see the branch)
- * mark_queued: status → queued, claimed_by untouched, queued_by = username;
- *              ANY volunteer may set it on an occupied stall
- * unqueue:     status → occupied, queued_by cleared (UI gates this to queued_by)
- * override:    admin sets status + claimed_by + queued_by directly (username is a
- *              comma-separated list of usernames here, "" clears it;
- *              queuedBy clears when status is "free" or omitted)
+ * A group joins a stall's queue. Idempotent: UNIQUE(stall_id, group_id) turns a
+ * double-tap into a no-op rather than a duplicate row or an error.
+ *
+ * Every precondition is a WHERE predicate rather than a JS check, the same
+ * reasoning requestStallSwitch uses - a future caller inherits the guards
+ * instead of having to remember them:
+ *   stall is in the caller's own session  - stops a crafted stall UUID from
+ *                                           another (or a past) session
+ *   group is in that same session         - same, for the group side
+ *   somebody is actually at the stall     - queueing for an empty stall is
+ *                                           meaningless; walk over instead
+ * Returns false when any of them fails, which the route turns into a 409.
+ */
+export async function addToQueue(
+  stallId: string,
+  groupId: string,
+  volunteerId: string,
+  sessionId: string
+): Promise<boolean> {
+  const rows = await sql`
+    INSERT INTO bootstrap_stall_queue (stall_id, group_id, volunteer_id)
+    SELECT ${stallId}::uuid, ${groupId}::uuid, ${volunteerId}::uuid
+    WHERE EXISTS (
+      SELECT 1 FROM bootstrap_stalls st
+      WHERE st.id = ${stallId}::uuid
+        AND st.session_id = ${sessionId}::uuid
+        AND coalesce(array_length(st.claimed_by, 1), 0) > 0
+    )
+    AND EXISTS (
+      SELECT 1 FROM bootstrap_groups g
+      WHERE g.id = ${groupId}::uuid AND g.session_id = ${sessionId}::uuid
+    )
+    ON CONFLICT (stall_id, group_id) DO NOTHING
+    RETURNING id`;
+  return rows.length === 1;
+}
+
+/**
+ * A group leaves a stall's queue. The delete predicate is (stall_id, group_id),
+ * with group_id resolved server-side from the cookie volunteer by the caller -
+ * never from a request parameter, or one lead could unqueue another group.
+ *
+ * No status guard and no session guard: group_id is already server-resolved and
+ * scoped to the caller's own session, so the worst a crafted stall_id can do is
+ * delete a row this group put there itself. Deleting a queue entry that is
+ * already gone is a successful no-op, which is what a stale double-tap wants.
+ */
+export async function removeFromQueue(stallId: string, groupId: string): Promise<void> {
+  await sql`
+    DELETE FROM bootstrap_stall_queue
+    WHERE stall_id = ${stallId}::uuid AND group_id = ${groupId}::uuid`;
+}
+
+/**
+ * S73B (Section C): live per-stall group capacity. Mirrors setStallMapPosition
+ * exactly - a bare single-column UPDATE with no involvement in the status state
+ * machine, because capacity is a property of the stall, not of who is standing
+ * at it. The 1-10 range is enforced by migration 027's CHECK as well as by the
+ * route, so a bad value fails at the database even if a caller forgets.
+ *
+ * LOWERING is deliberately not retroactive, matching max_occupancy's existing
+ * precedent (see updateStallStatus's claim branch: the new-claimant arm is
+ * guarded, the re-claim arm is not). Capacity gates new admissions; it never
+ * evicts groups already at the stall.
+ */
+export async function setStallMaxGroups(stallId: string, n: number): Promise<void> {
+  await sql`UPDATE bootstrap_stalls SET max_groups = ${n} WHERE id = ${stallId}`;
+}
+
+export type StallAction = "claim" | "release" | "override";
+
+/**
+ * claim:    append username to claimed_by if not already present, status → occupied
+ * release:  remove username; stall goes free when nobody is left. THE QUEUE IS
+ *           NOT TOUCHED - see the branch.
+ * override: admin sets status + claimed_by directly (username is a
+ *           comma-separated list of usernames here, "" clears it)
+ *
+ * S73B: mark_queued and unqueue are GONE from this function. They no longer share
+ * anything with claim/release - different table, different actor (a group lead,
+ * not the stall volunteer), different grain (a group, not a username) - so they
+ * are addToQueue / removeFromQueue above, called directly by the route. That
+ * removed two branches from here rather than adding a groupId parameter to a
+ * function that already took six.
  *
  * S72B: sessionId scopes every branch. Pass the caller's own session so a
  * volunteer cannot reach a stall belonging to a different (or past) session by
@@ -358,10 +521,11 @@ export async function updateStallStatus(
   username: string,
   action: StallAction,
   sessionId: string | null,
-  status?: string, // override only - every other action implies its status
-  queuedBy?: string // override only
+  status?: string // override only - every other action implies its status
 ): Promise<BootstrapStall | null> {
-  let rows;
+  // Nothing captures the UPDATE results: every branch below is followed by a
+  // single re-read through selectStalls, because only that query can compute the
+  // derived status and attach the queue.
   if (action === "claim") {
     // CASE instead of a WHERE guard so a re-claim by a volunteer already
     // in claimed_by still updates the row.
@@ -370,7 +534,7 @@ export async function updateStallStatus(
     // room. The re-claim arm stays unguarded on purpose - a volunteer already in
     // claimed_by must still be able to re-tap on a full stall (that is how a
     // stale card resyncs), and it adds nobody.
-    rows = await sql`
+    await sql`
       UPDATE bootstrap_stalls
       SET status = 'occupied',
           claimed_by = CASE
@@ -383,83 +547,74 @@ export async function updateStallStatus(
         AND (
           ${username} = ANY(coalesce(claimed_by, '{}'))
           OR coalesce(array_length(claimed_by, 1), 0) < max_occupancy
-        )
-      RETURNING *`;
+        )`;
   } else if (action === "release") {
-    // S72C: queued_by/queued_at used to clear UNCONDITIONALLY here, for whoever
-    // was queued, whoever called it. Same class of bug as S72B Section A - one
-    // volunteer's tap silently destroying another's state with no check and no
-    // signal. On a max_occupancy > 1 stall, the second volunteer releasing wiped
-    // the first one's queue signal and wait timer.
+    // ------------------------------------------------------------------
+    // S73B: THE RELEASE FIX. This branch used to carry two CASE expressions
+    // clearing queued_by / queued_at. Both are gone, and not because they were
+    // narrowed again - because a release has no business touching the queue at
+    // all.
     //
-    // Now scoped to the two cases where clearing is correct, mirroring the shape
-    // the `status` CASE right above already uses:
-    //   1. the caller set the queue themselves, or
-    //   2. the stall is going fully free, so any queue on it is moot anyway.
-    // Every SET expression in one UPDATE reads the OLD row, so `queued_by =
-    // ${username}` here tests the pre-release value, which is what we want.
-    rows = await sql`
+    // The bug those CASEs were patching: releasing a stall wiped the record of
+    // who was waiting for it, so the freed-stall notification could never say
+    // "your group can head over" to the group that had actually queued. S72C cut
+    // it down to two cases; one of them ("the stall is going fully free") was
+    // exactly the case that mattered, so the bug survived.
+    //
+    // The queue table is now untouched by a release regardless of who releases
+    // or why. A stall going free with groups still queued is the CORRECT and
+    // intended end state: selectStalls reads that as FREE with a non-empty queue,
+    // which is precisely the signal the waiting leads need.
+    // ------------------------------------------------------------------
+    await sql`
       UPDATE bootstrap_stalls
       SET claimed_by = array_remove(coalesce(claimed_by, '{}'), ${username}),
+          -- vestigial: status is derived on read (see selectStalls). Still
+          -- written so the raw column stays sane for anyone reading the table
+          -- directly in the Neon console.
           status = CASE
             WHEN array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
             THEN 'free' ELSE status
           END,
-          queued_by = CASE
-            WHEN queued_by = ${username}
-              OR array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
-            THEN NULL ELSE queued_by
-          END,
-          queued_at = CASE
-            WHEN queued_by = ${username}
-              OR array_length(array_remove(coalesce(claimed_by, '{}'), ${username}), 1) IS NULL
-            THEN NULL ELSE queued_at
-          END,
           updated_at = now()
       WHERE id = ${stallId}
-        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
-      RETURNING *`;
-  } else if (action === "mark_queued") {
-    // status guard: a stale card can't queue a stall that just went free
-    rows = await sql`
-      UPDATE bootstrap_stalls
-      SET status = 'queued', queued_by = ${username}, queued_at = now(), updated_at = now()
-      WHERE id = ${stallId} AND status = 'occupied'
-        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
-      RETURNING *`;
-  } else if (action === "unqueue") {
-    rows = await sql`
-      UPDATE bootstrap_stalls
-      SET status = 'occupied', queued_by = NULL, queued_at = NULL, updated_at = now()
-      WHERE id = ${stallId} AND status = 'queued'
-        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
-      RETURNING *`;
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)`;
   } else {
     // never pass a JS array as a driver param (spec rule) - build it in SQL
-    // queued_at clears whenever override lands on a non-queued status
-    rows = await sql`
+    //
+    // S73B: the queued_by pass-through is gone. It wrote a scalar column that no
+    // longer exists in any read path, and "manually mark this stall queued" has
+    // no meaning once a queue entry is a real group with a real row - the admin
+    // would have to pick WHICH group, which is a different control. The route
+    // now accepts free/occupied only. No queue-clearing logic is left here
+    // either: release stopped clearing the queue, so there is nothing for the
+    // override to mirror.
+    await sql`
       UPDATE bootstrap_stalls
       SET status = ${status ?? "free"},
           claimed_by = string_to_array(NULLIF(${username}, ''), ','),
-          queued_by = NULLIF(${status === "free" ? "" : (queuedBy ?? "")}, ''),
-          queued_at = CASE WHEN ${status ?? "free"} = 'queued' THEN coalesce(queued_at, now()) ELSE NULL END,
           updated_at = now()
       WHERE id = ${stallId}
-        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
-      RETURNING *`;
+        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)`;
   }
-  if (rows.length === 0) {
-    // guarded action raced a state change (or hit the occupancy cap) - hand back
-    // the current row so the tapping volunteer's UI resyncs immediately instead
-    // of 404ing. Scoped to the same session, so a cross-session id reads as
-    // not-found rather than leaking another session's row.
-    rows = await sql`
-      SELECT * FROM bootstrap_stalls
-      WHERE id = ${stallId}
-        AND (${sessionId}::uuid IS NULL OR session_id = ${sessionId}::uuid)
-      LIMIT 1`;
-  }
-  return (rows[0] as BootstrapStall) ?? null;
+  // Re-read through selectStalls whatever happened. Two reasons this replaced the
+  // old `RETURNING *`: the mutation cannot compute the derived status or attach
+  // the queue, and a guarded action that matched 0 rows (raced a state change, or
+  // hit the occupancy cap) still needs to hand the caller the CURRENT row so
+  // their UI resyncs instead of 404ing - which the old code needed a second query
+  // to do anyway. Session-scoped, so a cross-session id reads as not-found rather
+  // than leaking another session's row.
+  const fresh = await selectStalls(sessionId, stallId);
+  return fresh[0] ?? null;
+}
+
+/** S73B: one stall, same derived shape as the list. Session-scoped. */
+export async function getStallById(
+  stallId: string,
+  sessionId: string | null
+): Promise<BootstrapStall | null> {
+  const rows = await selectStalls(sessionId, stallId);
+  return rows[0] ?? null;
 }
 
 // map positions are percentages (0-100) from the top-left of the map image;
@@ -664,11 +819,24 @@ export async function getVolunteerByToken(token: string): Promise<BootstrapVolun
            -- S72C: the volunteer's own pending switch request, so their dashboard
            -- can show "switch request pending" instead of offering it again
            v.switch_requested_stall_id, v.switch_requested_at,
-           rst.stall_name AS switch_requested_stall_name
+           rst.stall_name AS switch_requested_stall_name,
+           -- S73B: the lead's own group. A queue entry belongs to the GROUP, and
+           -- this is the only place it is resolved for a queue action - the route
+           -- never takes a group id from the request body. Same bridge
+           -- getCheckinContext uses (team_lead_id, or the group_number -> "Group
+           -- X" name match for a lead who is not their group's recorded lead).
+           -- NULL for role 'stall' and for a lead not swept into a group yet;
+           -- the route 400s on that rather than guessing.
+           g.id AS group_id
     FROM bootstrap_volunteers v
     JOIN bootstrap_sessions s ON s.id = v.session_id
     LEFT JOIN bootstrap_stalls st ON st.id = v.suggested_stall_id
     LEFT JOIN bootstrap_stalls rst ON rst.id = v.switch_requested_stall_id
+    LEFT JOIN bootstrap_groups g
+      ON g.session_id = v.session_id
+     AND v.role = 'lead'
+     AND (g.team_lead_id = v.id
+          OR g.name = 'Group ' || chr(64 + v.group_number))
     WHERE v.current_session_token = ${token} AND s.is_active = true
     LIMIT 1`;
   return (rows[0] as BootstrapVolunteer) ?? null;
@@ -845,9 +1013,10 @@ export async function resolveStallSwitch(
     // claimed_by - and it would sit there showing OCCUPIED with a volunteer who
     // has physically walked away, clearable only by an admin override.
     //
-    // Uses the same updateStallStatus release branch a volunteer's own tap does,
-    // so S72C's queue scoping applies here too: another volunteer's queue signal
-    // on the old stall survives unless the stall actually goes free.
+    // Uses the same updateStallStatus release branch a volunteer's own tap does.
+    // S73B: that branch no longer touches the queue at all, so the groups waiting
+    // at the old stall keep their entries through an approved switch - which is
+    // right, since the stall is still there and they are still waiting for it.
     if (row.suggested_stall_id) {
       await updateStallStatus(
         row.suggested_stall_id,

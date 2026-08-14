@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 
 import type { BootstrapSession } from "@/lib/services/bootstrap";
+import SegmentedCount from "./SegmentedCount";
 
 interface StallDraft {
   stall_name: string;
   max_occupancy: number;
+  max_groups: number; // S73B - how many groups may be at the stall at once
   lead_names: string[]; // informational - shown on stall cards, no accounts (S35)
 }
 
@@ -28,6 +30,7 @@ export default function BootstrapCreateSession({
   const [stalls, setStalls] = useState<StallDraft[]>([]);
   const [stallName, setStallName] = useState("");
   const [stallOcc, setStallOcc] = useState(1);
+  const [stallGroups, setStallGroups] = useState(1);
   const [stallLeadsText, setStallLeadsText] = useState("");
   const [stallError, setStallError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,10 +62,20 @@ export default function BootstrapCreateSession({
       }
       const data = await res.json();
       const imported: StallDraft[] = (data.stalls ?? []).map(
-        (s: { stall_name: string; max_occupancy: number; lead_names: string | null }) => ({
+        (s: {
+          stall_name: string;
+          max_occupancy: number;
+          max_groups?: number;
+          lead_names: string | null;
+        }) => ({
           stall_name: s.stall_name,
           // occupancy is constrained to 1-3 in this form; clamp legacy values
           max_occupancy: Math.min(3, Math.max(1, Number(s.max_occupancy) || 1)),
+          // S73B: same clamp. An imported stall whose capacity was raised past 3
+          // by the live override comes back as 3 here, because this form cannot
+          // represent more - the admin re-raises it after creation. Clamping
+          // rather than dropping keeps the intent ("more than one group").
+          max_groups: Math.min(3, Math.max(1, Number(s.max_groups) || 1)),
           lead_names: s.lead_names
             ? s.lead_names.split(",").map((n) => n.trim()).filter(Boolean).slice(0, 3)
             : [],
@@ -98,10 +111,16 @@ export default function BootstrapCreateSession({
     setStallError("");
     setStalls([
       ...stalls,
-      { stall_name: stallName.trim(), max_occupancy: stallOcc, lead_names: leadNames },
+      {
+        stall_name: stallName.trim(),
+        max_occupancy: stallOcc,
+        max_groups: stallGroups,
+        lead_names: leadNames,
+      },
     ]);
     setStallName("");
     setStallOcc(1);
+    setStallGroups(1);
     setStallLeadsText("");
   }
 
@@ -388,29 +407,9 @@ export default function BootstrapCreateSession({
               maxLength={60}
               style={{ flex: "1 1 12rem" }}
             />
-            {/* max occupancy ∙ 1/2/3 segmented tiles */}
-            <div style={{ display: "flex" }}>
-              {[1, 2, 3].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setStallOcc(n)}
-                  style={{
-                    width: "2.4rem",
-                    padding: "0.55rem 0",
-                    fontFamily: "var(--font-mono), monospace",
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                    background: stallOcc === n ? "var(--accent)" : "transparent",
-                    color: stallOcc === n ? "var(--bg-base)" : "var(--text-primary)",
-                    border: "1px solid var(--border)",
-                    borderLeft: n === 1 ? "1px solid var(--border)" : "none",
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+            {/* max occupancy ∙ max groups -- 1/2/3 segmented tiles each */}
+            <SegmentedCount value={stallOcc} onChange={setStallOcc} label="Max volunteers" />
+            <SegmentedCount value={stallGroups} onChange={setStallGroups} label="Max groups" />
             <button
               type="button"
               className="btn-outline"
@@ -480,7 +479,9 @@ export default function BootstrapCreateSession({
                       </span>
                     )}
                   </span>
-                  <span className="admin-cell-mono">max {s.max_occupancy}</span>
+                  <span className="admin-cell-mono">
+                    max {s.max_occupancy} · {s.max_groups}g
+                  </span>
                   <button
                     type="button"
                     aria-label="Move up"

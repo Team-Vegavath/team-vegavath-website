@@ -49,6 +49,11 @@ export default function BootstrapDashboard({
   const [checkinToken, setCheckinToken] = useState<string | null>(null);
   // S35 - group number, assigned FCFS once the session is active
   const [groupNumber, setGroupNumber] = useState<number | null>(null);
+  // S73B - the lead's own group id, resolved server-side. Distinct from
+  // groupNumber, which is the human label: this is the key a queue entry is
+  // keyed on, and the only thing that can tell "my group is queued here" from
+  // "someone else's is". Null for stall volunteers.
+  const [myGroupId, setMyGroupId] = useState<string | null>(null);
   // S36 - lead classroom mode: rides the poll payload so it survives re-login
   // and stays in sync if an admin ever flips it server-side
   const [inClassroom, setInClassroom] = useState(false);
@@ -60,11 +65,12 @@ export default function BootstrapDashboard({
   const failCount = useRef(0);
   const [connectionIssue, setConnectionIssue] = useState(false);
 
-  // previous poll snapshot - freed-stall detection reads queued_by from here,
-  // because a stall that has just gone free has had its queued_by cleared, so the
-  // NEW row can no longer tell us who was waiting on it. (S72C narrowed that clear
-  // to "the caller set it, or the stall went fully free" - the second arm is
-  // exactly this case, so reading from the previous snapshot is still required.)
+  // Previous poll snapshot. S73B narrowed what this is for: it now answers ONLY
+  // "did this stall just transition to free", which is inherently a two-snapshot
+  // question. It is no longer the source for WHO was waiting - the queue survives
+  // the release now, so the new row itself carries that. That is the whole
+  // Section D story: the guard is not a bolt-on check, it is what falls out of
+  // reading live data instead of a stale snapshot.
   const prevStallsRef = useRef<BootstrapStall[]>([]);
   const [freedNotifications, setFreedNotifications] = useState<
     { id: string; name: string; forme: boolean }[]
@@ -93,6 +99,7 @@ export default function BootstrapDashboard({
       setVolunteerRole(data.volunteerRole ?? "stall");
       setCheckinToken(data.checkinToken ?? null);
       setGroupNumber(data.groupNumber ?? null);
+      setMyGroupId(data.myGroupId ?? null);
       setInClassroom(data.inClassroom ?? false);
       setLastUpdated(Date.now());
       failCount.current = 0;
@@ -107,13 +114,24 @@ export default function BootstrapDashboard({
         return s.status === "free" && prev && prev.status !== "free";
       });
 
+      // S73B (Section D): `forme` reads the CURRENT row's queue, not the previous
+      // snapshot. Before the release fix that was impossible - releasing wiped
+      // queued_by, so by the time a stall read "free" it had already forgotten who
+      // was waiting, and the snapshot was the only surviving copy. Now the queue
+      // entry is still there, which means this doubles as the guard the audit
+      // asked for: the banner fires only while the group's entry genuinely still
+      // exists. A lead who left the queue in the meantime gets nothing.
+      const myGroup = data.myGroupId ?? null;
+      const queuedHere = (s: BootstrapStall) =>
+        myGroup ? (s.queue ?? []).some((e) => e.group_id === myGroup) : false;
+
       if (justFreed.length > 0) {
         setFreedNotifications((prev) => [
           ...prev,
           ...justFreed.map((s) => ({
             id: s.id,
             name: s.stall_name,
-            forme: prevOf(s.id)?.queued_by === username, // was I waiting on it?
+            forme: queuedHere(s), // is my group still waiting on it?
           })),
         ]);
         setTimeout(() => {
@@ -124,9 +142,12 @@ export default function BootstrapDashboard({
       }
 
       // 5b: redirect suggestions - stalls that freed with NO group waiting,
-      // while I am queued somewhere else, ranked by map distance
-      const genuinelyFreed = justFreed.filter((s) => prevOf(s.id)?.queued_by == null);
-      const myQueuedStall = newStalls.find((s) => s.queued_by === username);
+      // while my group is queued somewhere else, ranked by map distance.
+      // "No group waiting" is now the live queue being empty rather than a
+      // remembered null, so a stall that frees with three groups queued correctly
+      // stops being offered as a spare.
+      const genuinelyFreed = justFreed.filter((s) => (s.queue ?? []).length === 0);
+      const myQueuedStall = newStalls.find(queuedHere);
 
       // S36 - classroom mode suppresses redirect suggestions (read fresh from
       // the poll payload, not the possibly-stale state closure)
@@ -157,7 +178,11 @@ export default function BootstrapDashboard({
       failCount.current += 1;
       if (failCount.current >= 3) setConnectionIssue(true);
     }
-  }, [username]);
+    // S73B: `username` used to be a dependency because the freed-stall check
+    // compared it against queued_by. Queue membership is now resolved by group id
+    // straight from the poll payload, so this closes over nothing but setters and
+    // refs.
+  }, []);
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -212,11 +237,18 @@ export default function BootstrapDashboard({
     if (others.length > 0) {
       parts.push(`${others.map(nameOf).join(", ")} currently holds this stall`);
     }
-    // Narrowed from the brief's "queued_by is set": a queue the CALLER set is not
-    // someone else's, and S72C's release fix clears exactly that one on purpose.
-    // Warning someone about their own queue entry is noise, not a safeguard.
-    if (stall.queued_by && stall.queued_by !== username) {
-      parts.push(`${nameOf(stall.queued_by)} is queued here`);
+    // S73B: names the waiting GROUPS rather than one queued_by username. The
+    // S72C exclusion ("do not warn about a queue the caller set themselves") is
+    // gone with the thing that motivated it - releasing no longer clears any
+    // queue entry, so there is no longer a destructive side effect to warn
+    // about. This is now purely informational: the groups listed here are still
+    // waiting after the release, which is what the releasing volunteer should
+    // know before walking off.
+    const waiting = stall.queue ?? [];
+    if (waiting.length > 0) {
+      parts.push(
+        `${waiting.map((e) => e.group_name).join(", ")} ${waiting.length === 1 ? "is" : "are"} still waiting here`
+      );
     }
     if (parts.length === 0) return null;
     return `Are you sure? ${parts.join(", and ")}.`;
@@ -733,6 +765,9 @@ export default function BootstrapDashboard({
               // offers queue actions only. Passed explicitly rather than relying
               // on the default, which is "stall".
               role="lead"
+              // S73B - which queue entry is ours. Without it the card cannot
+              // tell MARK QUEUED from LEAVE QUEUE.
+              myGroupId={myGroupId}
               onAction={inClassroom ? undefined : (action) => sendAction(stall.id, action)}
             />
           ))}

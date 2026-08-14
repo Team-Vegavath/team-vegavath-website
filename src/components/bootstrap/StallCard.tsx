@@ -62,7 +62,7 @@ export function StallGrid({ children }: { children: React.ReactNode }) {
 export type VolunteerStallAction = "claim" | "release" | "mark_queued" | "unqueue";
 
 // re-renders come from the 4s poll, so the count stays fresh without a ticker
-function waitMinutes(queued_at: string | null): number {
+export function waitMinutes(queued_at: string | null): number {
   if (!queued_at) return 0;
   return Math.floor((Date.now() - new Date(queued_at).getTime()) / 60000);
 }
@@ -111,53 +111,62 @@ const BTN_KINDS = {
 } satisfies Record<string, React.CSSProperties>;
 
 /**
- * Session 25 rules - MARK QUEUED stays open to anyone, but only the volunteer
- * who set the queue (queued_by) may clear it:
- *   free                     → CLAIM
- *   occupied, mine           → RELEASE + MARK QUEUED
- *   occupied, not mine       → MARK QUEUED (+ JOIN while max_occupancy has room)
- *   queued, I am queued_by   → BACK TO OCCUPIED (+ RELEASE if also in claimed_by)
- *   queued, in claimed_by    → RELEASE only
- *   queued, neither          → no actions, read-only
+ * S73B rules. The queue is a GROUP waiting at a stall (migration 027), not a
+ * username on the stall row, so every queue button is keyed on myGroupId:
+ *   role 'stall'                 → CLAIM / RELEASE / JOIN only, never a queue button
+ *   lead, nobody at the stall    → LEAVE QUEUE if my group is in it, else nothing
+ *   lead, someone at the stall   → my group queued ? LEAVE QUEUE : MARK QUEUED
  *
- * S72B (Section A5): those rules were role-blind, so a group lead's dashboard
- * rendered a full-width CLAIM on every stall card in the session. The server now
- * 403s claim/release for role 'lead' (see /api/bootstrap/stalls/[id]), and this
- * stops offering a button that can only fail. Leads keep the queue actions -
- * signalling a queue IS the group lead's job per docs/bootstrap-spec.md.
+ * The behaviour change from S72: MARK QUEUED used to be open to ANY volunteer of
+ * either role, because queued_by was one username and "who is waiting" was
+ * whoever tapped last. A stall volunteer has no group, so there is now nothing
+ * for them to enqueue - the route 403s it, and this stops offering a button that
+ * could only fail. In practice a stall volunteer never saw these anyway: their
+ * dashboard is StallVolunteerView, which renders its own single toggle and never
+ * mounts StallCard at all.
+ *
+ * S72B (Section A5): claim/release stay role-gated to 'stall'. The server 403s
+ * them for leads (see /api/bootstrap/stalls/[id]).
+ *
+ * Note the free-stall case: a lead whose group is queued at a stall that just
+ * went FREE still gets LEAVE QUEUE, because S73B stopped release from clearing
+ * the queue. That row surviving is what makes the "head over" banner possible,
+ * and the lead needs a way to stand down once their group has been.
  */
 function volunteerButtons(
   stall: BootstrapStall,
   username: string,
-  role: "stall" | "lead"
+  role: "stall" | "lead",
+  myGroupId: string | null
 ): { label: string; action: VolunteerStallAction; kind: keyof typeof BTN_KINDS }[] {
   const claimed = stall.claimed_by ?? [];
   const mine = claimed.includes(username);
   const mayClaim = role === "stall";
+  const iAmQueued = myGroupId
+    ? (stall.queue ?? []).some((e) => e.group_id === myGroupId)
+    : false;
+  const somebodyHere = claimed.length > 0;
 
-  if (stall.status === "free") {
-    return mayClaim ? [{ label: "Claim", action: "claim", kind: "accent" }] : [];
-  }
-  if (stall.status === "occupied") {
-    const buttons: ReturnType<typeof volunteerButtons> = [];
-    if (mayClaim) {
-      if (mine) {
-        buttons.push({ label: "Release", action: "release", kind: "danger" });
-      } else if (claimed.length < stall.max_occupancy) {
-        // shared-stall entry point (session 22) - kept alongside the new rules
-        buttons.push({ label: "Join", action: "claim", kind: "accent-outline" });
-      }
+  const buttons: ReturnType<typeof volunteerButtons> = [];
+
+  if (mayClaim) {
+    if (!somebodyHere) {
+      buttons.push({ label: "Claim", action: "claim", kind: "accent" });
+    } else if (mine) {
+      buttons.push({ label: "Release", action: "release", kind: "danger" });
+    } else if (claimed.length < stall.max_occupancy) {
+      // shared-stall entry point (session 22) - kept alongside the new rules
+      buttons.push({ label: "Join", action: "claim", kind: "accent-outline" });
     }
-    buttons.push({ label: "Mark queued", action: "mark_queued", kind: "queued" });
+    // stall volunteers get no queue buttons at all, by construction
     return buttons;
   }
-  // queued
-  const buttons: ReturnType<typeof volunteerButtons> = [];
-  if (mayClaim && mine) {
-    buttons.push({ label: "Release", action: "release", kind: "danger" });
-  }
-  if (stall.queued_by === username) {
-    buttons.push({ label: "Back to occupied", action: "unqueue", kind: "neutral" });
+
+  // role 'lead' from here down
+  if (iAmQueued) {
+    buttons.push({ label: "Leave queue", action: "unqueue", kind: "neutral" });
+  } else if (somebodyHere) {
+    buttons.push({ label: "Mark queued", action: "mark_queued", kind: "queued" });
   }
   return buttons;
 }
@@ -173,6 +182,7 @@ export default function StallCard({
   stall,
   username,
   role = "stall",
+  myGroupId = null,
   onAction,
   expanded,
   onToggle,
@@ -183,6 +193,10 @@ export default function StallCard({
   // S72B: decides which actions are offered. Defaults to "stall" so the admin
   // mode (which passes neither username nor role) is unaffected.
   role?: "stall" | "lead";
+  // S73B: the viewing lead's own group, resolved server-side and passed down
+  // from the poll payload. Null for stall volunteers and for the admin view,
+  // both of which get no queue buttons anyway.
+  myGroupId?: string | null;
   onAction?: (action: VolunteerStallAction) => void;
   expanded?: boolean;
   onToggle?: () => void;
@@ -286,22 +300,34 @@ export default function StallCard({
             ? `${stall.status === "queued" ? "Presenting: " : ""}${claimed.join(", ")}`
             : "No one here"}
         </div>
-        {stall.status === "queued" && stall.queued_by && (
-          <div style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: BS.queued }}>
-            Queued: {stall.queued_by}
-            {stall.queued_at && (
-              <span
-                style={{
-                  marginLeft: "0.4rem",
-                  fontFamily: "var(--font-mono), monospace",
-                  fontSize: "0.7rem",
-                  // yellow past 20 min - visual urgency signal
-                  color: waitMinutes(stall.queued_at) > 20 ? BS.queued : BS.muted,
-                }}
-              >
-                ({waitMinutes(stall.queued_at)} min)
-              </span>
-            )}
+        {/* S73B: the whole queue, not one name. Gated on the array rather than on
+            status, because a FREE stall can now have groups still waiting - that
+            is the release fix, and hiding the list there would hide exactly the
+            case the volunteer needs to see. Rendered in queued_at order as a
+            HINT only: no position numbers, because the waiting set is unordered
+            and an ordinal would promise a turn nobody is enforcing. */}
+        {(stall.queue ?? []).length > 0 && (
+          <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", color: BS.queued }}>
+            {(stall.queue ?? []).map((entry) => {
+              const mins = waitMinutes(entry.queued_at);
+              return (
+                <div key={entry.group_id} style={{ marginTop: "0.15rem" }}>
+                  Waiting: {entry.group_name}
+                  {entry.lead_name ? ` (${entry.lead_name})` : ""}
+                  <span
+                    style={{
+                      marginLeft: "0.4rem",
+                      fontFamily: "var(--font-mono), monospace",
+                      fontSize: "0.7rem",
+                      // yellow past 20 min - visual urgency signal
+                      color: mins > 20 ? BS.queued : BS.muted,
+                    }}
+                  >
+                    ({mins} min)
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -311,7 +337,7 @@ export default function StallCard({
         (() => {
           // A lead on a free stall now has no actions at all, so skip the
           // wrapper entirely rather than leaving an empty 14px gap under the card.
-          const buttons = volunteerButtons(stall, username, role);
+          const buttons = volunteerButtons(stall, username, role, myGroupId);
           if (buttons.length === 0) return null;
           return (
             <div

@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { updateStallStatus } from "@/lib/services/bootstrap";
 
-const STATUSES = ["free", "occupied", "queued"] as const;
+// S73B: "queued" is gone from the admin override. It used to write the scalar
+// queued_by column; a queue entry is now a real group with a real row, so
+// "manually mark this stall queued" would have to ask WHICH group - a different
+// control on a different grain, and not one the admin has ever needed. The
+// override's job is unsticking a stall someone walked away from, which is
+// free/occupied. Nothing here clears the queue either: release stopped clearing
+// it (that was the whole point of S73B Section B), so there is nothing to mirror.
+const STATUSES = ["free", "occupied"] as const;
 
 // Admin override - sets status and claimed_by directly, no conflict check.
 export async function PATCH(
@@ -34,14 +41,11 @@ export async function PATCH(
           ? body.claimed_by.join(",")
           : String(body?.claimed_by ?? "");
 
-    // optional queued_by pass-through - the service clears it when status is "free"
-    const queuedBy = body?.queued_by ? String(body.queued_by) : undefined;
-
     // sessionId null = deliberately unscoped. The admin override is the one
     // caller allowed to reach any stall in any session (S72B added session
     // scoping to every other path); this route is nested under /admin and
     // already carries both the isAdmin and the viewer guard above.
-    const stall = await updateStallStatus(id, claimedBy, "override", null, status, queuedBy);
+    const stall = await updateStallStatus(id, claimedBy, "override", null, status);
     if (!stall) {
       return NextResponse.json({ error: "Stall not found" }, { status: 404 });
     }

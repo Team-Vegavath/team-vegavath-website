@@ -40,6 +40,13 @@ export async function GET() {
       // S72C (Section D1) - names for the release-confirmation dialog, so it can
       // say "Kethan K B is queued here" rather than an SRN.
       volunteerNames,
+      // S73B - the lead's own group, resolved server-side. The client needs it to
+      // tell "my group is in this stall's queue" from "somebody else's is", which
+      // drives both the queue buttons and the freed-stall banner. It is an
+      // identifier the volunteer already effectively holds (it is their own
+      // group), not a capability: every queue mutation re-resolves it server-side
+      // and ignores anything the client sends.
+      myGroupId: volunteer.group_id ?? null,
       volunteerRole: volunteer.role ?? "stall", // S32 - picks the dashboard view
       checkinToken: volunteer.checkin_token ?? null, // S33 - lead's stable QR token
       groupNumber: volunteer.group_number ?? null, // S35 - assigned FCFS on activation

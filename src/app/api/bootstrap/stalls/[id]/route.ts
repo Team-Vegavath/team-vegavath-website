@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateStallStatus } from "@/lib/services/bootstrap";
+import {
+  addToQueue,
+  getStallById,
+  removeFromQueue,
+  updateStallStatus,
+} from "@/lib/services/bootstrap";
 import { getVolunteerFromCookie } from "../../volunteer-auth";
 
-// mark_queued is cooperative - any volunteer, either role, may signal a queue on
-// any occupied stall in their session: that is the group lead's whole job (see
-// docs/bootstrap-spec.md, "group volunteers get queue"). unqueue is likewise open
-// to both, still gated in the UI to the volunteer recorded in queued_by (a stale
-// tap is harmless and the next poll self-corrects).
-//
-// claim/release are NOT cooperative. See STALL_ONLY_ACTIONS below.
+// The wire-level action names are unchanged from S72; what they DO underneath
+// changed in S73B.
 const ACTIONS = ["claim", "release", "mark_queued", "unqueue"] as const;
 type VolunteerAction = (typeof ACTIONS)[number];
 
@@ -20,6 +20,21 @@ type VolunteerAction = (typeof ACTIONS)[number];
 // physically standing at that stall, so claim/release are stall-role only, and
 // only for their OWN stall.
 const STALL_ONLY_ACTIONS: readonly VolunteerAction[] = ["claim", "release"];
+
+/**
+ * S73B: queue actions are now LEAD-ONLY, which is a real behaviour change.
+ *
+ * Before: mark_queued was cooperative - ANY volunteer of either role could set
+ * queued_by on any occupied stall, because the queue was a single scalar column
+ * holding one username and "who is waiting" was whoever tapped last.
+ *
+ * After: a queue entry is a GROUP waiting at a stall. A stall volunteer has no
+ * group, so there is nothing for them to enqueue - the action is not merely
+ * discouraged for them, it is unrepresentable. The group is resolved server-side
+ * from the cookie volunteer (getVolunteerByToken's group_id), never from the
+ * request body, so one lead cannot queue or unqueue another lead's group.
+ */
+const LEAD_ONLY_ACTIONS: readonly VolunteerAction[] = ["mark_queued", "unqueue"];
 
 export async function PATCH(
   req: NextRequest,
@@ -61,11 +76,68 @@ export async function PATCH(
       }
     }
 
+    if (LEAD_ONLY_ACTIONS.includes(action)) {
+      if (volunteer.role !== "lead") {
+        return NextResponse.json(
+          { error: "Only group leads can queue for a stall" },
+          { status: 403 }
+        );
+      }
+      // A lead whose group_number has not been swept yet (or whose group was
+      // deleted) resolves to no group. 400 with the reason rather than a silent
+      // no-op, so the volunteer knows to find an admin.
+      if (!volunteer.group_id) {
+        return NextResponse.json(
+          { error: "You have no group assigned yet - ask an admin" },
+          { status: 400 }
+        );
+      }
+
+      if (action === "mark_queued") {
+        // Session scoping and the "somebody is actually at this stall" guard are
+        // both WHERE predicates inside addToQueue, so they cannot be skipped by a
+        // future caller. False means one of them failed.
+        const queued = await addToQueue(
+          id,
+          volunteer.group_id,
+          volunteer.id,
+          volunteer.session_id
+        );
+        if (!queued) {
+          // Already queued here is the common case and is a success from the
+          // volunteer's point of view - their group IS in the queue. Fall through
+          // to the fresh-row response rather than erroring on a double-tap.
+          const stall = await getStallById(id, volunteer.session_id);
+          if (!stall) {
+            return NextResponse.json({ error: "Stall not found" }, { status: 404 });
+          }
+          const alreadyQueued = stall.queue.some(
+            (e) => e.group_id === volunteer.group_id
+          );
+          if (!alreadyQueued) {
+            return NextResponse.json(
+              { error: "Nobody is at that stall right now - head over instead" },
+              { status: 409 }
+            );
+          }
+          return NextResponse.json(stall);
+        }
+      } else {
+        await removeFromQueue(id, volunteer.group_id);
+      }
+
+      const stall = await getStallById(id, volunteer.session_id);
+      if (!stall) {
+        return NextResponse.json({ error: "Stall not found" }, { status: 404 });
+      }
+      return NextResponse.json(stall);
+    }
+
     // A2 - session scoping happens inside the service, on every branch.
     const stall = await updateStallStatus(
       id,
       volunteer.username,
-      action,
+      action as "claim" | "release",
       volunteer.session_id
     );
     if (!stall) {

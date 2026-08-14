@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 
 import BootstrapMapSVG from "@/components/bootstrap/BootstrapMapSVG";
 import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootstrap/StallCard";
+import SegmentedCount from "./SegmentedCount";
 import type {
   BootstrapFeedbackSummary,
   BootstrapSession,
@@ -40,8 +41,12 @@ export default function BootstrapAdminDashboard({
   const [stallFormOpen, setStallFormOpen] = useState(false);
   const [newStallName, setNewStallName] = useState("");
   const [newStallOcc, setNewStallOcc] = useState(1);
+  // S73B - how many GROUPS may be at the new stall at once (migration 027)
+  const [newStallGroups, setNewStallGroups] = useState(1);
   const [stallBusy, setStallBusy] = useState<string | null>(null);
   const [stallError, setStallError] = useState("");
+  // S73B - live capacity override, keyed by stall id while an edit is in flight
+  const [capacityBusy, setCapacityBusy] = useState<string | null>(null);
   // S55 volunteer detail edit - name / phone / SRN, one row at a time
   const [volEditId, setVolEditId] = useState<string | null>(null);
   const [volName, setVolName] = useState("");
@@ -181,7 +186,11 @@ export default function BootstrapAdminDashboard({
       const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/stalls`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stallName: name, maxOccupancy: newStallOcc }),
+        body: JSON.stringify({
+          stallName: name,
+          maxOccupancy: newStallOcc,
+          maxGroups: newStallGroups,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -191,9 +200,46 @@ export default function BootstrapAdminDashboard({
       setStalls((prev) => [...prev, data.stall as BootstrapStall]);
       setNewStallName("");
       setNewStallOcc(1);
+      setNewStallGroups(1);
       setStallFormOpen(false);
     } finally {
       setStallBusy(null);
+    }
+  }
+
+  /**
+   * S73B (Section C): live per-stall group capacity, 1-10.
+   *
+   * The second of the two widgets that write this one column - the setup tiles
+   * above offer 1/2/3 to match max_occupancy's control, this one goes wider
+   * because a stall that turns out to absorb more groups than planned is exactly
+   * the situation an admin needs to fix mid-event.
+   *
+   * Optimistic like handlePositionSet: the number lands instantly and the 4s poll
+   * confirms. On rejection the poll puts the old value back within one cycle, and
+   * the error line says why.
+   */
+  async function setMaxGroups(stallId: string, n: number) {
+    if (!Number.isInteger(n) || n < 1 || n > 10) {
+      setStallError("Groups must be a whole number between 1 and 10");
+      return;
+    }
+    setCapacityBusy(stallId);
+    setStallError("");
+    setStalls((prev) => prev.map((s) => (s.id === stallId ? { ...s, max_groups: n } : s)));
+    try {
+      const res = await fetch(`/api/admin/bootstrap/stalls/${stallId}/max-groups`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_groups: n }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setStallError(data?.error ?? "Failed to set capacity");
+        await poll(); // put the real value back
+      }
+    } finally {
+      setCapacityBusy(null);
     }
   }
 
@@ -677,13 +723,18 @@ export default function BootstrapAdminDashboard({
     }
   }
 
-  // groups stuck in the queue past 15 min - derived from polled data, no extra API
-  const longWaiters = stalls.filter(
-    (s) =>
-      s.status === "queued" &&
-      s.queued_by &&
-      s.queued_at &&
-      Date.now() - new Date(s.queued_at).getTime() > 15 * 60 * 1000
+  // Groups stuck in the queue past 15 min - derived from polled data, no extra API.
+  //
+  // S73B: flattened from one-alert-per-stall to one-per-waiting-GROUP, because a
+  // stall can now have several groups queued and the old shape could only ever
+  // surface the single queued_by name. The status check is gone with it: a stall
+  // that went FREE while groups are still queued is the MOST urgent case (nobody
+  // is being served and nobody has moved), and gating on status === "queued"
+  // would have hidden exactly that.
+  const longWaiters = stalls.flatMap((s) =>
+    (s.queue ?? [])
+      .filter((e) => Date.now() - new Date(e.queued_at).getTime() > 15 * 60 * 1000)
+      .map((e) => ({ stall: s, entry: e }))
   );
 
   const counts = {
@@ -733,11 +784,11 @@ export default function BootstrapAdminDashboard({
       </div>
 
       {/* Long-wait alerts - refresh with the 4s poll */}
-      {longWaiters.map((s) => {
-        const mins = Math.floor((Date.now() - new Date(s.queued_at!).getTime()) / 60000);
+      {longWaiters.map(({ stall: s, entry }) => {
+        const mins = Math.floor((Date.now() - new Date(entry.queued_at).getTime()) / 60000);
         return (
           <div
-            key={s.id}
+            key={`${s.id}:${entry.group_id}`}
             style={{
               background: "color-mix(in srgb, var(--warning) 10%, transparent)",
               border: "1px solid var(--warning)",
@@ -758,7 +809,8 @@ export default function BootstrapAdminDashboard({
                 letterSpacing: "0.06em",
               }}
             >
-              {s.queued_by} waiting at {s.stall_name} for {mins} min
+              {entry.group_name} waiting at {s.stall_name} for {mins} min
+              {s.status === "free" ? " -- STALL IS FREE" : ""}
             </span>
             <span
               style={{
@@ -901,30 +953,19 @@ export default function BootstrapAdminDashboard({
                 aria-label="New stall name"
                 style={{ flex: "1 1 12rem", fontSize: "0.8rem" }}
               />
-              {/* same 1/2/3 segmented occupancy control as session creation */}
-              <div style={{ display: "flex" }}>
-                {[1, 2, 3].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setNewStallOcc(n)}
-                    aria-pressed={newStallOcc === n}
-                    style={{
-                      width: "2.4rem",
-                      padding: "0.5rem 0",
-                      fontFamily: "var(--font-mono), monospace",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      background: newStallOcc === n ? "var(--accent)" : "transparent",
-                      color: newStallOcc === n ? "var(--bg-base)" : "var(--text-primary)",
-                      border: "1px solid var(--border)",
-                      borderLeft: n === 1 ? "1px solid var(--border)" : "none",
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+              {/* volunteers behind the stall / groups at it -- same control,
+                  two columns. Raising groups past 3 is the stall table's live
+                  override, not this form. */}
+              <SegmentedCount
+                value={newStallOcc}
+                onChange={setNewStallOcc}
+                label="Max volunteers"
+              />
+              <SegmentedCount
+                value={newStallGroups}
+                onChange={setNewStallGroups}
+                label="Max groups"
+              />
               <button
                 className="btn-primary"
                 style={{ padding: "0.5rem 1.1rem", fontSize: "0.7rem", cursor: "pointer" }}
@@ -949,7 +990,9 @@ export default function BootstrapAdminDashboard({
                   <th>#</th>
                   <th>Stall</th>
                   <th>Max</th>
+                  <th>Groups</th>
                   <th>Claimed by</th>
+                  <th>Waiting</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -964,8 +1007,47 @@ export default function BootstrapAdminDashboard({
                           {s.stall_name}
                         </td>
                         <td className="admin-cell-mono">{s.max_occupancy}</td>
+                        {/* S73B: the live capacity override. Editable for admins,
+                            read-only text for viewers, sitting next to the
+                            read-only max_occupancy cell it mirrors. */}
+                        <td className="admin-cell-mono">
+                          {isViewer ? (
+                            s.max_groups
+                          ) : (
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={s.max_groups}
+                              disabled={capacityBusy === s.id}
+                              aria-label={`Max groups at ${s.stall_name}`}
+                              onChange={(e) => {
+                                const n = Number(e.target.value);
+                                if (Number.isInteger(n) && n >= 1 && n <= 10) {
+                                  void setMaxGroups(s.id, n);
+                                }
+                              }}
+                              style={{
+                                width: "3.5rem",
+                                padding: "0.25rem 0.4rem",
+                                fontFamily: "var(--font-mono), monospace",
+                                fontSize: "0.8rem",
+                                background: "transparent",
+                                color: "var(--text-primary)",
+                                border: "1px solid var(--border)",
+                              }}
+                            />
+                          )}
+                        </td>
                         <td className="admin-cell-mono">
                           {claimed.length > 0 ? claimed.join(", ") : "-"}
+                        </td>
+                        {/* S73B: the queue that replaced queued_by. A stall can
+                            hold several waiting groups now, so this is a list. */}
+                        <td className="admin-cell-mono">
+                          {(s.queue ?? []).length > 0
+                            ? (s.queue ?? []).map((e) => e.group_name).join(", ")
+                            : "-"}
                         </td>
                         <td>
                           <button
@@ -986,7 +1068,7 @@ export default function BootstrapAdminDashboard({
                   })
                 ) : (
                   <tr>
-                    <td className="admin-empty" colSpan={5}>
+                    <td className="admin-empty" colSpan={7}>
                       No stalls in this session yet.
                     </td>
                   </tr>
