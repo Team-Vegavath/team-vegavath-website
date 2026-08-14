@@ -306,6 +306,29 @@ export default function BootstrapAdminDashboard({
    * "the session ended" and "every group finished everywhere" are different
    * claims, and only a human should assert the second.
    */
+  /**
+   * S73D (I1): spread unplaced groups across stalls as advisory placements.
+   *
+   * Safe to tap repeatedly - the candidate set is groups with no queue row
+   * anywhere, so a re-run only fills gaps. No confirm dialog for that reason:
+   * unlike END ALL VISITS this writes nothing destructive, and each lead still
+   * has to accept or decline their own suggestion.
+   */
+  async function distributeGroups() {
+    setStallError("");
+    const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/distribute`, {
+      method: "POST",
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
+    if (!res?.ok) {
+      setStallError(data?.error ?? "Failed to distribute groups");
+      return;
+    }
+    // I4: no refusal on overflow, just an honest count. Leftovers get no row.
+    setStallError(`Placed ${data?.placed ?? 0} of ${data?.total ?? 0} unplaced group(s).`);
+    await poll();
+  }
+
   async function sweepVisits() {
     if (
       !window.confirm(
@@ -787,6 +810,15 @@ export default function BootstrapAdminDashboard({
         <h1 className="admin-page-title">{session.name}</h1>
         {!isViewer ? (
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            {/* S73D (I1) - runs during the event, so it leads */}
+            <button
+              className="btn-outline"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
+              onClick={distributeGroups}
+              title="Suggest a stall to every group that has none. Re-runnable."
+            >
+              DISTRIBUTE GROUPS
+            </button>
             {/* S73C (G3) - runs before deactivating, so it sits before it */}
             <button
               className="btn-outline"

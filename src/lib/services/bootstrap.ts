@@ -21,7 +21,11 @@ export interface StallQueueEntry {
   group_name: string;
   lead_name: string | null; // display only; null once the lead who queued is gone
   queued_at: string;
-  accepted_at: string | null; // S73D advisory placement; unused in S73B
+  accepted_at: string | null; // S73D - set when the lead confirms an admin placement
+  // S73D: an UNCONFIRMED admin auto-placement, as opposed to a queue entry a lead
+  // set themselves. Derived rather than stored, so it needed no migration:
+  // distributeGroups inserts with volunteer_id NULL, every manual path sets it.
+  is_advisory: boolean;
 }
 
 // S73C (migration 028): a group currently AT a stall, i.e. a visit row whose
@@ -414,7 +418,8 @@ async function selectStalls(
                         'group_name',  g.name,
                         'lead_name',   lv.display_name,
                         'queued_at',   bq.queued_at,
-                        'accepted_at', bq.accepted_at
+                        'accepted_at', bq.accepted_at,
+                        'is_advisory', (bq.volunteer_id IS NULL AND bq.accepted_at IS NULL)
                       ) ORDER BY bq.queued_at ASC
                     )
              FROM bootstrap_stall_queue bq
@@ -665,6 +670,142 @@ export async function sweepOpenVisits(sessionId: string): Promise<number> {
     WHERE session_id = ${sessionId}::uuid AND left_at IS NULL
     RETURNING id`;
   return rows.length;
+}
+
+/**
+ * S73D (I5): the lead confirms an admin auto-placement. Sets accepted_at, which
+ * stops it reading as advisory and dismisses the confirm block.
+ *
+ * Scoped to the caller's own group by the predicate, exactly like
+ * removeFromQueue - the group id is server-resolved and never taken from a body.
+ * "NOT NOW" has no function of its own: declining DELETES the row, which is
+ * plain removeFromQueue. Leaving it unaccepted was the alternative and is worse -
+ * the banner would reappear on the next 4s poll, so the dismissal would not
+ * stick and the control would read as broken.
+ */
+export async function acceptQueuePlacement(
+  stallId: string,
+  groupId: string
+): Promise<void> {
+  await sql`
+    UPDATE bootstrap_stall_queue
+    SET accepted_at = now()
+    WHERE stall_id = ${stallId}::uuid
+      AND group_id = ${groupId}::uuid
+      AND accepted_at IS NULL`;
+}
+
+/**
+ * S73D (H1): who is in a group. Name and SRN/PRN only.
+ *
+ * NEVER selects phone. The roster is shown to a group LEAD on their own
+ * dashboard, and a lead needs to know who is with them, not how to cold-call
+ * them - the check-in flow already gives the lead's number to the visitors,
+ * which is the direction contact should flow. The narrow SELECT makes the leak
+ * impossible rather than relying on the caller to strip fields, the same
+ * reasoning getSessionVolunteerNames documents.
+ */
+/**
+ * S73D (H3): just the headcount, for the group card's "Group 3 · 14 checked in".
+ * Separate from getGroupRoster so the 4s poll carries a single integer instead of
+ * every visitor's name and PRN - the roster itself is fetched only when the lead
+ * actually opens it.
+ */
+export async function getGroupVisitorCount(groupId: string): Promise<number> {
+  const rows = await sql`
+    SELECT count(*)::int AS n FROM bootstrap_visitors
+    WHERE group_id = ${groupId}::uuid`;
+  return (rows[0] as { n: number }).n;
+}
+
+export async function getGroupRoster(
+  groupId: string
+): Promise<{ name: string; prn: string; arrived_at: string }[]> {
+  const rows = await sql`
+    SELECT name, prn, arrived_at
+    FROM bootstrap_visitors
+    WHERE group_id = ${groupId}::uuid
+    ORDER BY arrived_at ASC
+    LIMIT 50`;
+  return rows as { name: string; prn: string; arrived_at: string }[];
+}
+
+/**
+ * S73D (I): spread unplaced groups across stalls as ADVISORY placements.
+ *
+ * Idempotent by construction: the candidate set is groups with no queue row
+ * ANYWHERE, so re-running only fills gaps and never reshuffles anyone. Same
+ * `WHERE ... IS NULL`-shaped discipline as assignGroupNumbers and
+ * assignUnassignedVisitors.
+ *
+ * I2's coupling, which is the part worth being careful about: a group is
+ * excluded from a stall by VISIT HISTORY, not merely by where it is now. A group
+ * that has been to a stall and left is unplaced but must never be sent back -
+ * that is the same hard revisit ban the UNIQUE(stall_id, group_id) on the visit
+ * table enforces, applied one step earlier so the suggestion never appears.
+ *
+ * Writes go straight to SQL rather than through addToQueue, deliberately: that
+ * function requires somebody to be AT the stall (you queue for a busy stall),
+ * and an advisory placement is the opposite case - it is most useful for a stall
+ * standing empty. volunteer_id is left NULL, which is what marks the row
+ * advisory (see StallQueueEntry.is_advisory).
+ *
+ * No refusal on overflow (I4): places what fits and reports it. Groups that fit
+ * nowhere get no row and no tracked state.
+ */
+export async function distributeGroups(
+  sessionId: string
+): Promise<{ placed: number; total: number }> {
+  const groupRows = await sql`
+    SELECT g.id, g.name FROM bootstrap_groups g
+    WHERE g.session_id = ${sessionId}::uuid
+      AND NOT EXISTS (
+        SELECT 1 FROM bootstrap_stall_queue q WHERE q.group_id = g.id
+      )
+    ORDER BY g.name ASC LIMIT 50`;
+  const groups = groupRows as { id: string; name: string }[];
+  if (groups.length === 0) return { placed: 0, total: 0 };
+
+  const stallRows = await sql`
+    SELECT st.id, st.max_groups,
+           (SELECT count(*) FROM bootstrap_stall_queue q WHERE q.stall_id = st.id)::int AS load
+    FROM bootstrap_stalls st
+    WHERE st.session_id = ${sessionId}::uuid
+    ORDER BY st.stall_number ASC LIMIT 50`;
+  const stalls = (stallRows as { id: string; max_groups: number; load: number }[]).map(
+    (s) => ({ ...s })
+  );
+  if (stalls.length === 0) return { placed: 0, total: groups.length };
+
+  // Every (stall, group) pair that has EVER happened, open or closed. This is
+  // the visit-history exclusion; a single read beats one query per candidate.
+  const visitRows = await sql`
+    SELECT stall_id, group_id FROM bootstrap_stall_visits
+    WHERE session_id = ${sessionId}::uuid LIMIT 2000`;
+  const visited = new Set(
+    (visitRows as { stall_id: string; group_id: string }[]).map(
+      (v) => `${v.stall_id}:${v.group_id}`
+    )
+  );
+
+  let placed = 0;
+  for (const group of groups) {
+    // Least-loaded stall this group has not been to and that still has advisory
+    // room. `load` counts existing queue rows, so a second run keeps spreading
+    // rather than piling onto the first stall.
+    const target = stalls
+      .filter((s) => !visited.has(`${s.id}:${group.id}`) && s.load < s.max_groups)
+      .sort((a, b) => a.load - b.load)[0];
+    if (!target) continue; // no room anywhere it may go - leftover, no row
+
+    await sql`
+      INSERT INTO bootstrap_stall_queue (stall_id, group_id, volunteer_id)
+      VALUES (${target.id}::uuid, ${group.id}::uuid, NULL)
+      ON CONFLICT (stall_id, group_id) DO NOTHING`;
+    target.load += 1;
+    placed += 1;
+  }
+  return { placed, total: groups.length };
 }
 
 export type StallAction = "claim" | "release" | "override";
@@ -1432,6 +1573,10 @@ export async function getCheckinContext(token: string): Promise<CheckinContext |
 // S33: the token lookup already resolved the group, so check in directly to it;
 // the capacity check and the INSERT are one statement, so two phones scanning
 // the last slot at once can't both get in. Returns false when the group is full.
+// S73D (J1): returns the new visitor's own id rather than a bare boolean. That
+// UUID is the bearer token for their checklist page - already a PK, already
+// unguessable, so the revisitable checklist needed no new schema at all. Null
+// still means "group was full", the same signal the boolean carried.
 export async function checkinVisitorToGroup(
   sessionId: string,
   groupId: string,
@@ -1439,13 +1584,99 @@ export async function checkinVisitorToGroup(
   name: string,
   prn: string,
   phone: string
-): Promise<boolean> {
+): Promise<string | null> {
   const rows = await sql`
     INSERT INTO bootstrap_visitors (session_id, name, prn, phone, group_id)
     SELECT ${sessionId}, ${name}, ${prn}, ${phone}, ${groupId}
     WHERE (SELECT count(*) FROM bootstrap_visitors WHERE group_id = ${groupId}) < ${maxGroupSize}
     RETURNING id`;
-  return rows.length === 1;
+  return (rows[0] as { id: string } | undefined)?.id ?? null;
+}
+
+// S73D (J3): everything the student checklist page shows, from the visitor's own
+// id. Deliberately narrow -- see the function's comment.
+export interface VisitorChecklistContext {
+  visitor_name: string;
+  visitor_prn: string;
+  session_name: string;
+  group_number: number | null;
+  lead_name: string | null;
+  lead_phone: string | null;
+  stalls: {
+    id: string;
+    stall_name: string;
+    visited: boolean;
+    arrived_at: string | null;
+  }[];
+}
+
+/**
+ * S73D (J3). This page is unauthenticated-by-token, so the SELECT discipline is
+ * Section H's applied at full strength: it returns the visitor's OWN details,
+ * their group's number, and the lead contact the welcome screen already gave
+ * them. It never selects another visitor's row, never a login_code, and nothing
+ * from claimed_by or the queue.
+ *
+ * `visited` is `left_at IS NOT NULL`, not merely "a row exists". A group standing
+ * at a stall right now has not finished it. That is also why the checklist reads
+ * empty for most of a visit and why the admin's END ALL VISITS sweep (S73C)
+ * matters at the end of an event: without it, stalls the group actually
+ * completed but never released stay unticked forever.
+ *
+ * No is_active gate on the session, unlike getCheckinContext. A student looking
+ * at their record after the event is over should still see it; the id is
+ * unguessable and the data is their own.
+ */
+export async function getVisitorChecklistContext(
+  visitorId: string
+): Promise<VisitorChecklistContext | null> {
+  const rows = await sql`
+    SELECT v.name AS visitor_name, v.prn AS visitor_prn, v.group_id,
+           v.session_id, s.name AS session_name,
+           lead.display_name AS lead_name, lead.phone AS lead_phone,
+           lead.group_number
+    FROM bootstrap_visitors v
+    JOIN bootstrap_sessions s ON s.id = v.session_id
+    LEFT JOIN bootstrap_groups g ON g.id = v.group_id
+    LEFT JOIN bootstrap_volunteers lead ON lead.id = g.team_lead_id
+    WHERE v.id = ${visitorId}::uuid
+    LIMIT 1`;
+  const row = rows[0] as
+    | {
+        visitor_name: string;
+        visitor_prn: string;
+        group_id: string | null;
+        session_id: string;
+        session_name: string;
+        lead_name: string | null;
+        lead_phone: string | null;
+        group_number: number | null;
+      }
+    | undefined;
+  if (!row) return null;
+
+  // The denormalized session_id on the visit table is what makes this one index
+  // hit rather than a join back through bootstrap_stalls.
+  const stallRows = await sql`
+    SELECT st.id, st.stall_name,
+           (vis.left_at IS NOT NULL) AS visited,
+           vis.arrived_at
+    FROM bootstrap_stalls st
+    LEFT JOIN bootstrap_stall_visits vis
+      ON vis.stall_id = st.id AND vis.group_id = ${row.group_id}::uuid
+    WHERE st.session_id = ${row.session_id}::uuid
+    ORDER BY st.stall_number ASC
+    LIMIT 50`;
+
+  return {
+    visitor_name: row.visitor_name,
+    visitor_prn: row.visitor_prn,
+    session_name: row.session_name,
+    group_number: row.group_number,
+    lead_name: row.lead_name,
+    lead_phone: row.lead_phone,
+    stalls: stallRows as VisitorChecklistContext["stalls"],
+  };
 }
 
 export async function getBootstrapVisitors(sessionId: string): Promise<BootstrapVisitor[]> {

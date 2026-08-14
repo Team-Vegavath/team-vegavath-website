@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getActiveBootstrapSession,
   getBootstrapStalls,
+  getGroupVisitorCount,
   getSessionVolunteerNames,
 } from "@/lib/services/bootstrap";
 import { getVolunteerFromCookie } from "../volunteer-auth";
@@ -23,6 +24,11 @@ export async function GET() {
       // is volunteer-authenticated. See getSessionVolunteerNames' own comment.
       getSessionVolunteerNames(volunteer.session_id),
     ]);
+    // S73D: one small indexed count, and only for a lead who actually has a
+    // group. Stall volunteers pay nothing for it.
+    const groupSize = volunteer.group_id
+      ? await getGroupVisitorCount(volunteer.group_id)
+      : 0;
     return NextResponse.json({
       stalls,
       session: { map_image_url: session?.map_image_url ?? null },
@@ -47,6 +53,9 @@ export async function GET() {
       // group), not a capability: every queue mutation re-resolves it server-side
       // and ignores anything the client sends.
       myGroupId: volunteer.group_id ?? null,
+      // S73D (H3) - headcount only, never the roster itself. The names and PRNs
+      // are fetched on demand from /api/bootstrap/roster when the lead opens it.
+      myGroupSize: groupSize,
       volunteerRole: volunteer.role ?? "stall", // S32 - picks the dashboard view
       checkinToken: volunteer.checkin_token ?? null, // S33 - lead's stable QR token
       groupNumber: volunteer.group_number ?? null, // S35 - assigned FCFS on activation

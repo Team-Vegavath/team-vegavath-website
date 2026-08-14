@@ -59,7 +59,15 @@ export function StallGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
-export type VolunteerStallAction = "claim" | "release" | "mark_queued" | "unqueue";
+// S73D adds accept_queued (the lead confirming an admin auto-placement). It is
+// fired from the dashboard's advisory banner, never from a stall card, but it
+// rides the same sendAction path so it belongs in the same union.
+export type VolunteerStallAction =
+  | "claim"
+  | "release"
+  | "mark_queued"
+  | "unqueue"
+  | "accept_queued";
 
 // re-renders come from the 4s poll, so the count stays fresh without a ticker
 export function waitMinutes(queued_at: string | null): number {

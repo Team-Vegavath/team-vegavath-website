@@ -54,7 +54,7 @@ export async function POST(
       );
     }
 
-    const ok = await checkinVisitorToGroup(
+    const visitorId = await checkinVisitorToGroup(
       ctx.session_id,
       ctx.group_id,
       ctx.max_group_size,
@@ -62,7 +62,7 @@ export async function POST(
       prn,
       phone
     );
-    if (!ok) {
+    if (!visitorId) {
       return NextResponse.json(
         { error: "This group is full! Ask a different group lead to scan you in." },
         { status: 409 }
@@ -79,6 +79,11 @@ export async function POST(
       // holding the QR is the one who should be named. Either may be null.
       leadName: ctx.lead_name,
       leadPhone: ctx.lead_phone,
+      // S73D (J1): the visitor's own row id, which is the bearer token for their
+      // checklist page at /bootstrap/checklist/[id]. It is a UUID PK that already
+      // existed, so the revisitable checklist needed no new schema. Returned only
+      // to the person who just checked in, in the response to their own POST.
+      visitorId,
     });
   } catch (error) {
     console.error("[POST /api/bootstrap/checkin/[token]]", error);

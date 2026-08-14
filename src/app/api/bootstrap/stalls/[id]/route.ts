@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  acceptQueuePlacement,
   addToQueue,
   closeStallVisit,
   getStallById,
@@ -11,7 +12,9 @@ import { getVolunteerFromCookie } from "../../volunteer-auth";
 
 // The wire-level action names are unchanged from S72; what they DO underneath
 // changed in S73B.
-const ACTIONS = ["claim", "release", "mark_queued", "unqueue"] as const;
+// S73D adds accept_queued: the lead confirming an admin auto-placement.
+// Declining one is plain `unqueue` - it deletes the row, so no third action.
+const ACTIONS = ["claim", "release", "mark_queued", "unqueue", "accept_queued"] as const;
 type VolunteerAction = (typeof ACTIONS)[number];
 
 // S72B (Section A). Before this, the ONLY check on this route was "is there a
@@ -36,7 +39,11 @@ const STALL_ONLY_ACTIONS: readonly VolunteerAction[] = ["claim", "release"];
  * from the cookie volunteer (getVolunteerByToken's group_id), never from the
  * request body, so one lead cannot queue or unqueue another lead's group.
  */
-const LEAD_ONLY_ACTIONS: readonly VolunteerAction[] = ["mark_queued", "unqueue"];
+const LEAD_ONLY_ACTIONS: readonly VolunteerAction[] = [
+  "mark_queued",
+  "unqueue",
+  "accept_queued",
+];
 
 export async function PATCH(
   req: NextRequest,
@@ -124,7 +131,13 @@ export async function PATCH(
           }
           return NextResponse.json(stall);
         }
+      } else if (action === "accept_queued") {
+        // S73D (I5) "HEADING THERE". Scoped to the caller's own group inside the
+        // service, so a lead can only ever confirm their own placement.
+        await acceptQueuePlacement(id, volunteer.group_id);
       } else {
+        // unqueue, which is also I5's "NOT NOW" - declining an advisory placement
+        // deletes the row, so it needs no action of its own.
         await removeFromQueue(id, volunteer.group_id);
       }
 

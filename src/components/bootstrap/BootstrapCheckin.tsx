@@ -63,6 +63,28 @@ export default function BootstrapCheckin({
     name: null,
     phone: null,
   });
+  // S73D (J4) - the visitor's own id, returned by the check-in POST, and the
+  // COPY LINK affordance's copied state (same two-second flash CheckinQROverlay
+  // uses).
+  const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const checklistUrl =
+    visitorId && typeof window !== "undefined"
+      ? `${window.location.origin}/bootstrap/checklist/${visitorId}`
+      : null;
+
+  async function copyChecklistLink() {
+    if (!checklistUrl) return;
+    try {
+      await navigator.clipboard.writeText(checklistUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard blocked (insecure context) - the printed URL below is the
+      // fallback, same as CheckinQROverlay's QR is for its link
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +103,10 @@ export default function BootstrapCheckin({
       }
       setJoinedGroupNumber(data.groupNumber ?? null);
       setLead({ name: data.leadName ?? null, phone: data.leadPhone ?? null });
+      // S73D (J1/J4): the visitor's own row id, which is the only key to their
+      // progress page. This response is the ONLY place it is ever handed out, so
+      // if they lose the link they have to be scanned in again.
+      setVisitorId(data.visitorId ?? null);
       setSubmitted(true);
     } catch {
       setError("Request failed -- check your connection.");
@@ -172,6 +198,64 @@ export default function BootstrapCheckin({
                 "Your team lead will find you shortly."
               )}
             </p>
+
+            {/* S73D (J4): the only discoverability path for the progress page.
+                There is no email and no SMS anywhere on this site, so if this
+                link is not saved here it is gone - which is why the URL is
+                printed in full underneath rather than hidden behind the button. */}
+            {checklistUrl && (
+              <div
+                style={{
+                  marginTop: "1.25rem",
+                  background: BS.surface,
+                  border: `1px solid ${BS.border}`,
+                  borderRadius: "8px",
+                  padding: "16px",
+                }}
+              >
+                <div style={labelStyle}>Track your group</div>
+                <p
+                  style={{
+                    marginTop: "6px",
+                    marginBottom: "12px",
+                    color: BS.muted,
+                    fontSize: "0.85rem",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Save this link to see which stalls your group has finished.
+                </p>
+                <button
+                  onClick={copyChecklistLink}
+                  style={{
+                    minHeight: "44px",
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "11px",
+                    letterSpacing: "0.1em",
+                    padding: "9px 14px",
+                    background: copied ? BS.free : "transparent",
+                    color: copied ? "#000" : BS.muted,
+                    border: `1px solid ${copied ? BS.free : BS.border}`,
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {copied ? "COPIED!" : "COPY LINK"}
+                </button>
+                <p
+                  style={{
+                    marginTop: "10px",
+                    marginBottom: 0,
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "10px",
+                    color: BS.muted,
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {checklistUrl}
+                </p>
+              </div>
+            )}
           </div>
         ) : sessionName === null ? (
           <div style={{ marginTop: "1.5rem" }}>

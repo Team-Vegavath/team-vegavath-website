@@ -5,7 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BootstrapStall } from "@/lib/services/bootstrap";
 import BootstrapMapSVG from "./BootstrapMapSVG";
 import CheckinQROverlay from "./CheckinQROverlay";
-import StallCard, { BS, StallGrid, type VolunteerStallAction } from "./StallCard";
+import StallCard, {
+  BS,
+  StallGrid,
+  waitMinutes,
+  type VolunteerStallAction,
+} from "./StallCard";
 import StallVolunteerView from "./StallVolunteerView";
 
 const POLL_MS = 4000;
@@ -54,6 +59,15 @@ export default function BootstrapDashboard({
   // keyed on, and the only thing that can tell "my group is queued here" from
   // "someone else's is". Null for stall volunteers.
   const [myGroupId, setMyGroupId] = useState<string | null>(null);
+  // S73D (H3) - the lead's own group roster, fetched on demand rather than on the
+  // 4s poll: it changes only when someone checks in, and the count line is
+  // already served by the poll payload.
+  const [roster, setRoster] = useState<
+    { name: string; prn: string; arrived_at: string }[]
+  >([]);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [myGroupSize, setMyGroupSize] = useState(0);
   // S36 - lead classroom mode: rides the poll payload so it survives re-login
   // and stays in sync if an admin ever flips it server-side
   const [inClassroom, setInClassroom] = useState(false);
@@ -100,6 +114,7 @@ export default function BootstrapDashboard({
       setCheckinToken(data.checkinToken ?? null);
       setGroupNumber(data.groupNumber ?? null);
       setMyGroupId(data.myGroupId ?? null);
+      setMyGroupSize(data.myGroupSize ?? 0);
       setInClassroom(data.inClassroom ?? false);
       setLastUpdated(Date.now());
       failCount.current = 0;
@@ -318,6 +333,22 @@ export default function BootstrapDashboard({
     }
     // pull the pending state straight back rather than waiting up to 4s for it
     await poll();
+  }
+
+  // S73D (H3). The route takes no group parameter at all - it resolves the
+  // caller's own group server-side - so there is nothing here to tamper with.
+  async function openRoster() {
+    setRosterOpen(true);
+    setRosterLoading(true);
+    try {
+      const res = await fetch("/api/bootstrap/roster");
+      const data = res.ok ? await res.json() : null;
+      setRoster(data?.roster ?? []);
+    } catch {
+      setRoster([]);
+    } finally {
+      setRosterLoading(false);
+    }
   }
 
   async function signOut() {
@@ -558,7 +589,116 @@ export default function BootstrapDashboard({
           >
             {groupNumber ? `Group ${groupNumber}` : "Not assigned yet"}
           </span>
+          {/* S73D (H3): the headcount rides the poll; the names are fetched only
+              when the lead taps. Names and SRN/PRN only, never phone. */}
+          {myGroupId && (
+            <button
+              onClick={() => void openRoster()}
+              style={{
+                marginLeft: "auto",
+                minHeight: "44px",
+                padding: "0 12px",
+                background: "transparent",
+                border: `1px solid ${BS.borderStrong}`,
+                borderRadius: "8px",
+                color: BS.text,
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "11px",
+                letterSpacing: "0.08em",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {myGroupSize} CHECKED IN
+            </button>
+          )}
         </div>
+
+        {/* S73D (I5): an UNCONFIRMED admin auto-placement. Two real buttons, not
+            a dismiss-only banner: HEADING THERE sets accepted_at, NOT NOW deletes
+            the row (which is plain unqueue - leaving it unaccepted would bring
+            the banner straight back on the next poll).
+            is_advisory is derived from volunteer_id IS NULL, so a queue entry the
+            lead set themselves never shows up here. */}
+        {stalls
+          .filter((s) =>
+            (s.queue ?? []).some((e) => e.group_id === myGroupId && e.is_advisory)
+          )
+          .map((s) => (
+            <div
+              key={`advisory-${s.id}`}
+              style={{
+                background: `${BS.accent}14`,
+                border: `1px solid ${BS.accent}`,
+                borderRadius: "8px",
+                padding: "14px 16px",
+                marginBottom: "8px",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--font-mono), monospace",
+                  fontSize: "11px",
+                  letterSpacing: "0.1em",
+                  color: BS.accent,
+                }}
+              >
+                SUGGESTED NEXT STALL
+              </div>
+              <div
+                style={{
+                  marginTop: "4px",
+                  fontFamily: "var(--font-chakra), sans-serif",
+                  fontWeight: 700,
+                  fontSize: "1.1rem",
+                  textTransform: "uppercase",
+                  color: BS.text,
+                }}
+              >
+                {s.stall_name}
+              </div>
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => void sendAction(s.id, "accept_queued")}
+                  style={{
+                    flex: "1 1 8rem",
+                    minHeight: "48px",
+                    background: BS.accent,
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontFamily: "var(--font-chakra), sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                  }}
+                >
+                  Heading there
+                </button>
+                <button
+                  onClick={() => void sendAction(s.id, "unqueue")}
+                  style={{
+                    flex: "1 1 8rem",
+                    minHeight: "48px",
+                    background: "transparent",
+                    color: BS.muted,
+                    border: `1px solid ${BS.borderStrong}`,
+                    borderRadius: "8px",
+                    fontFamily: "var(--font-chakra), sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                  }}
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          ))}
 
         {/* S33 - each group lead carries their own check-in link; the token is
             stable (migration 015), so a printed/QR'd URL survives re-logins */}
@@ -788,6 +928,100 @@ export default function BootstrapDashboard({
 
       {/* Full-screen map overlay - hardcoded SVG schematic (session 26) */}
       {showMap && <BootstrapMapSVG stalls={stalls} onClose={() => setShowMap(false)} />}
+
+      {/* S73D (H3): roster overlay, same tap-anywhere-to-close full-screen shape
+          as CheckinQROverlay. Name and SRN/PRN only - getGroupRoster does not
+          select phone, so there is no number here to leak. */}
+      {rosterOpen && (
+        <div
+          onClick={() => setRosterOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(10,10,10,0.97)",
+            padding: "24px 16px",
+            overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mx-auto"
+            style={{ maxWidth: "32rem" }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontWeight: 700,
+                fontSize: "1.35rem",
+                textTransform: "uppercase",
+                color: BS.text,
+              }}
+            >
+              {groupNumber ? `Group ${groupNumber}` : "Your group"}
+              <span style={{ marginLeft: "0.5rem", color: BS.muted, fontSize: "0.9rem" }}>
+                {roster.length} checked in
+              </span>
+            </div>
+
+            <div style={{ marginTop: "16px", border: `1px solid ${BS.border}` }}>
+              {rosterLoading ? (
+                <p style={{ padding: "16px", color: BS.muted, margin: 0 }}>Loading...</p>
+              ) : roster.length === 0 ? (
+                <p style={{ padding: "16px", color: BS.muted, margin: 0 }}>
+                  Nobody has checked into your group yet.
+                </p>
+              ) : (
+                roster.map((v, i) => (
+                  <div
+                    key={`${v.prn}-${i}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      padding: "12px 16px",
+                      background: BS.surface,
+                      borderTop: i === 0 ? "none" : `1px solid ${BS.border}`,
+                    }}
+                  >
+                    <span style={{ fontSize: "0.95rem", color: BS.text }}>{v.name}</span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono), monospace",
+                        fontSize: "0.7rem",
+                        letterSpacing: "0.06em",
+                        color: BS.muted,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {v.prn} · {waitMinutes(v.arrived_at)}m ago
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setRosterOpen(false)}
+              style={{
+                marginTop: "20px",
+                width: "100%",
+                minHeight: "48px",
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.5)",
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "13px",
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+              }}
+            >
+              TAP ANYWHERE TO CLOSE
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
