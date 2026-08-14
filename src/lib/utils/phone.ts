@@ -3,6 +3,11 @@
  * ten digits, optionally prefixed with +91 / 91 / 0 and one separator. Kept
  * beside normalisePhone so the browser check and the API check stay in step.
  * This module is pure -- client components may import it.
+ *
+ * S73I: every phone field is now maxLength={10} and instructs bare 10 digits,
+ * so the prefix branches here (and in normalisePhone) are unreachable from our
+ * own forms. They stay as a TOLERANT FALLBACK for pasted or programmatic input,
+ * deliberately a superset of what the UI asks for -- not the instructed shape.
  */
 export const PHONE_PATTERN = "(\\+?91[\\s-]?|0)?[0-9]{10}";
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { StatefulButton, type ButtonState } from "@/components/admin/StatefulButton";
+import { PHONE_PATTERN } from "@/lib/utils/phone";
 
 interface AdminProfileFormProps {
   displayName: string;
@@ -152,9 +153,15 @@ export default function AdminProfileForm({
             type="tel"
             value={mobileNumber}
             onChange={(e) => setMobileNumber(e.target.value)}
+            maxLength={10}
+            pattern={PHONE_PATTERN}
+            title="10 digits only -- no country code, no spaces"
+            placeholder="9876543210"
             autoComplete="tel"
           />
-          <p className="admin-hint">Leave blank to remove it.</p>
+          <p className="admin-hint">
+            10 digits only, no country code. Leave blank to remove it.
+          </p>
         </div>
 
         {detailsError && <p className="admin-error">{detailsError}</p>}

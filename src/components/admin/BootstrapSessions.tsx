@@ -621,15 +621,20 @@ export default function BootstrapSessions({
                             </div>
                             <div>
                               <label htmlFor={`bs-vol-phone-${v.id}`} className="admin-label">
-                                Phone
+                                Phone (10 digits)
                               </label>
+                              {/* S73I: see BootstrapAdminDashboard -- no form
+                                  wraps this editor, so maxLength is the only
+                                  client-side cap that can fire. */}
                               <input
                                 id={`bs-vol-phone-${v.id}`}
                                 type="tel"
                                 className="admin-input"
                                 value={volPhone}
                                 onChange={(e) => setVolPhone(e.target.value)}
-                                maxLength={20}
+                                maxLength={10}
+                                title="10 digits only -- no country code, no spaces"
+                                placeholder="9876543210"
                                 style={{ width: "10rem" }}
                               />
                             </div>

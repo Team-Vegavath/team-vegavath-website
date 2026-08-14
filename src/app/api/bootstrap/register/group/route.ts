@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
     if (!phone) {
       return NextResponse.json(
-        { error: "Phone must be 10 digits (optionally prefixed with +91)" },
+        { error: "Phone must be 10 digits, no country code" },
         { status: 400 }
       );
     }

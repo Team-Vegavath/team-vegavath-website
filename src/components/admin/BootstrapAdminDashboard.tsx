@@ -749,15 +749,21 @@ export default function BootstrapAdminDashboard({
             </div>
             <div>
               <label htmlFor={`bs-vol-phone-${v.id}`} className="admin-label">
-                Phone
+                Phone (10 digits)
               </label>
+              {/* S73I: maxLength is the ONLY client-side cap that works here --
+                  this editor saves through onClick, not a form submit, so a
+                  `pattern` attribute would never be evaluated. The server's
+                  normalisePhone stays the real guard. */}
               <input
                 id={`bs-vol-phone-${v.id}`}
                 type="tel"
                 className="admin-input"
                 value={volPhone}
                 onChange={(e) => setVolPhone(e.target.value)}
-                maxLength={20}
+                maxLength={10}
+                title="10 digits only -- no country code, no spaces"
+                placeholder="9876543210"
                 style={{ width: "10rem" }}
               />
             </div>

@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     // mobile_raw present but normalisePhone rejected it → not 10 digits
     if (mobile_raw !== null && mobile_number === null) {
       return NextResponse.json(
-        { error: "Mobile number must be 10 digits (optionally prefixed with +91)" },
+        { error: "Mobile number must be 10 digits, no country code" },
         { status: 400 }
       );
     }

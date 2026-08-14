@@ -166,7 +166,7 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
 
       <div>
         <label htmlFor="reg-phone" style={labelStyle}>
-          Phone number<Req />
+          Phone number (10 digits)<Req />
         </label>
         <input
           id="reg-phone"
@@ -175,10 +175,10 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
           value={form.phone}
           onChange={handleChange}
           required
-          maxLength={16}
+          maxLength={10}
           pattern={PHONE_PATTERN}
-          title="Exactly 10 digits (a +91 prefix is fine)"
-          placeholder="10-digit number"
+          title="10 digits only -- no country code, no spaces"
+          placeholder="9876543210"
           className="join-input"
         />
       </div>

@@ -432,7 +432,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
                 <div>
                   <label htmlFor="join-mobile" style={labelStyle}>
-                    Mobile number<Req />
+                    Mobile number (10 digits)<Req />
                   </label>
                   <input
                     id="join-mobile"
@@ -441,10 +441,10 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     value={form.mobile_number}
                     onChange={handleChange}
                     required
-                    maxLength={16}
+                    maxLength={10}
                     pattern={PHONE_PATTERN}
-                    title="Exactly 10 digits (a +91 prefix is fine)"
-                    placeholder="10-digit number"
+                    title="10 digits only -- no country code, no spaces"
+                    placeholder="9876543210"
                     className="join-input"
                   />
                   <p
@@ -456,7 +456,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                       marginTop: "0.4rem",
                     }}
                   >
-                    +91 prefix is fine -- it will be removed
+                    10 digits only -- no country code, no spaces
                   </p>
                 </div>
 

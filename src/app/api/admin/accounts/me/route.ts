@@ -112,7 +112,7 @@ export async function PATCH(req: NextRequest) {
         mobile = normalisePhone(mobile);
         if (mobile === null) {
           return NextResponse.json(
-            { error: "Mobile must be 10 digits (optionally prefixed with +91)" },
+            { error: "Mobile must be 10 digits, no country code" },
             { status: 400 }
           );
         }

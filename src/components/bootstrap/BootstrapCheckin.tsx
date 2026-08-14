@@ -355,17 +355,17 @@ export default function BootstrapCheckin({
               </div>
               <div>
                 <label htmlFor="ci-phone" style={labelStyle}>
-                  Phone
+                  Phone (10 digits)
                 </label>
                 <input
                   id="ci-phone"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  maxLength={16}
+                  maxLength={10}
                   pattern={PHONE_PATTERN}
-                  title="Exactly 10 digits (a +91 prefix is fine)"
-                  placeholder="10-digit number"
+                  title="10 digits only -- no country code, no spaces"
+                  placeholder="9876543210"
                   autoComplete="tel"
                   style={inputStyle}
                 />

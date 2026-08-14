@@ -295,7 +295,7 @@ export default function BootstrapRegister({
 
             <div style={{ marginBottom: "20px" }}>
               <label htmlFor="bs-reg-phone" style={labelStyle}>
-                Phone number
+                Phone number (10 digits)
               </label>
               <input
                 id="bs-reg-phone"
@@ -304,11 +304,11 @@ export default function BootstrapRegister({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                maxLength={16}
+                maxLength={10}
                 pattern={PHONE_PATTERN}
-                title="Exactly 10 digits (a +91 prefix is fine)"
+                title="10 digits only -- no country code, no spaces"
                 autoComplete="tel"
-                placeholder="10-digit number"
+                placeholder="9876543210"
                 style={inputStyle}
               />
               <p
@@ -320,7 +320,7 @@ export default function BootstrapRegister({
                   marginTop: "8px",
                 }}
               >
-                +91 prefix is fine -- it will be removed
+                10 digits only -- no country code, no spaces
               </p>
             </div>
 
