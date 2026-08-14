@@ -297,6 +297,35 @@ export default function BootstrapAdminDashboard({
     }
   }
 
+  /**
+   * S73C (G3): close every still-open visit in this session.
+   *
+   * Visits only get a left_at when a volunteer taps that a group left, and at the
+   * end of a real event people walk away instead. Without this the rows stay open
+   * forever. Sits beside DEACTIVATE SESSION but is deliberately a SEPARATE tap:
+   * "the session ended" and "every group finished everywhere" are different
+   * claims, and only a human should assert the second.
+   */
+  async function sweepVisits() {
+    if (
+      !window.confirm(
+        "Mark every group as having left every stall? Use this once the event is over."
+      )
+    )
+      return;
+    setStallError("");
+    const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/sweep-visits`, {
+      method: "POST",
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
+    if (!res?.ok) {
+      setStallError(data?.error ?? "Failed to close visits");
+      return;
+    }
+    setStallError(`Closed ${data?.closed ?? 0} open visit(s).`);
+    await poll();
+  }
+
   async function deactivate() {
     if (!window.confirm("Deactivate this session? Volunteers will be signed out of /bootstrap.")) return;
     const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/active`, {
@@ -758,6 +787,15 @@ export default function BootstrapAdminDashboard({
         <h1 className="admin-page-title">{session.name}</h1>
         {!isViewer ? (
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            {/* S73C (G3) - runs before deactivating, so it sits before it */}
+            <button
+              className="btn-outline"
+              style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
+              onClick={sweepVisits}
+              title="Close every still-open stall visit in this session"
+            >
+              END ALL VISITS
+            </button>
             <button
               className="admin-btn-danger-outline"
               style={{ padding: "0.6rem 1.25rem", fontSize: "0.75rem", cursor: "pointer" }}
@@ -992,6 +1030,7 @@ export default function BootstrapAdminDashboard({
                   <th>Max</th>
                   <th>Groups</th>
                   <th>Claimed by</th>
+                  <th>Here now</th>
                   <th>Waiting</th>
                   <th>Actions</th>
                 </tr>
@@ -1042,6 +1081,13 @@ export default function BootstrapAdminDashboard({
                         <td className="admin-cell-mono">
                           {claimed.length > 0 ? claimed.join(", ") : "-"}
                         </td>
+                        {/* S73C: open visit rows -- the groups AT the stall, as
+                            opposed to the volunteers manning it. */}
+                        <td className="admin-cell-mono">
+                          {(s.occupants ?? []).length > 0
+                            ? (s.occupants ?? []).map((o) => o.group_name).join(", ")
+                            : "-"}
+                        </td>
                         {/* S73B: the queue that replaced queued_by. A stall can
                             hold several waiting groups now, so this is a list. */}
                         <td className="admin-cell-mono">
@@ -1068,7 +1114,7 @@ export default function BootstrapAdminDashboard({
                   })
                 ) : (
                   <tr>
-                    <td className="admin-empty" colSpan={7}>
+                    <td className="admin-empty" colSpan={8}>
                       No stalls in this session yet.
                     </td>
                   </tr>

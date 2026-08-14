@@ -24,6 +24,15 @@ export interface StallQueueEntry {
   accepted_at: string | null; // S73D advisory placement; unused in S73B
 }
 
+// S73C (migration 028): a group currently AT a stall, i.e. a visit row whose
+// left_at is still NULL. There is no separate "current occupants" concept -
+// this IS the visit table, filtered.
+export interface StallOccupant {
+  group_id: string;
+  group_name: string;
+  arrived_at: string;
+}
+
 export interface BootstrapStall {
   id: string;
   session_id: string;
@@ -40,6 +49,10 @@ export interface BootstrapStall {
   // S73B: the queue that replaced queued_by / queued_at. Always present (empty
   // array when nobody is waiting), so callers never null-check it.
   queue: StallQueueEntry[];
+  // S73C: groups AT the stall right now (open visit rows). Distinct from
+  // claimed_by, which is the VOLUNTEERS manning it - the two answer different
+  // questions and a stall can have either without the other.
+  occupants: StallOccupant[];
   map_x: number | null; // migration 008 - % from left edge of map image
   map_y: number | null; // migration 008 - % from top edge
   lead_names: string | null; // migration 015 - informational, comma-separated
@@ -408,7 +421,21 @@ async function selectStalls(
              JOIN bootstrap_groups g ON g.id = bq.group_id
              LEFT JOIN bootstrap_volunteers lv ON lv.id = bq.volunteer_id
              WHERE bq.stall_id = st.id
-           ), '[]'::json) AS queue
+           ), '[]'::json) AS queue,
+           -- S73C: who is HERE now. left_at IS NULL is the whole predicate; no
+           -- separate occupancy table exists or is wanted.
+           COALESCE((
+             SELECT json_agg(
+                      json_build_object(
+                        'group_id',   vg.id,
+                        'group_name', vg.name,
+                        'arrived_at', vis.arrived_at
+                      ) ORDER BY vis.arrived_at ASC
+                    )
+             FROM bootstrap_stall_visits vis
+             JOIN bootstrap_groups vg ON vg.id = vis.group_id
+             WHERE vis.stall_id = st.id AND vis.left_at IS NULL
+           ), '[]'::json) AS occupants
     FROM bootstrap_stalls st
     WHERE (${sessionId}::uuid IS NULL OR st.session_id = ${sessionId}::uuid)
       AND (${stallId}::uuid IS NULL OR st.id = ${stallId}::uuid)
@@ -491,6 +518,153 @@ export async function removeFromQueue(stallId: string, groupId: string): Promise
  */
 export async function setStallMaxGroups(stallId: string, n: number): Promise<void> {
   await sql`UPDATE bootstrap_stalls SET max_groups = ${n} WHERE id = ${stallId}`;
+}
+
+// ----------------------------------------------- stall visits (S73C, mig 028)
+
+/**
+ * S73C (F1): the groups a stall volunteer may name when a group arrives.
+ *
+ * The session's groups MINUS any that already have a visit row for this stall -
+ * an anti-join against the visit table, which is the hard revisit ban made
+ * visible in the UI rather than only enforced at the INSERT. Deliberately NOT
+ * the queue: a group that walked up without queueing is still a legitimate
+ * arrival, so the picker has to offer everyone who has not been yet.
+ *
+ * Queued groups sort to the top as a HINT only. They carry no priority - the
+ * queue is an unordered waiting set and this ordering must never be read as a
+ * turn order.
+ *
+ * Selects only id and name (plus the sort flag). No lead phone, no login_code -
+ * same discipline getBootstrapGroups already follows.
+ */
+export async function getUnvisitedGroups(
+  stallId: string,
+  sessionId: string
+): Promise<{ id: string; name: string; is_queued: boolean }[]> {
+  const rows = await sql`
+    SELECT g.id, g.name,
+           EXISTS (
+             SELECT 1 FROM bootstrap_stall_queue q
+             WHERE q.stall_id = ${stallId}::uuid AND q.group_id = g.id
+           ) AS is_queued
+    FROM bootstrap_groups g
+    WHERE g.session_id = ${sessionId}::uuid
+      AND NOT EXISTS (
+        SELECT 1 FROM bootstrap_stall_visits v
+        WHERE v.stall_id = ${stallId}::uuid AND v.group_id = g.id
+      )
+    ORDER BY is_queued DESC, g.name ASC
+    LIMIT 50`;
+  return rows as { id: string; name: string; is_queued: boolean }[];
+}
+
+export type RecordVisitResult =
+  | { ok: true }
+  | { ok: false; reason: "already_here" } // idempotent re-tap, treat as success
+  | { ok: false; reason: "revisited" } // hard ban: this group has been before
+  | { ok: false; reason: "full" } // max_groups reached
+  | { ok: false; reason: "invalid" }; // stall or group not in this session
+
+/**
+ * S73C (F2/F3): log a group arriving at a stall.
+ *
+ * F3's server-side validation is the WHERE clause, not a JS check against a list
+ * the client sent - the client's picker is a convenience, and a crafted group_id
+ * has to fail here. Same discipline as addToQueue and requestStallSwitch:
+ *   stall in this session   - stops a stall UUID from another or a past session
+ *   group in this session   - same on the group side
+ *   capacity has room       - max_groups finally does something (S73B stored it
+ *                             with nothing enforcing it). Counts OPEN visits
+ *                             only, so it gates new admissions and never evicts,
+ *                             mirroring max_occupancy's claim-branch precedent.
+ * The UNIQUE(stall_id, group_id) handles the last two cases by conflicting.
+ *
+ * The follow-up SELECT runs only on the failure path, to say WHICH failure it
+ * was: a conflict is either a harmless double-tap (the group is still here) or
+ * the revisit ban firing (they have been and gone), and the volunteer needs a
+ * different message for each.
+ */
+export async function recordStallVisit(
+  stallId: string,
+  groupId: string,
+  volunteerId: string,
+  sessionId: string
+): Promise<RecordVisitResult> {
+  const inserted = await sql`
+    INSERT INTO bootstrap_stall_visits (session_id, stall_id, group_id, volunteer_id)
+    SELECT ${sessionId}::uuid, ${stallId}::uuid, ${groupId}::uuid, ${volunteerId}::uuid
+    WHERE EXISTS (
+      SELECT 1 FROM bootstrap_stalls st
+      WHERE st.id = ${stallId}::uuid
+        AND st.session_id = ${sessionId}::uuid
+        AND (
+          SELECT count(*) FROM bootstrap_stall_visits v
+          WHERE v.stall_id = st.id AND v.left_at IS NULL
+        ) < st.max_groups
+    )
+    AND EXISTS (
+      SELECT 1 FROM bootstrap_groups g
+      WHERE g.id = ${groupId}::uuid AND g.session_id = ${sessionId}::uuid
+    )
+    ON CONFLICT (stall_id, group_id) DO NOTHING
+    RETURNING id`;
+  if (inserted.length === 1) return { ok: true };
+
+  const existing = await sql`
+    SELECT left_at FROM bootstrap_stall_visits
+    WHERE stall_id = ${stallId}::uuid AND group_id = ${groupId}::uuid
+    LIMIT 1`;
+  const row = existing[0] as { left_at: string | null } | undefined;
+  if (row) return { ok: false, reason: row.left_at ? "revisited" : "already_here" };
+
+  // No conflicting row, so one of the EXISTS guards failed. Distinguish a full
+  // stall (recoverable, and the common case) from a bad id (never happens
+  // through the UI).
+  const capacity = await sql`
+    SELECT 1 FROM bootstrap_stalls st
+    WHERE st.id = ${stallId}::uuid
+      AND st.session_id = ${sessionId}::uuid
+      AND (
+        SELECT count(*) FROM bootstrap_stall_visits v
+        WHERE v.stall_id = st.id AND v.left_at IS NULL
+      ) >= st.max_groups
+    LIMIT 1`;
+  return { ok: false, reason: capacity.length === 1 ? "full" : "invalid" };
+}
+
+/**
+ * S73C (G1): a group leaves. Closes the OPEN visit only - `left_at IS NULL` in
+ * the predicate means a stale double-tap cannot rewrite an already-recorded
+ * departure time, and the revisit ban keeps the closed row around forever.
+ */
+export async function closeStallVisit(stallId: string, groupId: string): Promise<void> {
+  await sql`
+    UPDATE bootstrap_stall_visits
+    SET left_at = now()
+    WHERE stall_id = ${stallId}::uuid
+      AND group_id = ${groupId}::uuid
+      AND left_at IS NULL`;
+}
+
+/**
+ * S73C (G3): end-of-event sweep. Visits only get a left_at when somebody taps
+ * RELEASE, and at the end of a real event people simply walk away, so without
+ * this every still-open row stays open forever and the checklist (S73D) would
+ * show those stalls as never completed.
+ *
+ * Deliberately an explicit admin action, not automatic logic hung off session
+ * deactivation: "the session ended" and "every group has finished at every
+ * stall" are different claims, and only a human should assert the second.
+ * Returns how many rows were closed, matching assignUnassignedVisitors' shape.
+ */
+export async function sweepOpenVisits(sessionId: string): Promise<number> {
+  const rows = await sql`
+    UPDATE bootstrap_stall_visits
+    SET left_at = now()
+    WHERE session_id = ${sessionId}::uuid AND left_at IS NULL
+    RETURNING id`;
+  return rows.length;
 }
 
 export type StallAction = "claim" | "release" | "override";

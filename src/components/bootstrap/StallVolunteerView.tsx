@@ -47,11 +47,21 @@ export default function StallVolunteerView({
   actionError: string | null;
   connectionIssue: boolean;
   liveLabel: string;
-  onAction: (stallId: string, action: VolunteerStallAction) => void;
+  // S73C - groupId names which group arrived or left. Omitted for the
+  // "unlisted group" escape and for releasing a stall with no group logged.
+  onAction: (stallId: string, action: VolunteerStallAction, groupId?: string) => void;
   onRequestSwitch: (stallId: string) => void;
   onSignOut: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  // S73C - the mandatory group picker. "arrive" lists groups that have not been
+  // here yet (fetched); "leave" lists the ones currently here (already on the
+  // stall row, so no fetch).
+  const [groupMode, setGroupMode] = useState<"arrive" | "leave" | null>(null);
+  const [candidates, setCandidates] = useState<
+    { id: string; name: string; is_queued: boolean }[]
+  >([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
 
   // Derived, not state. S72B had to seed a myStallId useState from assignedStallId
   // and then hide "Switch stall" because the effect re-seeded it one render after
@@ -69,6 +79,70 @@ export default function StallVolunteerView({
   // would only ever 400.
   const canRequestSwitch = assignedStallId !== null;
   const otherStalls = stalls.filter((s) => s.id !== myStall?.id);
+
+  // S73C: groups AT the stall now. Distinct from iAmOnIt, which is about the
+  // VOLUNTEER being on it - a stall claimed through the unlisted-group escape has
+  // a claim and no occupants, which is a legitimate state.
+  const occupants = myStall?.occupants ?? [];
+  const hasRoom = myStall ? occupants.length < myStall.max_groups : false;
+
+  async function openArrivePicker(stallId: string) {
+    setGroupMode("arrive");
+    setLoadingGroups(true);
+    setCandidates([]);
+    try {
+      const res = await fetch(`/api/bootstrap/stalls/${stallId}/groups`);
+      const data = res.ok ? await res.json() : null;
+      setCandidates(data?.groups ?? []);
+    } catch {
+      setCandidates([]);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }
+
+  function chooseGroup(stallId: string, action: VolunteerStallAction, groupId?: string) {
+    setGroupMode(null);
+    onAction(stallId, action, groupId);
+  }
+
+  // the full-width action button this view has always used, now shared by the
+  // two or three controls that replaced the single toggle
+  const actionBtn: React.CSSProperties = {
+    minHeight: "56px",
+    width: "100%",
+    fontFamily: "var(--font-chakra), sans-serif",
+    fontWeight: 700,
+    fontSize: "1rem",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    borderRadius: "10px",
+    cursor: "pointer",
+  };
+  const dangerBtn: React.CSSProperties = {
+    ...actionBtn,
+    background: `${BS.danger}14`,
+    color: BS.danger,
+    border: `1px solid ${BS.danger}`,
+  };
+
+  // shared look for a row in either picker
+  const groupTileStyle: React.CSSProperties = {
+    width: "100%",
+    minHeight: "56px",
+    marginTop: "8px",
+    padding: "12px 16px",
+    background: BS.surface,
+    border: `1px solid ${BS.border}`,
+    borderRadius: "10px",
+    color: BS.text,
+    fontFamily: "var(--font-chakra), sans-serif",
+    fontWeight: 700,
+    fontSize: "1rem",
+    letterSpacing: "0.04em",
+    textAlign: "left",
+    cursor: "pointer",
+  };
 
   const headerBtn: React.CSSProperties = {
     minHeight: "48px",
@@ -248,31 +322,166 @@ export default function StallVolunteerView({
                 />
                 {myStall.status === "free" ? "FREE" : "OCCUPIED"}
               </div>
-              <button
-                onClick={() => onAction(myStall.id, iAmOnIt ? "release" : "claim")}
-                style={{
-                  marginTop: "20px",
-                  minHeight: "56px",
-                  width: "100%",
-                  fontFamily: "var(--font-chakra), sans-serif",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  borderRadius: "10px",
-                  cursor: "pointer",
-                  background: iAmOnIt ? `${BS.danger}14` : BS.accent,
-                  color: iAmOnIt ? BS.danger : "#ffffff",
-                  border: iAmOnIt ? `1px solid ${BS.danger}` : "none",
-                }}
-              >
-                {/* S72C (Section D3): was "Mark free". "Release" and "Mark free"
-                    were the same action under two labels (this file vs StallCard),
-                    and "Mark free" over-promises - release only removes the caller
-                    from claimed_by, so the stall stays OCCUPIED if anyone else is
-                    still on it. "Release" is the one that is always true. */}
-                {iAmOnIt ? "Release" : "Mark occupied"}
-              </button>
+              {/* S73C: who is actually here. The status pill above is about the
+                  stall; this is about the groups, and on a max_groups > 1 stall
+                  they are genuinely different facts. */}
+              {occupants.length > 0 && (
+                <div
+                  style={{
+                    marginTop: "12px",
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.06em",
+                    color: BS.muted,
+                  }}
+                >
+                  HERE NOW: {occupants.map((o) => o.group_name).join(", ")}
+                </div>
+              )}
+
+              {/* S73C (F2): the single claim/release toggle is gone. Occupying is
+                  now "which group arrived", because an occupancy with no group
+                  named records nothing and the visit table is what the whole
+                  checklist is built on. */}
+              {groupMode === "arrive" ? (
+                <div style={{ marginTop: "20px" }}>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-chakra), sans-serif",
+                      fontSize: "0.95rem",
+                      color: BS.muted,
+                      margin: 0,
+                    }}
+                  >
+                    Which group just arrived?
+                  </p>
+                  {loadingGroups ? (
+                    <p style={{ marginTop: "12px", color: BS.muted, fontSize: "0.9rem" }}>
+                      Loading groups...
+                    </p>
+                  ) : candidates.length > 0 ? (
+                    candidates.map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => chooseGroup(myStall.id, "claim", g.id)}
+                        style={groupTileStyle}
+                      >
+                        {g.name}
+                        {/* queued groups sort first; the tag says why, without
+                            implying a turn order the queue does not enforce */}
+                        {g.is_queued && (
+                          <span
+                            style={{
+                              marginLeft: "0.5rem",
+                              fontFamily: "var(--font-mono), monospace",
+                              fontSize: "0.7rem",
+                              letterSpacing: "0.08em",
+                              color: BS.queued,
+                            }}
+                          >
+                            WAITING
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    /* S73C: the empty-picker escape. Every group in the session
+                       has already been through this stall, so the mandatory
+                       naming has nobody left to name. Occupy without a group -
+                       no visit row is written, so the revisit ban stays intact
+                       and nobody gets a second visit logged. */
+                    <>
+                      <p
+                        style={{
+                          marginTop: "12px",
+                          fontSize: "0.9rem",
+                          color: BS.muted,
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        Every group has already been here. You can still mark the
+                        stall occupied, but the visit will not be recorded.
+                      </p>
+                      <button
+                        onClick={() => chooseGroup(myStall.id, "claim")}
+                        style={groupTileStyle}
+                      >
+                        Mark occupied (group not listed)
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => setGroupMode(null)} style={textLink}>
+                    Cancel
+                  </button>
+                </div>
+              ) : groupMode === "leave" ? (
+                <div style={{ marginTop: "20px" }}>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-chakra), sans-serif",
+                      fontSize: "0.95rem",
+                      color: BS.muted,
+                      margin: 0,
+                    }}
+                  >
+                    Which group is leaving?
+                  </p>
+                  {occupants.map((o) => (
+                    <button
+                      key={o.group_id}
+                      onClick={() => chooseGroup(myStall.id, "release", o.group_id)}
+                      style={groupTileStyle}
+                    >
+                      {o.group_name}
+                    </button>
+                  ))}
+                  <button onClick={() => setGroupMode(null)} style={textLink}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    marginTop: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  {hasRoom && (
+                    <button
+                      onClick={() => void openArrivePicker(myStall.id)}
+                      style={{ ...actionBtn, background: BS.accent, color: "#ffffff", border: "none" }}
+                    >
+                      Group arrived
+                    </button>
+                  )}
+                  {/* G2: per-group release ONLY when more than one group is here.
+                      One group keeps the single unambiguous tap it has always
+                      had - the picker would be a modal over a list of one. */}
+                  {occupants.length === 1 && (
+                    <button
+                      onClick={() => onAction(myStall.id, "release", occupants[0]!.group_id)}
+                      style={dangerBtn}
+                    >
+                      Group left
+                    </button>
+                  )}
+                  {occupants.length > 1 && (
+                    <button onClick={() => setGroupMode("leave")} style={dangerBtn}>
+                      Group left
+                    </button>
+                  )}
+                  {/* No groups logged but still holding the stall - the unlisted
+                      group escape, or a leftover claim. "Release" is the honest
+                      label: it only removes this volunteer. */}
+                  {occupants.length === 0 && iAmOnIt && (
+                    <button onClick={() => onAction(myStall.id, "release")} style={dangerBtn}>
+                      Release
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* S72C (Section B3): the sanctioned replacement for S72B's removed

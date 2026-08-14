@@ -254,13 +254,25 @@ export default function BootstrapDashboard({
     return `Are you sure? ${parts.join(", and ")}.`;
   }
 
-  async function sendAction(stallId: string, action: VolunteerStallAction) {
+  // S73C: groupId names which group arrived or left. Undefined means the
+  // "unlisted group" escape on claim, or a one-tap release with nothing to close.
+  async function sendAction(
+    stallId: string,
+    action: VolunteerStallAction,
+    groupId?: string
+  ) {
     // One guard for both views: StallCard's RELEASE (lead dashboard) and
     // StallVolunteerView's own button both route through here, so this cannot be
     // half-applied the way two separate call-site checks could drift.
     if (action === "release") {
       const stall = stalls.find((s) => s.id === stallId);
-      const warning = stall ? releaseWarning(stall) : null;
+      // S73C: on a multi-group stall, releasing ONE group leaves the volunteer on
+      // the stall serving the others, so the "are you sure, X still holds this"
+      // warning would be noise. Only confirm when this tap is the last group
+      // leaving, which is when the volunteer actually steps off.
+      const remaining = (stall?.occupants ?? []).filter((o) => o.group_id !== groupId);
+      const stepsOff = remaining.length === 0;
+      const warning = stall && stepsOff ? releaseWarning(stall) : null;
       // window.confirm matches the only other confirmation in the Bootstrap
       // surface (changeRole in BootstrapAdminDashboard). Native, nothing to build.
       if (warning && !window.confirm(warning)) return;
@@ -269,7 +281,7 @@ export default function BootstrapDashboard({
       const res = await fetch(`/api/bootstrap/stalls/${stallId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, group_id: groupId ?? null }),
       });
       if (res.status === 401) {
         window.location.href = "/bootstrap";
@@ -329,7 +341,7 @@ export default function BootstrapDashboard({
         actionError={actionError}
         connectionIssue={connectionIssue}
         liveLabel={secondsAgo !== null ? `LIVE · ${secondsAgo}s ago` : "CONNECTING…"}
-        onAction={(stallId, action) => void sendAction(stallId, action)}
+        onAction={(stallId, action, groupId) => void sendAction(stallId, action, groupId)}
         onRequestSwitch={(stallId) => void requestSwitch(stallId)}
         onSignOut={() => void signOut()}
       />

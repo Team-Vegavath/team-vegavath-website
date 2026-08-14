@@ -300,6 +300,15 @@ export default function StallCard({
             ? `${stall.status === "queued" ? "Presenting: " : ""}${claimed.join(", ")}`
             : "No one here"}
         </div>
+        {/* S73C: which GROUPS are at the stall, as opposed to which volunteers
+            are manning it. A lead deciding where to walk needs this more than
+            claimed_by, which is why it renders even though the line above
+            already says the stall is busy. */}
+        {(stall.occupants ?? []).length > 0 && (
+          <div style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: BS.occupied }}>
+            Here now: {(stall.occupants ?? []).map((o) => o.group_name).join(", ")}
+          </div>
+        )}
         {/* S73B: the whole queue, not one name. Gated on the array rather than on
             status, because a FREE stall can now have groups still waiting - that
             is the release fix, and hiding the list there would hide exactly the

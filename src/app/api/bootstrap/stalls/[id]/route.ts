@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   addToQueue,
+  closeStallVisit,
   getStallById,
+  recordStallVisit,
   removeFromQueue,
   updateStallStatus,
 } from "@/lib/services/bootstrap";
@@ -131,6 +133,71 @@ export async function PATCH(
         return NextResponse.json({ error: "Stall not found" }, { status: 404 });
       }
       return NextResponse.json(stall);
+    }
+
+    // S73C: claim and release now also move a GROUP through the visit table.
+    // group_id is optional on both, and its absence means different things:
+    //   claim   - the "unlisted group" escape (F2). Every group has already
+    //             visited this stall, so there is nobody left to name; the stall
+    //             is marked occupied and NO visit row is written.
+    //   release - a single-group stall's one-tap release, or a stall claimed
+    //             through that escape and so having no visit to close.
+    const groupId = body?.group_id ? String(body.group_id) : null;
+
+    if (action === "claim" && groupId) {
+      // Visit FIRST, then claim. If the visit is rejected nothing has changed
+      // yet, so the volunteer can pick again from a clean state. The reverse
+      // order would leave a stall claimed after a failed naming. The residual
+      // risk is the opposite ordering's mirror - a visit logged while the claim
+      // then fails the occupancy cap - but hitting that cap means max_occupancy
+      // volunteers are already on the stall, so it reads occupied regardless.
+      const visit = await recordStallVisit(
+        id,
+        groupId,
+        volunteer.id,
+        volunteer.session_id
+      );
+      if (!visit.ok && visit.reason !== "already_here") {
+        const messages = {
+          revisited: "That group has already been to this stall",
+          full: "This stall is already at its group capacity",
+          invalid: "That group is not part of this session",
+        } as const;
+        return NextResponse.json(
+          { error: messages[visit.reason] },
+          { status: visit.reason === "invalid" ? 400 : 409 }
+        );
+      }
+      // "already_here" falls through: the group IS at the stall, which is what
+      // the volunteer was asserting, so a double-tap is a success.
+    }
+
+    if (action === "release") {
+      const stallNow = await getStallById(id, volunteer.session_id);
+      if (!stallNow) {
+        return NextResponse.json({ error: "Stall not found" }, { status: 404 });
+      }
+      const open = stallNow.occupants;
+      // With one group here the client need not name it; with several it must,
+      // which is exactly when the UI shows the per-group picker.
+      const leaving = groupId ?? (open.length === 1 ? open[0]!.group_id : null);
+      if (!leaving && open.length > 1) {
+        return NextResponse.json(
+          { error: "Say which group is leaving" },
+          { status: 400 }
+        );
+      }
+      if (leaving) await closeStallVisit(id, leaving);
+
+      // The volunteer only steps off the stall once the LAST group has gone.
+      // On a max_groups = 1 stall that is identical to the pre-S73C one-tap
+      // behaviour; on a multi-group stall it stops "Group 3 is leaving" from
+      // silently abandoning Group 5.
+      const stillHere = open.filter((o) => o.group_id !== leaving);
+      if (stillHere.length > 0) {
+        const fresh = await getStallById(id, volunteer.session_id);
+        return NextResponse.json(fresh);
+      }
     }
 
     // A2 - session scoping happens inside the service, on every branch.
