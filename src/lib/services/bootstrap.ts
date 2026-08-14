@@ -652,6 +652,123 @@ export async function closeStallVisit(stallId: string, groupId: string): Promise
       AND left_at IS NULL`;
 }
 
+// S73G: the shared row shape for "which stalls has this group done". `visited` is
+// the checklist's only real question; `is_open` exists so a caller can tell a
+// FINISHED visit from one the automatic system currently has live, which is the
+// single case a manual clear refuses.
+export interface GroupStallChecklistRow {
+  id: string;
+  stall_name: string;
+  visited: boolean;
+  is_open: boolean;
+  arrived_at: string | null;
+}
+
+/**
+ * S73G: extracted from getVisitorChecklistContext (S73D) rather than written a
+ * second time -- the student page, the lead's manual checklist and the admin's
+ * all ask the identical question and now share one query.
+ *
+ * groupId is nullable on purpose: a visitor with no group still sees the
+ * session's stalls, all unticked, which is the behaviour S73D shipped.
+ *
+ * `visited` is `left_at IS NOT NULL`, not "a row exists" -- a group standing at a
+ * stall right now has not finished it.
+ */
+export async function getGroupStallChecklist(
+  sessionId: string,
+  groupId: string | null
+): Promise<GroupStallChecklistRow[]> {
+  const rows = await sql`
+    SELECT st.id, st.stall_name,
+           (vis.left_at IS NOT NULL) AS visited,
+           (vis.id IS NOT NULL AND vis.left_at IS NULL) AS is_open,
+           vis.arrived_at
+    FROM bootstrap_stalls st
+    LEFT JOIN bootstrap_stall_visits vis
+      ON vis.stall_id = st.id AND vis.group_id = ${groupId}::uuid
+    WHERE st.session_id = ${sessionId}::uuid
+    ORDER BY st.stall_number ASC
+    LIMIT 50`;
+  return rows as GroupStallChecklistRow[];
+}
+
+/**
+ * S73G: the manual BACKUP path. A second, independent way to write a visit row,
+ * for when the automatic stall-volunteer flow missed one.
+ *
+ * Deliberately NOT a variant of recordStallVisit, and the differences are the
+ * whole point:
+ *   - `arrived_at` AND `left_at` are both now(). A manual tick is a retroactive
+ *     record ("yes, we went there"), never a live occupancy, so it must never
+ *     create an open visit that the occupants list or max_groups would then see.
+ *   - NO capacity check. max_groups gates who may be AT a stall; it is
+ *     meaningless for a record of something that already happened, and applying
+ *     it would make a correction fail because of unrelated live state.
+ *   - No candidate-group / unvisited validation. Correcting the record IS the
+ *     use case.
+ *
+ * What it keeps: the same ON CONFLICT DO NOTHING idempotency recordStallVisit
+ * uses, so re-ticking an existing row (open or closed) is a no-op rather than an
+ * error or a duplicate.
+ *
+ * session_id is derived from the stall rather than passed in -- the column is
+ * NOT NULL and the stall is the authority on which session it belongs to. The
+ * group-in-same-session EXISTS is cheap and stops a cross-session write; it is
+ * an integrity guard, not a capacity one.
+ *
+ * volunteerId is null for an admin-initiated edit (no volunteer is acting) and
+ * the lead's own id for a lead-initiated one. Nothing reads volunteer_id on this
+ * table -- note that the queue table's `volunteer_id IS NULL` advisory signal
+ * (S73D) is on bootstrap_stall_queue, a different table with no accepted_at
+ * counterpart here, so there is no collision.
+ */
+export async function markStallVisitedManually(
+  groupId: string,
+  stallId: string,
+  volunteerId: string | null
+): Promise<void> {
+  await sql`
+    INSERT INTO bootstrap_stall_visits
+      (session_id, stall_id, group_id, volunteer_id, arrived_at, left_at)
+    SELECT st.session_id, st.id, ${groupId}::uuid, ${volunteerId}::uuid, now(), now()
+    FROM bootstrap_stalls st
+    WHERE st.id = ${stallId}::uuid
+      AND EXISTS (
+        SELECT 1 FROM bootstrap_groups g
+        WHERE g.id = ${groupId}::uuid AND g.session_id = st.session_id
+      )
+    ON CONFLICT (stall_id, group_id) DO NOTHING`;
+}
+
+/**
+ * S73G: remove a manual (or any closed) visit mark.
+ *
+ * `left_at IS NOT NULL` is the refusal, expressed as a predicate so BOTH callers
+ * inherit it and neither route can forget it: a visit the automatic system
+ * currently has OPEN is live state, and this backup path does not get to
+ * overwrite it. That applies identically to the admin -- admin override
+ * authority is real, but it runs through the stall-volunteer release flow and
+ * the existing stall-override tools, not through a checklist correction that
+ * would silently contradict what a volunteer is looking at right now.
+ *
+ * Returns false when nothing was deleted, so the routes can tell the caller WHY
+ * instead of reporting a silent success. An absent row also returns false; the
+ * routes distinguish the two cases.
+ */
+export async function clearStallVisitManually(
+  groupId: string,
+  stallId: string
+): Promise<boolean> {
+  const rows = await sql`
+    DELETE FROM bootstrap_stall_visits
+    WHERE stall_id = ${stallId}::uuid
+      AND group_id = ${groupId}::uuid
+      AND left_at IS NOT NULL
+    RETURNING id`;
+  return rows.length > 0;
+}
+
 /**
  * S73C (G3): end-of-event sweep. Visits only get a left_at when somebody taps
  * RELEASE, and at the end of a real event people simply walk away, so without
@@ -1602,12 +1719,9 @@ export interface VisitorChecklistContext {
   group_number: number | null;
   lead_name: string | null;
   lead_phone: string | null;
-  stalls: {
-    id: string;
-    stall_name: string;
-    visited: boolean;
-    arrived_at: string | null;
-  }[];
+  // S73G: now the shared GroupStallChecklistRow, so the student page, the lead's
+  // manual checklist and the admin's all read one query.
+  stalls: GroupStallChecklistRow[];
 }
 
 /**
@@ -1655,18 +1769,9 @@ export async function getVisitorChecklistContext(
     | undefined;
   if (!row) return null;
 
-  // The denormalized session_id on the visit table is what makes this one index
-  // hit rather than a join back through bootstrap_stalls.
-  const stallRows = await sql`
-    SELECT st.id, st.stall_name,
-           (vis.left_at IS NOT NULL) AS visited,
-           vis.arrived_at
-    FROM bootstrap_stalls st
-    LEFT JOIN bootstrap_stall_visits vis
-      ON vis.stall_id = st.id AND vis.group_id = ${row.group_id}::uuid
-    WHERE st.session_id = ${row.session_id}::uuid
-    ORDER BY st.stall_number ASC
-    LIMIT 50`;
+  // S73G: was an inline query here; extracted to getGroupStallChecklist so the
+  // manual override paths reuse it rather than growing a second copy.
+  const stallRows = await getGroupStallChecklist(row.session_id, row.group_id);
 
   return {
     visitor_name: row.visitor_name,
@@ -1675,7 +1780,7 @@ export async function getVisitorChecklistContext(
     group_number: row.group_number,
     lead_name: row.lead_name,
     lead_phone: row.lead_phone,
-    stalls: stallRows as VisitorChecklistContext["stalls"],
+    stalls: stallRows,
   };
 }
 

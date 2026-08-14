@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { BootstrapStall } from "@/lib/services/bootstrap";
+import type { BootstrapStall, GroupStallChecklistRow } from "@/lib/services/bootstrap";
 import BootstrapMapSVG from "./BootstrapMapSVG";
 import CheckinQROverlay from "./CheckinQROverlay";
+import ManualChecklistPanel from "./ManualChecklistPanel";
 import StallCard, {
   BS,
   StallGrid,
@@ -68,6 +69,13 @@ export default function BootstrapDashboard({
   const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [myGroupSize, setMyGroupSize] = useState(0);
+  // S73G - manual checklist BACKUP. Not the primary record: the stall
+  // volunteer's occupy/release flow still owns live occupancy.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualStalls, setManualStalls] = useState<GroupStallChecklistRow[]>([]);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualBusy, setManualBusy] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
   // S36 - lead classroom mode: rides the poll payload so it survives re-login
   // and stays in sync if an admin ever flips it server-side
   const [inClassroom, setInClassroom] = useState(false);
@@ -351,6 +359,48 @@ export default function BootstrapDashboard({
     }
   }
 
+  // S73G. The route resolves the group from the cookie, so like the roster
+  // endpoint there is no group id in the request to tamper with.
+  async function openManual() {
+    setManualOpen(true);
+    setManualLoading(true);
+    setManualError(null);
+    try {
+      const res = await fetch("/api/bootstrap/checklist/manual");
+      const data = res.ok ? await res.json() : null;
+      setManualStalls(data?.stalls ?? []);
+    } catch {
+      setManualStalls([]);
+    } finally {
+      setManualLoading(false);
+    }
+  }
+
+  async function toggleManual(stallId: string, visited: boolean) {
+    setManualBusy(stallId);
+    setManualError(null);
+    try {
+      const res = await fetch("/api/bootstrap/checklist/manual", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stall_id: stallId, visited }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // The refused-clear case (409) lands here with a real reason - an open
+        // visit belongs to the automatic system and this path will not override
+        // it. Surfaced in the panel rather than swallowed.
+        setManualError(data?.error ?? "Could not update the checklist.");
+        return;
+      }
+      setManualStalls(data?.stalls ?? []);
+    } catch {
+      setManualError("Request failed -- check your connection.");
+    } finally {
+      setManualBusy(null);
+    }
+  }
+
   async function signOut() {
     await fetch("/api/bootstrap/logout", { method: "POST" }).catch(() => {});
     window.location.href = "/bootstrap";
@@ -613,6 +663,31 @@ export default function BootstrapDashboard({
             </button>
           )}
         </div>
+
+        {/* S73G: manual checklist backup, sitting under the group card next to
+            the roster it belongs with. Deliberately understated -- a text link
+            rather than a button -- so it does not compete with the stall
+            volunteer's flow, which remains the primary way visits get recorded. */}
+        {myGroupId && (
+          <button
+            onClick={() => void openManual()}
+            style={{
+              marginTop: "-8px",
+              marginBottom: "16px",
+              background: "none",
+              border: "none",
+              color: BS.muted,
+              fontFamily: "var(--font-mono), monospace",
+              fontSize: "11px",
+              letterSpacing: "0.06em",
+              textDecoration: "underline",
+              cursor: "pointer",
+              padding: "8px 0",
+            }}
+          >
+            MANUAL CHECKLIST (BACKUP)
+          </button>
+        )}
 
         {/* S73D (I5): an UNCONFIRMED admin auto-placement. Two real buttons, not
             a dismiss-only banner: HEADING THERE sets accepted_at, NOT NOW deletes
@@ -928,6 +1003,19 @@ export default function BootstrapDashboard({
 
       {/* Full-screen map overlay - hardcoded SVG schematic (session 26) */}
       {showMap && <BootstrapMapSVG stalls={stalls} onClose={() => setShowMap(false)} />}
+
+      {manualOpen && (
+        <ManualChecklistPanel
+          title={groupNumber ? `Group ${groupNumber} checklist` : "Your checklist"}
+          subtitle="BACKUP ONLY -- USE IF THE AUTOMATIC SYSTEM MISSED A STALL. THE STALL VOLUNTEER MARKING YOU IN AND OUT IS STILL THE MAIN RECORD."
+          stalls={manualStalls}
+          loading={manualLoading}
+          busyStallId={manualBusy}
+          error={manualError}
+          onToggle={(stallId, visited) => void toggleManual(stallId, visited)}
+          onClose={() => setManualOpen(false)}
+        />
+      )}
 
       {/* S73D (H3): roster overlay, same tap-anywhere-to-close full-screen shape
           as CheckinQROverlay. Name and SRN/PRN only - getGroupRoster does not

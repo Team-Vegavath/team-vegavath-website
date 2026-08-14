@@ -7,11 +7,14 @@ import ReactMarkdown from "react-markdown";
 import BootstrapMapSVG from "@/components/bootstrap/BootstrapMapSVG";
 import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootstrap/StallCard";
 import SegmentedCount from "./SegmentedCount";
+import ManualChecklistPanel from "@/components/bootstrap/ManualChecklistPanel";
 import type {
   BootstrapFeedbackSummary,
+  BootstrapGroup,
   BootstrapSession,
   BootstrapStall,
   BootstrapVolunteer,
+  GroupStallChecklistRow,
 } from "@/lib/services/bootstrap";
 
 const POLL_MS = 4000;
@@ -47,6 +50,14 @@ export default function BootstrapAdminDashboard({
   const [stallError, setStallError] = useState("");
   // S73B - live capacity override, keyed by stall id while an edit is in flight
   const [capacityBusy, setCapacityBusy] = useState<string | null>(null);
+  // S73G - visitor groups (already in the poll payload, previously discarded)
+  // and the manual checklist overlay for whichever one the admin opened.
+  const [groups, setGroups] = useState<BootstrapGroup[]>([]);
+  const [checklistGroup, setChecklistGroup] = useState<BootstrapGroup | null>(null);
+  const [checklistStalls, setChecklistStalls] = useState<GroupStallChecklistRow[]>([]);
+  const [checklistLoading, setChecklistLoading] = useState(false);
+  const [checklistBusy, setChecklistBusy] = useState<string | null>(null);
+  const [checklistError, setChecklistError] = useState<string | null>(null);
   // S55 volunteer detail edit - name / phone / SRN, one row at a time
   const [volEditId, setVolEditId] = useState<string | null>(null);
   const [volName, setVolName] = useState("");
@@ -86,6 +97,10 @@ export default function BootstrapAdminDashboard({
       const data = await res.json();
       setStalls(data.stalls);
       setVolunteers(data.volunteers);
+      // S73G: this endpoint has always returned groups; the dashboard discarded
+      // them because nothing rendered a group list. The manual checklist needs
+      // one row per group, so they are kept now.
+      setGroups(data.groups ?? []);
     } catch {
       // next poll self-corrects
     }
@@ -314,6 +329,55 @@ export default function BootstrapAdminDashboard({
    * unlike END ALL VISITS this writes nothing destructive, and each lead still
    * has to accept or decline their own suggestion.
    */
+  // S73G: manual checklist for ANY group. Unlike the lead route, the group is
+  // explicit here - there is no cookie-resolved group on the admin side, and
+  // admin may correct any group's record.
+  async function openChecklist(group: BootstrapGroup) {
+    setChecklistGroup(group);
+    setChecklistLoading(true);
+    setChecklistError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/bootstrap/sessions/${session.id}/groups/${group.id}/checklist`
+      );
+      const data = res.ok ? await res.json() : null;
+      setChecklistStalls(data?.stalls ?? []);
+    } catch {
+      setChecklistStalls([]);
+    } finally {
+      setChecklistLoading(false);
+    }
+  }
+
+  async function toggleChecklist(stallId: string, visited: boolean) {
+    if (!checklistGroup) return;
+    setChecklistBusy(stallId);
+    setChecklistError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/bootstrap/sessions/${session.id}/groups/${checklistGroup.id}/checklist`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stall_id: stallId, visited }),
+        }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // 409 = the refused clear on an OPEN visit. Admin authority does not
+        // extend to silently overwriting live occupancy through this path.
+        setChecklistError(data?.error ?? "Could not update the checklist.");
+        return;
+      }
+      setChecklistStalls(data?.stalls ?? []);
+      await poll();
+    } catch {
+      setChecklistError("Request failed.");
+    } finally {
+      setChecklistBusy(null);
+    }
+  }
+
   async function distributeGroups() {
     setStallError("");
     const res = await fetch(`/api/admin/bootstrap/sessions/${session.id}/distribute`, {
@@ -1157,6 +1221,71 @@ export default function BootstrapAdminDashboard({
         </section>
       )}
 
+      {/* S73G: visitor groups. This dashboard has never rendered a group list --
+          the poll returned `groups` and threw them away -- so this section is
+          purely additive rather than a restructure of an existing area, which is
+          the fallback the brief allowed for exactly this case. One row per
+          group is the grain the manual checklist acts on. */}
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2 style={sectionTitleStyle}>Visitor Groups</h2>
+        <p
+          style={{
+            marginTop: "-0.5rem",
+            marginBottom: "1rem",
+            fontFamily: "var(--font-mono), monospace",
+            fontSize: "0.7rem",
+            letterSpacing: "0.06em",
+            color: "var(--text-muted)",
+          }}
+        >
+          MANUAL CHECKLIST IS A BACKUP -- STALL VOLUNTEERS MARKING GROUPS IN AND
+          OUT REMAINS THE PRIMARY RECORD.
+        </p>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Group</th>
+                <th>Lead</th>
+                <th>Checked in</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.length > 0 ? (
+                groups.map((g) => (
+                  <tr key={g.id}>
+                    <td className="admin-td-primary" style={{ fontWeight: 500 }}>
+                      {g.name}
+                    </td>
+                    <td className="admin-cell-mono">{g.lead_name ?? "-"}</td>
+                    <td className="admin-cell-mono">{g.visitor_count}</td>
+                    <td>
+                      {isViewer ? (
+                        "-"
+                      ) : (
+                        <button
+                          className="admin-row-action"
+                          onClick={() => void openChecklist(g)}
+                        >
+                          CHECKLIST
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="admin-empty" colSpan={4}>
+                    No visitor groups in this session yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* S35: self-registered accounts, split by role. Login codes are shown
           in plaintext on purpose - these accounts only reach /bootstrap. */}
       <section style={{ marginTop: "2.5rem" }}>
@@ -1950,6 +2079,21 @@ export default function BootstrapAdminDashboard({
             )}
           </div>
         </>
+      )}
+
+      {/* S73G: same shared panel the lead dashboard uses, so the two sides of
+          the manual override cannot drift apart visually or behaviourally. */}
+      {checklistGroup && (
+        <ManualChecklistPanel
+          title={`${checklistGroup.name} checklist`}
+          subtitle="BACKUP ONLY -- FOR CORRECTING STALLS THE AUTOMATIC SYSTEM MISSED. A STALL SHOWING HERE NOW CANNOT BE UNMARKED FROM HERE; RELEASE THE GROUP FROM THE STALL FIRST."
+          stalls={checklistStalls}
+          loading={checklistLoading}
+          busyStallId={checklistBusy}
+          error={checklistError}
+          onToggle={(stallId, visited) => void toggleChecklist(stallId, visited)}
+          onClose={() => setChecklistGroup(null)}
+        />
       )}
     </>
   );
