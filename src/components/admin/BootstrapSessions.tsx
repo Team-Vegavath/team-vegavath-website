@@ -535,9 +535,10 @@ export default function BootstrapSessions({
           className="admin-hint"
           style={{ marginTop: "-0.25rem", marginBottom: "0.75rem" }}
         >
-          Registered at /bootstrap/register/stall while no session was active.
-          Creating a session auto-assigns anyone whose stall preference matches a
-          stall name; the rest are assigned here.
+          Registered at /bootstrap/register/pool, which is open whether or not a
+          session is running. Creating a session auto-assigns anyone whose stall
+          preference matches a stall name, and pulls in everyone who registered as
+          a group lead; the rest are assigned here.
         </p>
 
         {/* S73K: bulk actions on the whole pool. Only shown when there is a pool

@@ -32,15 +32,22 @@ const inputStyle: React.CSSProperties = {
   transition: "border-color 150ms",
 };
 
-// S35 self-registration - one component, two variants. Stall volunteers pick
-// the stall they will manage; group volunteers just leave their details and
+// S35 self-registration - one component, now three variants. Stall volunteers
+// pick the stall they will manage; group volunteers just leave their details and
 // get a group number once the session activates.
+//
+// S74B: `pool` is the third variant. It used to be a MODE of the stall variant,
+// reached whenever no session was active, which meant one route was serving two
+// unrelated audiences and anyone pre-registering was silently recorded as a stall
+// volunteer -- including people who meant to lead a group. The pool is now its own
+// route and asks which role is intended; `stall` and `group` are both plain
+// session-gated pages again.
 export default function BootstrapRegister({
   variant,
   hasSession,
   stalls = [],
 }: {
-  variant: "stall" | "group";
+  variant: "stall" | "group" | "pool";
   hasSession: boolean;
   stalls?: { id: string; stall_name: string }[];
 }) {
@@ -49,6 +56,9 @@ export default function BootstrapRegister({
   const [srn, setSrn] = useState("");
   const [stallId, setStallId] = useState("");
   const [preferredStall, setPreferredStall] = useState("");
+  // Pool registrants declare intent; 'stall' matches the old behaviour, so it is
+  // the default and nobody is forced to answer to get the previous outcome.
+  const [poolRole, setPoolRole] = useState<"stall" | "lead">("stall");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
@@ -57,11 +67,13 @@ export default function BootstrapRegister({
     pooled?: boolean;
   } | null>(null);
 
-  // S49 pre-registration pool: stall volunteers can register before any session
-  // exists. There are no stalls to choose from, so they type a preference and an
-  // admin assigns them once the session is built. Group volunteers still wait -
-  // their flow depends on visitor groups that only exist inside a session.
-  const poolMode = variant === "stall" && !hasSession;
+  // S49 pre-registration pool: register before any session exists. There are no
+  // stalls to choose from, so a stall-bound registrant types a preference and the
+  // session-creation sweep matches it; a group lead has nothing to match on and is
+  // swept in by role (autoAssignPoolMembers).
+  const poolMode = variant === "pool";
+  // Only a pool registrant who intends to work a stall types a preference.
+  const wantsStall = poolMode && poolRole === "stall";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,10 +84,17 @@ export default function BootstrapRegister({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          variant !== "stall"
-            ? { name, phone, srn }
-            : poolMode
-              ? { name, phone, srn, preferred_stall_name: preferredStall }
+          poolMode
+            ? {
+                name,
+                phone,
+                srn,
+                role: poolRole,
+                // a lead has no stall preference to send
+                preferred_stall_name: wantsStall ? preferredStall : "",
+              }
+            : variant === "group"
+              ? { name, phone, srn }
               : { name, phone, srn, stall_id: stallId }
         ),
       });
@@ -92,7 +111,12 @@ export default function BootstrapRegister({
     }
   }
 
-  const title = variant === "stall" ? "Stall Volunteer Registration" : "Group Volunteer Registration";
+  const title =
+    variant === "pool"
+      ? "Volunteer Pre-Registration"
+      : variant === "stall"
+        ? "Stall Volunteer Registration"
+        : "Group Volunteer Registration";
 
   return (
     <div
@@ -147,19 +171,61 @@ export default function BootstrapRegister({
         </div>
 
         {!hasSession && !poolMode ? (
-          <p
-            style={{
-              fontFamily: "var(--font-chakra), sans-serif",
-              fontWeight: 600,
-              fontSize: "1rem",
-              letterSpacing: "0.04em",
-              color: BS.muted,
-              textAlign: "center",
-              lineHeight: 1.6,
-            }}
-          >
-            Registration is not open yet.
-          </p>
+          // S74B: this block used to be the group variant's alone -- the stall
+          // variant fell through to poolMode instead and quietly accepted the
+          // submission. Both session-gated variants now land here, and both need
+          // somewhere to go, so it points at the pool rather than dead-ending.
+          // An inline pointer beats a redirect: the block already exists and is
+          // already shared, so this is one edit that fixes both routes, and the
+          // registrant keeps the URL they were given rather than being bounced to
+          // a page they did not ask for.
+          <div style={{ textAlign: "center" }}>
+            <p
+              style={{
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontWeight: 600,
+                fontSize: "1rem",
+                letterSpacing: "0.04em",
+                color: BS.muted,
+                lineHeight: 1.6,
+              }}
+            >
+              No live session right now.
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-mono), monospace",
+                fontSize: "12px",
+                color: BS.muted,
+                lineHeight: 1.7,
+                marginTop: "12px",
+              }}
+            >
+              Pre-register instead and you&apos;ll be assigned automatically when
+              the next session opens.
+            </p>
+            <a
+              href="/bootstrap/register/pool"
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "14px",
+                fontFamily: "var(--font-chakra), sans-serif",
+                fontSize: "14px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                textAlign: "center",
+                textDecoration: "none",
+                background: "transparent",
+                border: `1px solid ${BS.border}`,
+                borderRadius: "10px",
+                color: BS.text,
+                marginTop: "1.5rem",
+              }}
+            >
+              Pre-register
+            </a>
+          </div>
         ) : result ? (
           <div>
             <div
@@ -222,10 +288,15 @@ export default function BootstrapRegister({
               }}
             >
               Save these -- you&apos;ll need them to log in at /bootstrap.
-              {variant === "group" &&
+              {/* S74B: a pooled registrant can now be a lead, so the group-number
+                  line is keyed on the role that was actually chosen rather than on
+                  the variant alone. */}
+              {(variant === "group" || (poolMode && poolRole === "lead")) &&
                 " Your group number will be shown on your dashboard after Bootstrap day starts."}
               {result.pooled &&
-                " You're in the pre-registration pool. You'll be assigned to a stall when the next session is created, and your login starts working then."}
+                (poolRole === "lead"
+                  ? " You're pre-registered. You'll be added to the next session when it's created, and your login starts working then."
+                  : " You're pre-registered. You'll be assigned to a stall when the next session is created, and your login starts working then.")}
             </p>
             {/* S72C (Section H): was 11px muted mono with no border and no
                 min-height, sitting under a 20px-padded card - it read as a caption
@@ -271,9 +342,63 @@ export default function BootstrapRegister({
                   marginBottom: "24px",
                 }}
               >
-                You&apos;re in the pre-registration pool. You&apos;ll be assigned
-                to a stall when the next session is created.
+                No session is running yet. Register now and you&apos;ll be
+                assigned when the next one is created ∙ your login starts working
+                then.
               </p>
+            )}
+
+            {poolMode && (
+              <div style={{ marginBottom: "20px" }}>
+                <span style={labelStyle}>What do you want to do?</span>
+                {/* Two buttons rather than a <select>: there are exactly two
+                    options and both need to be readable at a glance, since this
+                    choice is the whole point of the page. */}
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {(
+                    [
+                      ["stall", "Stall volunteer"],
+                      ["lead", "Group lead"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setPoolRole(value)}
+                      style={{
+                        flex: 1,
+                        padding: "14px 10px",
+                        fontFamily: "var(--font-chakra), sans-serif",
+                        fontSize: "13px",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        background: poolRole === value ? BS.accent : "transparent",
+                        color: poolRole === value ? "#ffffff" : BS.muted,
+                        border: `1px solid ${poolRole === value ? BS.accent : BS.border}`,
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        transition: "background 150ms, color 150ms",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p
+                  style={{
+                    fontFamily: "var(--font-mono), monospace",
+                    fontSize: "10px",
+                    letterSpacing: "0.06em",
+                    color: BS.muted,
+                    marginTop: "8px",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {poolRole === "stall"
+                    ? "You'll be stationed at one stall for the day."
+                    : "You'll walk a visitor group around the stalls and get a group number when the session starts."}
+                </p>
+              </div>
             )}
 
             <div style={{ marginBottom: "20px" }}>
@@ -324,7 +449,7 @@ export default function BootstrapRegister({
               </p>
             </div>
 
-            <div style={{ marginBottom: variant === "stall" ? "20px" : "28px" }}>
+            <div style={{ marginBottom: variant === "group" ? "28px" : "20px" }}>
               <label htmlFor="bs-reg-srn" style={labelStyle}>
                 SRN / PRN
               </label>
@@ -346,7 +471,7 @@ export default function BootstrapRegister({
               />
             </div>
 
-            {poolMode && (
+            {wantsStall && (
               <div style={{ marginBottom: "28px" }}>
                 <label htmlFor="bs-reg-pref-stall" style={labelStyle}>
                   Which stall are you interested in?
@@ -410,7 +535,7 @@ export default function BootstrapRegister({
               </div>
             )}
 
-            {variant === "stall" && !poolMode && (
+            {variant === "stall" && (
               <div style={{ marginBottom: "28px" }}>
                 <label htmlFor="bs-reg-stall" style={labelStyle}>
                   Your stall
@@ -437,7 +562,7 @@ export default function BootstrapRegister({
 
             <button
               type="submit"
-              disabled={busy || (variant === "stall" && !poolMode && !stallId)}
+              disabled={busy || (variant === "stall" && !stallId)}
               style={{
                 width: "100%",
                 height: "64px",
@@ -451,7 +576,7 @@ export default function BootstrapRegister({
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 cursor: busy ? "wait" : "pointer",
-                opacity: busy || (variant === "stall" && !poolMode && !stallId) ? 0.6 : 1,
+                opacity: busy || (variant === "stall" && !stallId) ? 0.6 : 1,
                 transition: "opacity 150ms",
               }}
             >

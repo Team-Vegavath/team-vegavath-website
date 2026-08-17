@@ -232,6 +232,9 @@ export default function BootstrapCreateSession({
 
         {linkBox("Stall volunteers", "/bootstrap/register/stall")}
         {linkBox("Group volunteers", "/bootstrap/register/group")}
+        {/* S74B: always-open, unlike the two above, which close with the session.
+            Worth sharing now so it is already circulating when this session ends. */}
+        {linkBox("Pre-register (any time)", "/bootstrap/register/pool")}
 
         <p
           style={{

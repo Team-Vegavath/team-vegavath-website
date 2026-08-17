@@ -1072,27 +1072,44 @@ export async function setSessionMapImage(sessionId: string, imageUrl: string): P
 // S49: sessionId and stallId are nullable. With both null the volunteer lands in
 // the pre-registration pool (migration 021) and carries preferredStallName as
 // free text until an admin assigns them to a real session stall.
-export async function registerStallVolunteer(
+//
+// S74B: `role` was hardcoded 'stall' here, which was true while
+// /bootstrap/register/stall was the only door into the pool. /bootstrap/register/pool
+// lets a registrant say they intend to lead a group instead, so the role is now a
+// parameter and the function is no longer stall-specific (hence the rename from
+// registerStallVolunteer). Defaulted to 'stall' so the existing call sites read
+// exactly as before.
+export async function registerVolunteer(
   sessionId: string | null,
   name: string,
   phone: string,
   srn: string,
   stallId: string | null,
-  preferredStallName: string | null = null
+  preferredStallName: string | null = null,
+  role: "stall" | "lead" = "stall"
 ): Promise<{ username: string; loginCode: string }> {
   const username = srn.toLowerCase().trim();
   const loginCode = generatePassword(8);
   const hash = await bcrypt.hash(loginCode, 10);
+  // Leads check visitors in via a QR pointing at this token, and
+  // registerGroupVolunteer mints it at registration so that URL never changes.
+  // A pooled lead gets one on the same terms -- waiting until they are swept
+  // into a session would hand them a different URL than the one they were told.
+  // Stall volunteers have no check-in flow, so theirs stays NULL (migration 015
+  // is UNIQUE, and Postgres treats NULLs as distinct, so any number may coexist).
+  const checkinToken = role === "lead" ? randomBytes(20).toString("hex") : null;
 
   // suggested_stall_id is the existing volunteer→stall link (S28/S33): it
   // drives the admin STALL column and the volunteer's own dashboard highlight
   await sql`
     INSERT INTO bootstrap_volunteers
       (session_id, username, display_name, password_hash,
-       login_code, phone, srn, role, suggested_stall_id, preferred_stall_name)
+       login_code, phone, srn, role, suggested_stall_id, preferred_stall_name,
+       checkin_token)
     VALUES
       (${sessionId}, ${username}, ${name}, ${hash},
-       ${loginCode}, ${phone}, ${srn}, 'stall', ${stallId}, ${preferredStallName})`;
+       ${loginCode}, ${phone}, ${srn}, ${role}, ${stallId}, ${preferredStallName},
+       ${checkinToken})`;
 
   // S36: the stall is NOT claimed at registration - the volunteer hasn't
   // arrived yet. suggested_stall_id (set above) is enough for the admin STALL
@@ -1489,7 +1506,7 @@ export async function getSessionVolunteerNames(
 // pool rows and assigned rows alike -- no session_id guard.
 //
 // SRN writes BOTH columns. `username` is the lowercased SRN and is what the
-// login lookup keys on (see registerStallVolunteer), while `srn` is the display
+// login lookup keys on (see registerVolunteer), while `srn` is the display
 // copy the admin tables read. Updating one without the other would leave a
 // volunteer logging in under an SRN the panel no longer shows.
 //
@@ -1622,11 +1639,38 @@ export async function autoAssignPoolMembers(sessionId: string): Promise<number> 
         suggested_stall_id = s.id
     FROM bootstrap_stalls s
     WHERE v.session_id IS NULL
+      AND v.role = 'stall'
       AND s.session_id = ${sessionId}
       AND lower(regexp_replace(trim(s.stall_name), '[^a-zA-Z0-9]', '', 'g'))
         = lower(regexp_replace(trim(v.preferred_stall_name), '[^a-zA-Z0-9]', '', 'g'))
     RETURNING v.id`;
-  return rows.length;
+
+  // S74B: pooled LEADS are claimed unconditionally -- there is nothing to match
+  // them on. This is not a convenience: a lead has no preferred_stall_name, so
+  // the join above can never reach one (NULL = anything is NULL), and
+  // assignGroupNumbers only walks volunteers already inside the session. The
+  // manual fallback, assignVolunteerToSession, assigns someone TO A STALL, which
+  // is meaningless for a lead. Without this statement a pooled lead has no exit
+  // from the pool at all.
+  //
+  // Deliberately NOT folded into the statement above: that one is a stall-name
+  // match and this one is a role sweep, and a single query doing both would read
+  // as one rule with a hole in it.
+  //
+  // group_number is left NULL on purpose -- assignGroupNumbers owns it and runs
+  // on activation, so a swept lead is numbered by the same FCFS round-robin as
+  // one who registered directly. Nothing about that function changes.
+  //
+  // No UNIQUE(session_id, username) risk: the only caller runs this against a
+  // session created moments earlier, which holds no volunteers yet.
+  const leadRows = await sql`
+    UPDATE bootstrap_volunteers
+    SET session_id = ${sessionId}
+    WHERE session_id IS NULL
+      AND role = 'lead'
+    RETURNING id`;
+
+  return rows.length + leadRows.length;
 }
 
 // -------------------------------------------- visitor groups (S32, mig 014)

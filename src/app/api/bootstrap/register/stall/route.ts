@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getActiveBootstrapSession,
   getBootstrapStalls,
-  getPoolVolunteerBySrn,
   getVolunteerByUsername,
-  registerStallVolunteer,
+  registerVolunteer,
 } from "@/lib/services/bootstrap";
 import { normalisePhone } from "@/lib/utils/phone";
 import { normaliseSrnPrn } from "@/lib/utils/srn";
 
 // PUBLIC endpoint (S35) - stall volunteers register themselves before
 // Bootstrap day and pick the stall they will manage.
-// S49: with no active session the registration still goes through, into the
-// pre-registration pool (session_id NULL, migration 021). There are no stalls to
-// pick from yet, so the form sends a free-text preferred_stall_name instead.
+//
+// S74B: this route now requires an active session, exactly as
+// /api/bootstrap/register/group has since S35. The pre-registration pool it used
+// to fall into (S49, migration 021) has NOT gone away -- it moved to
+// /api/bootstrap/register/pool, which is always open and asks which role the
+// registrant intends. The capability is unchanged; only the door moved.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -24,7 +26,9 @@ export async function POST(req: NextRequest) {
     // Both formats are alphanumeric, so the username stays typeable either way.
     const srn = normaliseSrnPrn(srn_raw);
     const stallId = String(body?.stall_id ?? "");
-    const preferredStallName = String(body?.preferred_stall_name ?? "").trim();
+    // S74B: preferred_stall_name is gone from this route. It only ever applied to
+    // the pool branch, which now has its own endpoint, and a stall registered here
+    // picks a real stall_id -- there is nothing left to prefer.
 
     if (!name || !srn_raw) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (name.length > 100 || preferredStallName.length > 60) {
+    if (name.length > 100) {
       return NextResponse.json({ error: "Field too long" }, { status: 400 });
     }
     if (!srn) {
@@ -47,28 +51,13 @@ export async function POST(req: NextRequest) {
 
     const username = srn.toLowerCase();
     const session = await getActiveBootstrapSession();
-
-    // ---- pre-registration pool: no session exists yet -----------------------
+    // Same guard, same status and same message as the group route: this endpoint
+    // is for registering INTO a live session, and without one there is nothing to
+    // register into. Pre-registration lives at /api/bootstrap/register/pool.
     if (!session) {
-      const existingPool = await getPoolVolunteerBySrn(username);
-      if (existingPool) {
-        return NextResponse.json(
-          { error: "This SRN is already pre-registered. Ask an admin for your login code." },
-          { status: 409 }
-        );
-      }
-      const pooled = await registerStallVolunteer(
-        null,
-        name,
-        phone,
-        srn,
-        null,
-        preferredStallName || null
-      );
-      return NextResponse.json({ ...pooled, pooled: true });
+      return NextResponse.json({ error: "Registration is not open yet" }, { status: 404 });
     }
 
-    // ---- normal path: an active session with real stalls --------------------
     if (!stallId) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
@@ -89,7 +78,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await registerStallVolunteer(session.id, name, phone, srn, stallId);
+    const result = await registerVolunteer(session.id, name, phone, srn, stallId);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[POST /api/bootstrap/register/stall]", error);

@@ -103,9 +103,17 @@ Both are public (no login, no middleware gate) and both render the single
   manage from a dropdown.
 - `src/app/bootstrap/register/group/page.tsx` -- variant `"group"`. Just name,
   phone, SRN.
+- `src/app/bootstrap/register/pool/page.tsx` -- variant `"pool"` (S74B). The
+  always-open one. It does not load the session at all, so it is the only
+  statically rendered page of the three and never waits on a Neon cold start.
+  Adds a role choice (stall volunteer / group lead); the stall-preference field
+  appears only for the former.
 
-If there is no active session, both pages render "Registration is not open
-yet."
+If there is no active session, `stall` and `group` both render "No live session
+right now." with a link to the pool page. S74B: before that, only `group` did --
+`stall` silently accepted the submission into the pool instead, which is why
+everyone who pre-registered was recorded as a stall volunteer whatever they
+actually intended.
 
 ### The form and the APIs
 
@@ -126,8 +134,9 @@ Shared server-side rules in both routes:
 - The stall route additionally validates that the submitted `stall_id` belongs
   to the active session.
 
-On success the service functions `registerStallVolunteer` /
-`registerGroupVolunteer` do the following:
+On success the service functions `registerVolunteer` (S74B -- was
+`registerStallVolunteer`; it takes a `role` now, so the stall-specific name no
+longer fit) / `registerGroupVolunteer` do the following:
 
 - `username = srn.toLowerCase().trim()`.
 - `loginCode = generatePassword(8)` -- 8 chars from
@@ -143,6 +152,11 @@ On success the service functions `registerStallVolunteer` /
   arrives.
 - Group registrants are stored with `role = 'lead'` and a stable
   `checkin_token = randomBytes(20).toString("hex")` for their QR link.
+- S74B: a POOL registrant is stored with whichever of those two roles they picked,
+  by the same `registerVolunteer` call, with `session_id = NULL`. A pooled lead
+  gets its `checkin_token` here too, at registration rather than when it is later
+  swept into a session -- minting it late would hand the lead a different QR URL
+  than the one they were originally given.
 
 The response returns `{ username, loginCode }`, which the component shows on a
 "Registered!" screen telling the volunteer to save both (they are their login
@@ -708,8 +722,9 @@ Notes:
 | Path | Access | Purpose |
 | --- | --- | --- |
 | `/bootstrap` | Volunteer cookie | Login screen, or the role-appropriate dashboard. |
-| `/bootstrap/register/stall` | Public | Stall volunteer self-registration. |
-| `/bootstrap/register/group` | Public | Group volunteer self-registration. |
+| `/bootstrap/register/stall` | Public | Stall volunteer self-registration. Needs an active session (S74B). |
+| `/bootstrap/register/group` | Public | Group volunteer self-registration. Needs an active session. |
+| `/bootstrap/register/pool` | Public | Pre-registration, always open, either role (S74B). |
 | `/bootstrap/checkin/[token]` | Public | Visitor check-in into a lead's group via QR. |
 | `/bootstrap/feedback` | Public | Visitor feedback form. |
 | `/admin/bootstrap` | Admin (NextAuth) | Session list or the live control dashboard. |

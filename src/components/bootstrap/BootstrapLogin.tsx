@@ -274,6 +274,29 @@ export default function BootstrapLogin() {
           >
             Register as Group Volunteer
           </a>
+          {/* S74B: the two links above only work while a session is live. This is
+              the one that always does, so it is the fallback for anyone who lands
+              here between events -- which, off-season, is everyone. */}
+          <a
+            href="/bootstrap/register/pool"
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "14px",
+              fontFamily: "var(--font-chakra), sans-serif",
+              fontSize: "14px",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              textDecoration: "none",
+              background: "transparent",
+              border: `1px solid ${BS.border}`,
+              borderRadius: "10px",
+              color: BS.text,
+            }}
+          >
+            Pre-register for the next session
+          </a>
         </div>
       </div>
     </div>

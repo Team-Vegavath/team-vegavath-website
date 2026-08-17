@@ -210,7 +210,7 @@ session (re-registration is refused).
 - `srn` (string, required) -- trimmed, max 30, `[a-zA-Z0-9]` only (becomes the username).
 - `stall_id` (string, required) -- must be a stall in the active session.
 
-**Response (2xx):** `200` JSON from `registerStallVolunteer` (the created login/code).
+**Response (2xx):** `200` JSON from `registerVolunteer` (the created login/code).
 **Response (4xx/5xx):**
 - `400` missing fields, invalid phone, field too long, non-alphanumeric SRN, or unknown stall.
 - `404` `{ error: "Registration is not open yet" }` when no active session.
@@ -219,6 +219,42 @@ session (re-registration is refused).
 
 **Notes:** Validates the stall id against `getBootstrapStalls(session.id)`
 to reject stale/forged ids. Username lookup is `srn.toLowerCase()`.
+
+S74B: the pre-registration fallback this route used to contain (S49 -- accept the
+submission into the pool whenever no session was active) has moved to
+`/api/bootstrap/register/pool`. This route now 404s in that case, as documented
+above and as the group route always has.
+
+## POST /api/bootstrap/register/pool
+
+**Auth:** Public (S74B) -- the pre-registration pool's own endpoint. **No session
+boundary at all:** this is the one registration route that works whether or not a
+session is active, which is the entire reason it exists. A row written here has
+`session_id = NULL` (migration 021) and is claimed by
+`autoAssignPoolMembers(sessionId)` when a session is next created.
+
+**Purpose:** Pre-register for the next session and declare which role is intended.
+
+**Request body:**
+- `name` (string, required) -- trimmed, max 100.
+- `phone` (string, required) -- normalised via `normalisePhone`; must be 10 digits.
+- `srn` (string, required) -- `SRN_PATTERN` or `PRN_PATTERN` (S73F), becomes the username.
+- `role` (string, optional) -- `"lead"` or `"stall"`. Anything else, including
+  absent, is read as `"stall"`, which is what every pool row was before this route
+  existed.
+- `preferred_stall_name` (string, optional) -- free text, max 60. Ignored and
+  stored NULL when `role = "lead"`: a lead has no stall to be matched against.
+
+**Response (2xx):** `200` JSON from `registerVolunteer` plus `pooled: true`.
+**Response (4xx/5xx):**
+- `400` missing fields, invalid phone, field too long, or malformed SRN/PRN.
+- `409` `{ error: "This SRN is already pre-registered..." }`.
+- `500` `{ error: "Registration failed" }`.
+
+**Notes:** No `404` -- there is no session to be missing. The duplicate check is
+`getPoolVolunteerBySrn`, in application code rather than a constraint, because
+`UNIQUE(session_id, username)` does not constrain rows whose `session_id` is NULL
+(Postgres treats NULLs as distinct).
 
 ## POST /api/bootstrap/register/group
 
