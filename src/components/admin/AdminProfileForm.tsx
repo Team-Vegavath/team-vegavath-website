@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { StatefulButton, type ButtonState } from "@/components/admin/StatefulButton";
-import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 
 interface AdminProfileFormProps {
   displayName: string;
@@ -152,7 +152,8 @@ export default function AdminProfileForm({
             className="admin-input"
             type="tel"
             value={mobileNumber}
-            onChange={(e) => setMobileNumber(e.target.value)}
+            onChange={onDigitsChange(setMobileNumber)}
+            inputMode="numeric"
             maxLength={10}
             pattern={PHONE_PATTERN}
             title="10 digits only -- no country code, no spaces"

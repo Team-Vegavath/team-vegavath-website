@@ -9,6 +9,7 @@ import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootst
 import SegmentedCount from "./SegmentedCount";
 import ManualChecklistPanel from "@/components/bootstrap/ManualChecklistPanel";
 import { groupLabel } from "@/lib/utils/group";
+import { onDigitsChange } from "@/lib/utils/phone";
 import type {
   BootstrapFeedbackSummary,
   BootstrapGroup,
@@ -752,16 +753,21 @@ export default function BootstrapAdminDashboard({
               <label htmlFor={`bs-vol-phone-${v.id}`} className="admin-label">
                 Phone (10 digits)
               </label>
-              {/* S73I: maxLength is the ONLY client-side cap that works here --
-                  this editor saves through onClick, not a form submit, so a
-                  `pattern` attribute would never be evaluated. The server's
+              {/* S73I: this editor saves through onClick, not a form submit, so a
+                  `pattern` attribute would never be evaluated -- which left
+                  maxLength as the only client-side cap, and maxLength limits the
+                  COUNT of characters, not their type.
+                  S76B: onDigitsChange is therefore the only thing that actually
+                  keeps a letter out of this field, and it works precisely because
+                  it does not depend on a <form> existing. The server's
                   normalisePhone stays the real guard. */}
               <input
                 id={`bs-vol-phone-${v.id}`}
                 type="tel"
                 className="admin-input"
                 value={volPhone}
-                onChange={(e) => setVolPhone(e.target.value)}
+                onChange={onDigitsChange(setVolPhone)}
+                inputMode="numeric"
                 maxLength={10}
                 title="10 digits only -- no country code, no spaces"
                 placeholder="9876543210"

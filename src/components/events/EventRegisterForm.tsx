@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
-import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 import { PRN_PATTERN, SRN_PATTERN } from "@/lib/utils/srn";
 
 interface Props {
@@ -173,8 +173,10 @@ export default function EventRegisterForm({ slug, eventTitle }: Props) {
           type="tel"
           name="phone"
           value={form.phone}
-          onChange={handleChange}
+          // S76B: filters non-digits as typed, unlike the shared handleChange.
+          onChange={onDigitsChange((phone) => setForm((prev) => ({ ...prev, phone })))}
           required
+          inputMode="numeric"
           maxLength={10}
           pattern={PHONE_PATTERN}
           title="10 digits only -- no country code, no spaces"

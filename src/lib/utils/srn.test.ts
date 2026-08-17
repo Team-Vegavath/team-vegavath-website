@@ -132,6 +132,25 @@ describe("regression guards -- the S73F 'any alphanumeric string' rule", () => {
    * lets through, the server must accept. A future edit to either regex that breaks
    * this is what these two assertions catch.
    */
+  /**
+   * S76B: same guard PHONE_PATTERN now carries, for the same reason. PHONE_PATTERN
+   * contained `[\s-]`, which throws under the RegExp `v` flag that browsers compile
+   * `pattern` with -- and a throwing pattern is ignored entirely, so the field
+   * accepts anything. These two constants happen to be safe (plain ranges, no
+   * class-escape-adjacent punctuation), which is why /join's SRN validation kept
+   * working while its phone validation silently did not. Pinned so a future edit
+   * cannot introduce the same defect here.
+   */
+  it("compiles under the RegExp v flag, the way browsers compile a pattern attribute", () => {
+    const combined = `(${SRN_PATTERN})|(${PRN_PATTERN})`;
+    for (const [name, p] of [["SRN", SRN_PATTERN], ["PRN", PRN_PATTERN], ["combined", combined]]) {
+      expect(
+        () => new RegExp(`^(?:${p})$`, "v"),
+        `${name} pattern does not compile under v, so browsers will IGNORE it`
+      ).not.toThrow();
+    }
+  });
+
   it("stays in step with the patterns the forms feed to the HTML pattern attribute", () => {
     expect(new RegExp(`^(?:${SRN_PATTERN})$`).test("PES1UG21CS999")).toBe(true);
     expect(new RegExp(`^(?:${PRN_PATTERN})$`).test("PES1201912345")).toBe(true);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 import { PRN_PATTERN, SRN_PATTERN } from "@/lib/utils/srn";
 
 import { BS } from "./StallCard";
@@ -361,7 +361,8 @@ export default function BootstrapCheckin({
                   id="ci-phone"
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={onDigitsChange(setPhone)}
+                  inputMode="numeric"
                   maxLength={10}
                   pattern={PHONE_PATTERN}
                   title="10 digits only -- no country code, no spaces"

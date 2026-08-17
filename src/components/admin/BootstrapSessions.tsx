@@ -7,6 +7,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import BootstrapCreateSession from "@/components/admin/BootstrapCreateSession";
 import GoogleSheetsExportButton from "@/components/admin/GoogleSheetsExportButton";
 import type { BootstrapSession, PoolVolunteer } from "@/lib/services/bootstrap";
+import { onDigitsChange } from "@/lib/utils/phone";
 
 export default function BootstrapSessions({
   sessions,
@@ -767,13 +768,17 @@ export default function BootstrapSessions({
                               </label>
                               {/* S73I: see BootstrapAdminDashboard -- no form
                                   wraps this editor, so maxLength is the only
-                                  client-side cap that can fire. */}
+                                  client-side cap that can fire, and it caps count
+                                  not character type.
+                                  S76B: onDigitsChange is what actually keeps a
+                                  letter out, and needs no <form> to work. */}
                               <input
                                 id={`bs-vol-phone-${v.id}`}
                                 type="tel"
                                 className="admin-input"
                                 value={volPhone}
-                                onChange={(e) => setVolPhone(e.target.value)}
+                                onChange={onDigitsChange(setVolPhone)}
+                                inputMode="numeric"
                                 maxLength={10}
                                 title="10 digits only -- no country code, no spaces"
                                 placeholder="9876543210"

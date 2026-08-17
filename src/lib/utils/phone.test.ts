@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PHONE_PATTERN, normalisePhone } from "./phone";
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, digitsOnly, normalisePhone } from "./phone";
 
 /**
  * S75. Read the note under "Historical bugs" before adding a test here that claims
@@ -58,19 +58,59 @@ describe("normalisePhone", () => {
   });
 
   /**
-   * The signature is `(input: string)`, so null/undefined are a type error, not a
-   * runtime case -- every caller reaches it through `String(body?.phone ?? "")`.
-   * Pinned as a THROW rather than quietly asserting null, because that is what the
-   * code actually does: `null.replace` is a TypeError. If someone later makes the
-   * parameter optional, this test fails and forces the decision to be explicit
-   * instead of silently turning a crash into a null.
+   * S76B: this used to assert a THROW. `null.replace` was a TypeError, and S75
+   * pinned that as the honest current behaviour rather than papering over it.
    *
-   * ponytail: the function is NOT being changed to accept null. It has seven
-   * callers that all coerce already, and widening the signature to satisfy a test
-   * would be the test dictating production behaviour.
+   * It is now hardened to degrade to null instead. Still unreachable in production
+   * -- all EIGHT callers coerce before calling (re-verified caller by caller in
+   * S76B; S75's report said seven, which was stale before the pool route landed).
+   * The parameter type stays `string` on purpose: this is "do not crash if it ever
+   * happens", not an invitation to start passing nullable values deliberately.
    */
-  it("throws rather than returning null when handed null (callers coerce upstream)", () => {
-    expect(() => normalisePhone(null as unknown as string)).toThrow(TypeError);
+  it("degrades to null rather than throwing when handed null or undefined", () => {
+    expect(() => normalisePhone(null as unknown as string)).not.toThrow();
+    expect(() => normalisePhone(undefined as unknown as string)).not.toThrow();
+    expect(normalisePhone(null as unknown as string)).toBeNull();
+    expect(normalisePhone(undefined as unknown as string)).toBeNull();
+  });
+});
+
+describe("digitsOnly", () => {
+  it("strips every non-digit character", () => {
+    expect(digitsOnly("98765abcde")).toBe("98765");
+    expect(digitsOnly("+91 98765-43210")).toBe("9198765432");
+    expect(digitsOnly("abc")).toBe("");
+    expect(digitsOnly("")).toBe("");
+  });
+
+  it("caps at 10 digits, so the field can never hold more", () => {
+    expect(digitsOnly("12345678901234")).toBe("1234567890");
+    expect(digitsOnly("12345678901234")).toHaveLength(PHONE_MAX_DIGITS);
+  });
+
+  it("leaves a clean 10-digit value untouched", () => {
+    expect(digitsOnly("9876543210")).toBe("9876543210");
+  });
+
+  /**
+   * The property the whole S76B fix rests on: whatever a user types, what lands in
+   * React state is 0-10 digits and nothing else. Asserted over the shapes that
+   * actually reached the field in the reported bug.
+   */
+  it("only ever yields 0-10 digits, whatever it is given", () => {
+    const inputs = [
+      "abc def",
+      "98765 43210",
+      "+91-98765-43210",
+      "((((",
+      "9".repeat(50),
+      "1a2b3c4d5e6f7g8h9i0j",
+      "  ",
+    ];
+    for (const raw of inputs) {
+      const out = digitsOnly(raw);
+      expect(out, `${JSON.stringify(raw)} produced ${JSON.stringify(out)}`).toMatch(/^\d{0,10}$/);
+    }
   });
 });
 
@@ -113,6 +153,44 @@ describe("regression guards", () => {
    * This is what fails if a future session tightens one side and forgets the other,
    * which is the drift both sessions were written to prevent.
    */
+  /**
+   * S76B, and the one test in this file that would have caught the live bug.
+   *
+   * PHONE_PATTERN was `(\+?91[\s-]?|0)?[0-9]{10}`. That `[\s-]` -- a hyphen directly
+   * after a class escape -- is a SYNTAX ERROR under the RegExp `v` flag. Per the HTML
+   * spec the `pattern` attribute is compiled with `v`, and a pattern that fails to
+   * compile is ignored ENTIRELY: the field then reports valid for any value at all,
+   * letters included. Five fields shared this constant, so all five silently lost
+   * their client-side validation at once, which is exactly what "the field accepts
+   * letters with no resistance" looked like from the outside.
+   *
+   * It compiled fine under `u` and in Node's default mode, which is why every earlier
+   * check of this constant -- including S75's own subset test right below -- passed
+   * while the browser was ignoring it.
+   *
+   * Anything put in an HTML `pattern` attribute must compile under `v`. This asserts
+   * that directly rather than trusting a match result, because a match result cannot
+   * distinguish "validated and passed" from "never validated at all".
+   */
+  it("compiles under the RegExp v flag, which is how browsers compile a pattern attribute", () => {
+    expect(
+      () => new RegExp(`^(?:${PHONE_PATTERN})$`, "v"),
+      "PHONE_PATTERN does not compile under the v flag, so browsers will IGNORE it and accept any input"
+    ).not.toThrow();
+  });
+
+  it("matches identically under v, u and the default mode", () => {
+    const cases = ["9876543210", "+919876543210", "09876543210", "987654321", "98765abcde", "98765 4321"];
+    for (const flags of ["", "u", "v"]) {
+      const re = new RegExp(`^(?:${PHONE_PATTERN})$`, flags);
+      for (const value of cases) {
+        expect(re.test(value), `${JSON.stringify(value)} differs under flags "${flags}"`).toBe(
+          /^(?:(\+?91[\s-]?|0)?[0-9]{10})$/.test(value)
+        );
+      }
+    }
+  });
+
   it("accepts everything PHONE_PATTERN accepts, so no form can submit a value the API rejects", () => {
     const anchored = new RegExp(`^(?:${PHONE_PATTERN})$`);
     const browserAccepts = [

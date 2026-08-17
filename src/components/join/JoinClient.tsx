@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
 import { HyperText } from "@/components/ui/hyper-text";
-import { PHONE_PATTERN } from "@/lib/utils/phone";
+import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 import { PRN_PATTERN, SRN_PATTERN, type SrnPrnKind } from "@/lib/utils/srn";
 
 /* FY26 recruitment domains. These six values are what /api/join and the DB
@@ -439,8 +439,14 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     type="tel"
                     name="mobile_number"
                     value={form.mobile_number}
-                    onChange={handleChange}
+                    // S76B: not the shared handleChange -- that writes the raw
+                    // keystroke straight into state, which is how a letter reached
+                    // this field at all. onDigitsChange filters first.
+                    onChange={onDigitsChange((mobile_number) =>
+                      setForm((prev) => ({ ...prev, mobile_number }))
+                    )}
                     required
+                    inputMode="numeric"
                     maxLength={10}
                     pattern={PHONE_PATTERN}
                     title="10 digits only -- no country code, no spaces"
