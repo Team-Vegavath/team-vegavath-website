@@ -661,8 +661,15 @@ export default function BootstrapSessions({
                       </td>
                       <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{v.username}</td>
                       <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{v.phone ?? "-"}</td>
+                      {/* S74B: a lead has no stall to prefer, so a blank cell here
+                          would read as "stall volunteer, no preference" -- which is
+                          exactly the wrong thing to assign them. Say what they are. */}
                       <td style={{ color: "var(--text-secondary)" }}>
-                        {v.preferred_stall_name ?? "-"}
+                        {v.role === "lead" ? (
+                          <span style={{ color: "var(--accent)" }}>Group lead</span>
+                        ) : (
+                          (v.preferred_stall_name ?? "-")
+                        )}
                       </td>
                       {/* S55C: plaintext by design, same as the active-session
                           tables -- these accounts only reach /bootstrap. */}

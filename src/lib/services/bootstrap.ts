@@ -103,6 +103,10 @@ export interface PoolVolunteer {
   srn: string | null;
   phone: string | null;
   preferred_stall_name: string | null;
+  // S74B - which role they pre-registered for. Before the pool had its own route
+  // this was always 'stall', so it was not worth selecting; now a lead can sit
+  // here and an admin assigning them to a stall would be assigning the wrong thing.
+  role: "stall" | "lead";
   login_code: string | null; // S55C - plaintext, same deal as BootstrapVolunteer
   created_at: string;
 }
@@ -1554,7 +1558,7 @@ export async function resetVolunteerLoginCode(
 export async function getUnassignedVolunteers(): Promise<PoolVolunteer[]> {
   const rows = await sql`
     SELECT id, display_name, username, srn, phone, preferred_stall_name,
-           login_code, created_at
+           role, login_code, created_at
     FROM bootstrap_volunteers
     WHERE session_id IS NULL
     ORDER BY created_at ASC LIMIT 200`;
