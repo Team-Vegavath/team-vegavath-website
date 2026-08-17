@@ -16,6 +16,13 @@ import type { Application } from "@/types/settings";
 export interface ExportTable {
   /** Filename stem, no extension and no timestamp -- callers add those. */
   name: string;
+  /**
+   * S74A: the tab this dataset owns in the shared "Vegavath_Exports"
+   * spreadsheet. Declared here beside the columns rather than derived from
+   * `name` inside googleExport, so the human-facing tab title is stated once and
+   * not reverse-engineered from a filename stem by string surgery.
+   */
+  tab: string;
   headers: string[];
   rows: (string | number | null | undefined)[][];
 }
@@ -39,6 +46,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
 export function applicationsTable(apps: Application[]): ExportTable {
   return {
     name: "vegavath-applications",
+    tab: "Applications",
     headers: [
       "Name", "Email", "Mobile", "SRN/PRN", "Semester",
       "Domain 1", "Domain 2", "Domain 3",
@@ -60,6 +68,7 @@ export function applicationsTable(apps: Application[]): ExportTable {
 export function poolVolunteersTable(pool: PoolVolunteer[]): ExportTable {
   return {
     name: "vegavath-volunteer-pool",
+    tab: "Pool Volunteers",
     headers: [
       "Name", "Username", "SRN", "Phone",
       "Preferred Stall", "Login Code", "Registered",

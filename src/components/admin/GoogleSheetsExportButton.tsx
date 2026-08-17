@@ -11,7 +11,9 @@ import { useState } from "react";
  * button failing, or the integration being unconfigured, changes nothing about
  * it.
  *
- * A POST, so it cannot be a link: creating a Drive file is not a navigation.
+ * A POST, so it cannot be a link: writing into a spreadsheet is not a
+ * navigation. (S74A: it used to create a Drive file, which service accounts can
+ * never own. Nothing about this component changed -- only what the route does.)
  */
 export default function GoogleSheetsExportButton({ endpoint }: { endpoint: string }) {
   const [busy, setBusy] = useState(false);
