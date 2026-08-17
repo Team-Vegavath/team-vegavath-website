@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import BootstrapCreateSession from "@/components/admin/BootstrapCreateSession";
+import GoogleSheetsExportButton from "@/components/admin/GoogleSheetsExportButton";
 import type { BootstrapSession, PoolVolunteer } from "@/lib/services/bootstrap";
 
 export default function BootstrapSessions({
@@ -42,6 +43,13 @@ export default function BootstrapSessions({
   const [volPhone, setVolPhone] = useState("");
   const [volSrn, setVolSrn] = useState("");
   const [volError, setVolError] = useState("");
+
+  // S73K bulk pool reset -- an inline confirm rather than window.confirm, because
+  // the dialog has to carry a working "export first" link and a native confirm
+  // cannot hold one.
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const [wipeError, setWipeError] = useState("");
 
   async function activate(id: string) {
     setBusyId(id);
@@ -242,6 +250,27 @@ export default function BootstrapSessions({
     }
   }
 
+  // S73K: the between-events reset. Deleting the pool one row at a time is fine
+  // for a duplicate and useless for a roster turnover, which is what this is for.
+  async function deleteAllPool() {
+    setWiping(true);
+    setWipeError("");
+    try {
+      const res = await fetch("/api/admin/bootstrap/volunteers/pool/delete-all", {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setWipeError(data?.error ?? "Delete failed");
+        return;
+      }
+      setWipeOpen(false);
+      router.refresh();
+    } finally {
+      setWiping(false);
+    }
+  }
+
   function startAssign(volunteerId: string) {
     setAssignError("");
     if (assignId === volunteerId) {
@@ -317,6 +346,19 @@ export default function BootstrapSessions({
     textTransform: "uppercase",
     color: "var(--text-primary)",
     margin: "0 0 0.75rem",
+  };
+
+  // S73K: same treatment as the applications page's EXPORT CSV link, so the two
+  // exports read as one control rather than two inventions.
+  const exportLinkStyle: React.CSSProperties = {
+    fontFamily: "var(--font-mono)",
+    fontSize: "0.72rem",
+    letterSpacing: "0.1em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    border: "1px solid var(--border)",
+    padding: "6px 14px",
+    textDecoration: "none",
   };
 
   return (
@@ -497,6 +539,98 @@ export default function BootstrapSessions({
           Creating a session auto-assigns anyone whose stall preference matches a
           stall name; the rest are assigned here.
         </p>
+
+        {/* S73K: bulk actions on the whole pool. Only shown when there is a pool
+            to act on -- an EXPORT that yields a header row and a DELETE ALL that
+            deletes nothing are both noise on an empty table. */}
+        {pool.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: "0.75rem",
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: "0.75rem",
+            }}
+          >
+            {/* Plain <a>: must be a real navigation so the browser downloads the
+                file. Not gated on isViewer -- this reads, and the read-only tier
+                is meant to be able to read. */}
+            <a
+              href="/api/admin/bootstrap/volunteers/pool/export"
+              download
+              style={exportLinkStyle}
+            >
+              EXPORT POOL CSV
+            </a>
+            {/* S73K: sibling destination, not a replacement. If the Google
+                integration is unconfigured or down it reports that and the CSV
+                link above is unaffected. */}
+            {!isViewer && (
+              <GoogleSheetsExportButton endpoint="/api/admin/bootstrap/volunteers/pool/export/google" />
+            )}
+            {!isViewer && !wipeOpen && (
+              <button
+                type="button"
+                className="admin-btn-danger-outline"
+                onClick={() => {
+                  setWipeError("");
+                  setWipeOpen(true);
+                }}
+              >
+                DELETE ALL
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* The confirmation. An inline danger zone rather than window.confirm,
+            because the nudge to export first has to be a link the person can
+            actually click without losing the dialog. Deliberately a nudge and
+            not a gate -- skipping the export is their call. */}
+        {wipeOpen && !isViewer && (
+          <div className="admin-danger-zone" style={{ marginTop: 0, marginBottom: "1rem" }}>
+            <p className="admin-danger-title">Delete all pre-registered volunteers</p>
+            <p className="admin-danger-text">
+              Delete all {pool.length} pre-registered{" "}
+              {pool.length === 1 ? "volunteer" : "volunteers"}? This cannot be
+              undone. They would each have to register again. Volunteers already
+              assigned to a session are not affected. Export the list first if you
+              might need their details or login codes.
+            </p>
+            {wipeError && (
+              <p className="admin-danger-text" style={{ color: "var(--error)" }}>
+                {wipeError}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
+              <a
+                href="/api/admin/bootstrap/volunteers/pool/export"
+                download
+                style={exportLinkStyle}
+              >
+                EXPORT FIRST
+              </a>
+              <button
+                type="button"
+                className="admin-btn-danger"
+                disabled={wiping}
+                onClick={() => void deleteAllPool()}
+              >
+                {wiping ? "DELETING..." : `DELETE ALL ${pool.length}`}
+              </button>
+              <button
+                type="button"
+                className="admin-row-action"
+                disabled={wiping}
+                onClick={() => setWipeOpen(false)}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>

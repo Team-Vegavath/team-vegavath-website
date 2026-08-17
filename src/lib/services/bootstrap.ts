@@ -1574,6 +1574,24 @@ export async function deletePoolVolunteer(volunteerId: string): Promise<boolean>
   return rows.length === 1;
 }
 
+// S73K: wipe the whole pre-registration pool, for the between-events reset where
+// the roster has turned over and picking off rows one at a time is not viable.
+// Returns how many were deleted.
+//
+// Same `session_id IS NULL` guard as deletePoolVolunteer, and it is doing the
+// same structural job here rather than merely narrowing the target: it is what
+// stops a bulk wipe from ever reaching a volunteer who has been assigned to a
+// session and may be a group's team_lead_id or hold checked-in visitors. The
+// guard is the whole safety property of this function, so it lives in the WHERE
+// clause rather than in a caller's filter.
+export async function deleteAllPoolVolunteers(): Promise<number> {
+  const rows = await sql`
+    DELETE FROM bootstrap_volunteers
+    WHERE session_id IS NULL
+    RETURNING id`;
+  return rows.length;
+}
+
 // The session_id IS NULL guard makes this a one-way door: an already-assigned
 // volunteer cannot be moved by re-firing the assign route.
 export async function assignVolunteerToSession(

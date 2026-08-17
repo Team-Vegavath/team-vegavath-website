@@ -177,7 +177,7 @@ export default async function AdminAccountsPage() {
                   <td style={{ whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
                       {isGodfather && <ResetPasswordButton accountId={account.id} />}
-                      {isGodfather &&
+                      {isGodfather && //Godfather account reset password is not allowed to prevent lockout.
                         (accounts.length > 1 ? (
                           <InlineDelete
                             endpoint={`/api/admin/accounts?id=${account.id}`}

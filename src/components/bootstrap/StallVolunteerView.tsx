@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { BootstrapStall } from "@/lib/services/bootstrap";
+import { groupLabel } from "@/lib/utils/group";
 import { BS, StallGrid, type VolunteerStallAction } from "./StallCard";
 
 /**
@@ -335,7 +336,7 @@ export default function StallVolunteerView({
                     color: BS.muted,
                   }}
                 >
-                  HERE NOW: {occupants.map((o) => o.group_name).join(", ")}
+                  HERE NOW: {occupants.map((o) => groupLabel(o.group_name)).join(", ")}
                 </div>
               )}
 
@@ -366,7 +367,7 @@ export default function StallVolunteerView({
                         onClick={() => chooseGroup(myStall.id, "claim", g.id)}
                         style={groupTileStyle}
                       >
-                        {g.name}
+                        {groupLabel(g.name)}
                         {/* queued groups sort first; the tag says why, without
                             implying a turn order the queue does not enforce */}
                         {g.is_queued && (
@@ -432,7 +433,7 @@ export default function StallVolunteerView({
                       onClick={() => chooseGroup(myStall.id, "release", o.group_id)}
                       style={groupTileStyle}
                     >
-                      {o.group_name}
+                      {groupLabel(o.group_name)}
                     </button>
                   ))}
                   <button onClick={() => setGroupMode(null)} style={textLink}>

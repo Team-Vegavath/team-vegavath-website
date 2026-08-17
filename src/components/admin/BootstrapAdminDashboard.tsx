@@ -8,6 +8,7 @@ import BootstrapMapSVG from "@/components/bootstrap/BootstrapMapSVG";
 import StallCard, { BS, StallGrid, bootstrapBtnStyle } from "@/components/bootstrap/StallCard";
 import SegmentedCount from "./SegmentedCount";
 import ManualChecklistPanel from "@/components/bootstrap/ManualChecklistPanel";
+import { groupLabel } from "@/lib/utils/group";
 import type {
   BootstrapFeedbackSummary,
   BootstrapGroup,
@@ -949,7 +950,7 @@ export default function BootstrapAdminDashboard({
                 letterSpacing: "0.06em",
               }}
             >
-              {entry.group_name} waiting at {s.stall_name} for {mins} min
+              {groupLabel(entry.group_name)} waiting at {s.stall_name} for {mins} min
               {s.status === "free" ? " -- STALL IS FREE" : ""}
             </span>
             <span
@@ -1187,14 +1188,14 @@ export default function BootstrapAdminDashboard({
                             opposed to the volunteers manning it. */}
                         <td className="admin-cell-mono">
                           {(s.occupants ?? []).length > 0
-                            ? (s.occupants ?? []).map((o) => o.group_name).join(", ")
+                            ? (s.occupants ?? []).map((o) => groupLabel(o.group_name)).join(", ")
                             : "-"}
                         </td>
                         {/* S73B: the queue that replaced queued_by. A stall can
                             hold several waiting groups now, so this is a list. */}
                         <td className="admin-cell-mono">
                           {(s.queue ?? []).length > 0
-                            ? (s.queue ?? []).map((e) => e.group_name).join(", ")
+                            ? (s.queue ?? []).map((e) => groupLabel(e.group_name)).join(", ")
                             : "-"}
                         </td>
                         <td>
@@ -1262,7 +1263,7 @@ export default function BootstrapAdminDashboard({
                 groups.map((g) => (
                   <tr key={g.id}>
                     <td className="admin-td-primary" style={{ fontWeight: 500 }}>
-                      {g.name}
+                      {groupLabel(g.name)}
                     </td>
                     <td className="admin-cell-mono">{g.lead_name ?? "-"}</td>
                     <td className="admin-cell-mono">{g.visitor_count}</td>
@@ -2091,7 +2092,7 @@ export default function BootstrapAdminDashboard({
           the manual override cannot drift apart visually or behaviourally. */}
       {checklistGroup && (
         <ManualChecklistPanel
-          title={`${checklistGroup.name} checklist`}
+          title={`${groupLabel(checklistGroup.name)} checklist`}
           subtitle="BACKUP ONLY -- FOR CORRECTING STALLS THE AUTOMATIC SYSTEM MISSED. A STALL SHOWING HERE NOW CANNOT BE UNMARKED FROM HERE; RELEASE THE GROUP FROM THE STALL FIRST."
           stalls={checklistStalls}
           loading={checklistLoading}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { BootstrapStall, GroupStallChecklistRow } from "@/lib/services/bootstrap";
+import { groupLabel } from "@/lib/utils/group";
 import BootstrapMapSVG from "./BootstrapMapSVG";
 import CheckinQROverlay from "./CheckinQROverlay";
 import ManualChecklistPanel from "./ManualChecklistPanel";
@@ -270,7 +271,7 @@ export default function BootstrapDashboard({
     const waiting = stall.queue ?? [];
     if (waiting.length > 0) {
       parts.push(
-        `${waiting.map((e) => e.group_name).join(", ")} ${waiting.length === 1 ? "is" : "are"} still waiting here`
+        `${waiting.map((e) => groupLabel(e.group_name)).join(", ")} ${waiting.length === 1 ? "is" : "are"} still waiting here`
       );
     }
     if (parts.length === 0) return null;

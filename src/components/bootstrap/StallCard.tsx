@@ -1,6 +1,7 @@
 "use client";
 
 import type { BootstrapStall } from "@/lib/services/bootstrap";
+import { groupLabel } from "@/lib/utils/group";
 
 // Standalone Bootstrap palette (docs/bootstrap-spec + session 24) - deliberately
 // separate from the main site's globals.css tokens. JS constants rather than CSS
@@ -314,7 +315,7 @@ export default function StallCard({
             already says the stall is busy. */}
         {(stall.occupants ?? []).length > 0 && (
           <div style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: BS.occupied }}>
-            Here now: {(stall.occupants ?? []).map((o) => o.group_name).join(", ")}
+            Here now: {(stall.occupants ?? []).map((o) => groupLabel(o.group_name)).join(", ")}
           </div>
         )}
         {/* S73B: the whole queue, not one name. Gated on the array rather than on
@@ -329,7 +330,7 @@ export default function StallCard({
               const mins = waitMinutes(entry.queued_at);
               return (
                 <div key={entry.group_id} style={{ marginTop: "0.15rem" }}>
-                  Waiting: {entry.group_name}
+                  Waiting: {groupLabel(entry.group_name)}
                   {entry.lead_name ? ` (${entry.lead_name})` : ""}
                   <span
                     style={{

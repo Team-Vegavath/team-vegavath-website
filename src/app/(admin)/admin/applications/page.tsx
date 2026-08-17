@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import ApplicationsTable from "@/components/admin/ApplicationsTable";
+import GoogleSheetsExportButton from "@/components/admin/GoogleSheetsExportButton";
 import { auth } from "@/lib/auth";
 import { getApplications } from "@/lib/services/applications";
 import type { Application, ApplicationStatus, InterviewGroup } from "@/types/settings";
@@ -70,23 +71,33 @@ export default async function AdminApplicationsPage({
           activeGroup ? `interview group ${activeGroup}` : activeStatus ?? "all statuses"
         }`}
         action={
-          // Plain <a>: must be a real navigation so the browser downloads the file.
-          <a
-            href={`/api/admin/applications/export${activeStatus ? `?status=${activeStatus}` : ""}`}
-            download
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.72rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: "var(--text-muted)",
-              border: "1px solid var(--border)",
-              padding: "6px 14px",
-              textDecoration: "none",
-            }}
-          >
-            EXPORT CSV
-          </a>
+          // S73K: two independent destinations for the same filtered set. The
+          // CSV link is untouched and does not depend on the Google integration
+          // being configured or reachable.
+          <span style={{ display: "inline-flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+            {/* Plain <a>: must be a real navigation so the browser downloads the file. */}
+            <a
+              href={`/api/admin/applications/export${activeStatus ? `?status=${activeStatus}` : ""}`}
+              download
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.72rem",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "var(--text-muted)",
+                border: "1px solid var(--border)",
+                padding: "6px 14px",
+                textDecoration: "none",
+              }}
+            >
+              EXPORT CSV
+            </a>
+            {!session.user.isViewer && (
+              <GoogleSheetsExportButton
+                endpoint={`/api/admin/applications/export/google${activeStatus ? `?status=${activeStatus}` : ""}`}
+              />
+            )}
+          </span>
         }
       />
 
