@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import FileUploadField from "@/components/admin/FileUploadField";
 import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
+import { uploadToR2 } from "@/lib/utils";
 
 interface MemberFormProps {
   mode: "create" | "edit";
@@ -40,18 +41,6 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function uploadFile(file: File, path: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Upload failed");
-    }
-    return data.url;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -66,7 +55,7 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
       const imageFields: { photo_url?: string } = {};
 
       if (photoFiles[0]) {
-        imageFields.photo_url = await uploadFile(
+        imageFields.photo_url = await uploadToR2(
           photoFiles[0],
           `team/${tier}/${safeName}-${Date.now()}.jpg`,
         );

@@ -2,6 +2,8 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
+import { uploadToR2 } from "@/lib/utils";
+
 interface TeamMember { id: string; name: string; photo_url: string | null; }
 interface Match {
   file: File;
@@ -63,14 +65,12 @@ export default function BulkTeamPhotoUpload({ members }: { members: TeamMember[]
       matches.map(async (m) => {
         const memberId = m.override ?? m.member?.id;
         if (!memberId) return;  // unmatched, user left unassigned
-        const form = new FormData();
-        form.append("file", m.file);
-        // timestamped key: R2 serves immutable cache headers, never reuse a key
-        form.append("path", `team/${memberId}-${Date.now()}.${m.file.name.split(".").pop()}`);
         try {
-          const up = await fetch("/api/admin/upload", { method: "POST", body: form });
-          if (!up.ok) throw new Error("Upload failed");
-          const { url } = await up.json() as { url: string };
+          // timestamped key: R2 serves immutable cache headers, never reuse a key
+          const url = await uploadToR2(
+            m.file,
+            `team/${memberId}-${Date.now()}.${m.file.name.split(".").pop()}`
+          );
           const save = await fetch("/api/admin/team", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

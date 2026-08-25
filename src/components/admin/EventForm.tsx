@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import FileUploadField from "@/components/admin/FileUploadField";
 import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
-import { isNoRegistrationEvent } from "@/lib/utils";
+import { isNoRegistrationEvent, uploadToR2 } from "@/lib/utils";
 
 interface EventFormProps {
   mode: "create" | "edit";
@@ -55,18 +55,6 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function uploadFile(file: File, path: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Upload failed");
-    }
-    return data.url;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -90,11 +78,11 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
       // R2 objects are served with immutable cache headers; replacements need
       // a new filename, so key each upload by timestamp.
       if (logoFiles[0]) {
-        imageFields.logo_url = await uploadFile(logoFiles[0], `events/${slug}/logo-${Date.now()}.png`);
+        imageFields.logo_url = await uploadToR2(logoFiles[0], `events/${slug}/logo-${Date.now()}.png`);
       }
 
       if (coverFiles[0]) {
-        imageFields.cover_image_url = await uploadFile(coverFiles[0], `events/${slug}/cover-${Date.now()}.jpg`);
+        imageFields.cover_image_url = await uploadToR2(coverFiles[0], `events/${slug}/cover-${Date.now()}.jpg`);
       }
 
       const eventFields = {

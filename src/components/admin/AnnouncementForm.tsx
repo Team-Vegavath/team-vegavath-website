@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import FileUploadField from "@/components/admin/FileUploadField";
 import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
+import { uploadToR2 } from "@/lib/utils";
 
 /* Structure copied from SponsorForm: same upload helper, same admin-* classes,
    same StatefulButton, same onSuccess-or-navigate contract.
@@ -59,18 +60,6 @@ export default function AnnouncementForm({
 
   const isEdit = mode === "edit" && Boolean(initialData?.id);
 
-  async function uploadFile(file: File, path: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Upload failed");
-    }
-    return data.url;
-  }
-
   /** New file wins; else an explicit removal clears; else leave the column
    *  alone (undefined), which on create falls through to null. */
   function resolveImage(
@@ -98,13 +87,13 @@ export default function AnnouncementForm({
       let desktopUrl: string | undefined;
       let mobileUrl: string | undefined;
       if (desktopFiles[0]) {
-        desktopUrl = await uploadFile(
+        desktopUrl = await uploadToR2(
           desktopFiles[0],
           `announcements/${safeTitle}-desktop-${Date.now()}.png`
         );
       }
       if (mobileFiles[0]) {
-        mobileUrl = await uploadFile(
+        mobileUrl = await uploadToR2(
           mobileFiles[0],
           `announcements/${safeTitle}-mobile-${Date.now()}.png`
         );

@@ -35,9 +35,10 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 - Seed scripts in scripts/ hit the live database - never run unprompted.
 - Migrations are numbered files in migrations/ applied to Neon MANUALLY
   by the owner. Never auto-apply; write the file, flag it, stop.
-  Status as of S76D: 001-025 applied, including 020, which the owner
-  applied during S76D after it was found to be the cause of a live bug.
-  026-028 exist in the repo and their applied state is UNCONFIRMED. The
+  Status as of S76D: migrations now run through 028. 024-028 are
+  confirmed applied, verified directly against Neon by the owner during
+  S76D, as is 020, which the owner applied in the same session after it
+  was found to be the cause of a live bug. The
   `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`
   seed is applied.
 - S72D's note here read "001-025 are ALL confirmed applied. Nothing is

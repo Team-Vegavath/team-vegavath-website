@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { uploadToR2 } from "@/lib/utils";
+
 /* One-click photo upload for the /admin/team list: uploads to R2 under a
    timestamped key (R2 objects are immutable ∙ never overwrite), then
    PATCHes just { id, photo_url }. Skips the full edit form entirely. */
@@ -22,18 +24,10 @@ export default function QuickPhotoUpload({ memberId, currentPhotoUrl }: Props) {
     setUploading(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append(
-        "path",
+      const url = await uploadToR2(
+        file,
         `team/${memberId}-${Date.now()}.${file.name.split(".").pop()}`
       );
-      const up = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!up.ok) throw new Error("Upload failed");
-      const { url } = (await up.json()) as { url: string };
 
       const save = await fetch("/api/admin/team", {
         method: "PATCH",

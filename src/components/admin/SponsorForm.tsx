@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import FileUploadField from "@/components/admin/FileUploadField";
 import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
+import { uploadToR2 } from "@/lib/utils";
 
 interface SponsorFormProps {
   mode: "create" | "edit";
@@ -39,18 +40,6 @@ export default function SponsorForm({ mode, onSuccess, initialData }: SponsorFor
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function uploadFile(file: File, path: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Upload failed");
-    }
-    return data.url;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -66,7 +55,7 @@ export default function SponsorForm({ mode, onSuccess, initialData }: SponsorFor
 
       // Timestamped key: R2 serves immutable cache headers, never reuse a key.
       if (logoFiles[0]) {
-        logo_url = await uploadFile(logoFiles[0], `sponsors/${safeName}-${Date.now()}.png`);
+        logo_url = await uploadToR2(logoFiles[0], `sponsors/${safeName}-${Date.now()}.png`);
       }
 
       const sponsorFields = {

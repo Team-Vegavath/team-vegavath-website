@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import FileUploadField from "@/components/admin/FileUploadField";
+import { uploadToR2 } from "@/lib/utils";
 
 type UploadStatus = "queued" | "uploading" | "done" | "error";
 
@@ -127,28 +128,7 @@ export default function GalleryUploadForm() {
         // same-named file must never reuse the old object key.
         const uploadPath = `gallery/${eventSlug}/${Date.now()}-${filename}`;
 
-        const uploadFormData = new FormData();
-        uploadFormData.append("file", file);
-        uploadFormData.append("path", uploadPath);
-
-        const uploadResponse = await fetch("/api/admin/upload", {
-          method: "POST",
-          body: uploadFormData,
-        });
-
-        if (!uploadResponse.ok) {
-          const uploadError = (await uploadResponse.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          throw new Error(uploadError?.error ?? "Image upload failed.");
-        }
-
-        const uploadResult = (await uploadResponse.json()) as { url?: string };
-        const r2Url = uploadResult.url;
-
-        if (!r2Url) {
-          throw new Error("Upload succeeded but no URL was returned.");
-        }
+        const r2Url = await uploadToR2(file, uploadPath);
 
         const createResponse = await fetch("/api/admin/gallery", {
           method: "POST",

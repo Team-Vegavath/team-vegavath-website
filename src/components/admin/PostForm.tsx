@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import FileUploadField from "@/components/admin/FileUploadField";
 import { StatefulButton } from "@/components/admin/StatefulButton";
 import ToggleSwitch from "@/components/admin/ToggleSwitch";
-import { slugify } from "@/lib/utils";
+import { slugify, uploadToR2 } from "@/lib/utils";
 // From src/types/post.ts, NOT from services/posts.ts: a value import out of a
 // service would pull lib/db.ts and the Neon driver into the client bundle.
 import {
@@ -65,18 +65,6 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Same helper as EventForm: the upload route takes the full R2 key as `path`
-  // and does not derive one.
-  async function uploadFile(file: File, path: string): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
-    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Upload failed");
-    return data.url;
-  }
-
   function handleTitleChange(value: string) {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
@@ -97,7 +85,7 @@ export default function PostForm({ mode, initialData }: PostFormProps) {
       // missing key as "leave alone", so edit mode keeps the stored thumbnail.
       const thumbField: { thumbnail_url?: string } = {};
       if (thumbFiles[0]) {
-        thumbField.thumbnail_url = await uploadFile(
+        thumbField.thumbnail_url = await uploadToR2(
           thumbFiles[0],
           `posts/${finalSlug}/thumb-${Date.now()}.jpg`
         );
