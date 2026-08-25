@@ -7,6 +7,15 @@ import {
   revokeOpenToken,
 } from "@/lib/services/admin";
 
+/** S76C: this route is godfather-only, so returning the underlying error text is
+ *  not a wider disclosure -- and swallowing it behind "Failed to create invite"
+ *  cost a full diagnosis round-trip on a live prod failure. Same shape as
+ *  src/app/api/admin/upload/route.ts. */
+function errorText(error: unknown, fallback: string): string {
+  const msg = error instanceof Error ? error.message : "";
+  return msg ? `${fallback}: ${msg}` : fallback;
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.isAdmin || !session.user.isGodfather) {
@@ -47,7 +56,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("[POST /api/admin/accounts/invite]", error);
-    return NextResponse.json({ error: "Failed to create invite" }, { status: 500 });
+    return NextResponse.json({ error: errorText(error, "Failed to create invite") }, { status: 500 });
   }
 }
 
@@ -74,7 +83,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("[GET /api/admin/accounts/invite]", error);
-    return NextResponse.json({ error: "Failed to load open links" }, { status: 500 });
+    return NextResponse.json({ error: errorText(error, "Failed to load open links") }, { status: 500 });
   }
 }
 
@@ -98,6 +107,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[DELETE /api/admin/accounts/invite]", error);
-    return NextResponse.json({ error: "Failed to revoke link" }, { status: 500 });
+    return NextResponse.json({ error: errorText(error, "Failed to revoke link") }, { status: 500 });
   }
 }

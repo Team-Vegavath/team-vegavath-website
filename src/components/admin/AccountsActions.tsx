@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+/** S76C: every action on this page used to alert a hardcoded string, so a real
+ *  server error ("Failed to create invite" from a 500) was indistinguishable
+ *  from a dropped network request, and the HTTP status was never visible at all.
+ *  This shows the status plus whatever the server actually said. */
+async function failureText(res: Response, fallback: string): Promise<string> {
+  const data = (await res.json().catch(() => null)) as { error?: string } | null;
+  return `${data?.error ?? fallback} (HTTP ${res.status})`;
+}
+
 /** Shared copyable-URL box for generated invite / reset links. */
 function CopyUrlBox({ url, note }: { url: string; note: string }) {
   const [copied, setCopied] = useState(false);
@@ -72,15 +81,19 @@ export function GenerateInviteButton() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inviteeName: name.trim(), role }),
       });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        setUrl(data.url as string);
-        setIssuedRole(data.role === "viewer" ? "viewer" : "admin");
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.url) {
+          setUrl(data.url as string);
+          setIssuedRole(data.role === "viewer" ? "viewer" : "admin");
+        } else {
+          alert("Server returned no invite URL (HTTP 200)");
+        }
       } else {
-        alert(data?.error ?? "Failed to generate invite link");
+        alert(await failureText(res, "Failed to generate invite link"));
       }
-    } catch {
-      alert("Failed to generate invite link");
+    } catch (e) {
+      alert(`Could not reach the server: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -226,15 +239,19 @@ export function OpenViewerLink({ initialTokens }: { initialTokens: OpenTokenRow[
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "open" }),
       });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        setNewUrl(data.url as string);
-        router.refresh();
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.url) {
+          setNewUrl(data.url as string);
+          router.refresh();
+        } else {
+          alert("Server returned no link URL (HTTP 200)");
+        }
       } else {
-        alert(data?.error ?? "Failed to create open viewer link");
+        alert(await failureText(res, "Failed to create open viewer link"));
       }
-    } catch {
-      alert("Failed to create open viewer link");
+    } catch (e) {
+      alert(`Could not reach the server: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -252,11 +269,10 @@ export function OpenViewerLink({ initialTokens }: { initialTokens: OpenTokenRow[
         setNewUrl("");
         router.refresh();
       } else {
-        const data = await res.json().catch(() => null);
-        alert(data?.error ?? "Failed to revoke link");
+        alert(await failureText(res, "Failed to revoke link"));
       }
-    } catch {
-      alert("Failed to revoke link");
+    } catch (e) {
+      alert(`Could not reach the server: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setRevoking("");
     }
@@ -402,14 +418,18 @@ export function ResetPasswordButton({ accountId }: { accountId: string }) {
       const res = await fetch(`/api/admin/accounts/${accountId}/reset-token`, {
         method: "POST",
       });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        setUrl(data.url as string);
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.url) {
+          setUrl(data.url as string);
+        } else {
+          alert("Server returned no reset URL (HTTP 200)");
+        }
       } else {
-        alert(data?.error ?? "Failed to generate reset link");
+        alert(await failureText(res, "Failed to generate reset link"));
       }
-    } catch {
-      alert("Failed to generate reset link");
+    } catch (e) {
+      alert(`Could not reach the server: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -441,12 +461,11 @@ export function PendingRequestActions({ id }: { id: string }) {
     try {
       const res = await fetch(`/api/admin/accounts/${id}/${action}`, { method: "POST" });
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        alert(data?.error ?? "Action failed");
+        alert(await failureText(res, "Action failed"));
       }
       router.refresh();
-    } catch {
-      alert("Action failed. Please retry.");
+    } catch (e) {
+      alert(`Could not reach the server: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }

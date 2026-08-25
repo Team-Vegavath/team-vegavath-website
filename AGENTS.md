@@ -35,9 +35,20 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 - Seed scripts in scripts/ hit the live database - never run unprompted.
 - Migrations are numbered files in migrations/ applied to Neon MANUALLY
   by the owner. Never auto-apply; write the file, flag it, stop.
-  Status as of S72D: 001-025 are ALL confirmed applied, as is the
+  Status as of S76D: 001-025 applied, including 020, which the owner
+  applied during S76D after it was found to be the cause of a live bug.
+  026-028 exist in the repo and their applied state is UNCONFIRMED. The
   `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`
-  seed. Nothing is outstanding.
+  seed is applied.
+- S72D's note here read "001-025 are ALL confirmed applied. Nothing is
+  outstanding." That was wrong: 020 was not applied, and the reusable
+  open-viewer invite link had been failing in prod ever since S67 first
+  made the button visible. Two sessions were spent diagnosing code that
+  was correct the whole time. Treat this status line as a claim to
+  re-verify, never as proof -- a migration whose feature is gated off
+  can sit unapplied indefinitely without anything failing loudly. When
+  a query fails on a column, check the column exists in prod BEFORE
+  reading the code that names it.
 
 ## Folder Structure - Do Not Deviate
 

@@ -38,3 +38,22 @@ export const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: "/f1/seasons", priority: 0.4 },
   { path: "/legal", priority: 0.3 },
 ];
+
+/**
+ * S76D: what the QR tool offers = the sitemap's routes PLUS public utility pages
+ * that are shareable but deliberately not crawlable.
+ *
+ * /bootstrap/feedback is public, unauthenticated and tokenless -- the admin panel
+ * already prints it as a shareable FEEDBACK URL -- so it satisfies the QR tool's
+ * "public route pages only, no fragments, no token-gated content" rule. It is
+ * still not sitemap content: it is a utility page, and STATIC_ROUTES excludes
+ * /bootstrap/* from crawling on purpose.
+ *
+ * Kept as a separate array rather than a `sitemap: false` flag on STATIC_ROUTES
+ * so sitemap.ts needs no change at all and cannot regress. `priority` is a
+ * sitemap concept, so entries here carry none.
+ */
+export const QR_ROUTES: { path: string }[] = [
+  ...STATIC_ROUTES.map(({ path }) => ({ path })),
+  { path: "/bootstrap/feedback" },
+];

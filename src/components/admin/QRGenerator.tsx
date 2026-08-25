@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
-import { SITE_URL, STATIC_ROUTES } from "@/types/routes";
+import { SITE_URL, QR_ROUTES } from "@/types/routes";
 
 // Same R2 logo the check-in QR embeds (CheckinQROverlay). NEXT_PUBLIC_* is inlined
 // at build time; imageSettings falls back to undefined when it is unset, exactly as
@@ -15,7 +15,7 @@ const R2_LOGO = `${R2_BASE}/icons/logo.png`;
 /**
  * S72C (Section I): QR codes for the site's public route pages.
  *
- * A dropdown over the shared STATIC_ROUTES list and nothing else. No free-text
+ * A dropdown over the shared QR_ROUTES list and nothing else. No free-text
  * field on purpose: the product rule is "route pages only, no in-page fragments,
  * no internal-only content", and a fixed dropdown makes that structural. There is
  * no input to validate, so no validation exists to drift out of sync with what
@@ -25,7 +25,7 @@ const R2_LOGO = `${R2_BASE}/icons/logo.png`;
  * it like every other read surface in the panel.
  */
 export default function QRGenerator() {
-  const [path, setPath] = useState(STATIC_ROUTES[0]?.path ?? "/");
+  const [path, setPath] = useState(QR_ROUTES[0]?.path ?? "/");
   const [copied, setCopied] = useState(false);
 
   const url = new URL(path, SITE_URL).toString();
@@ -72,7 +72,7 @@ export default function QRGenerator() {
           cursor: "pointer",
         }}
       >
-        {STATIC_ROUTES.map((r) => (
+        {QR_ROUTES.map((r) => (
           <option key={r.path} value={r.path}>
             {r.path}
           </option>
