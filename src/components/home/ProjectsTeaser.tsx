@@ -60,6 +60,7 @@ const LOGO_URL = "https://pub-f86fbbd7cd4a45088698b74e2b9a3e5f.r2.dev/icons/logo
 
 const PROJECTS = [
   { name: "Go-Kart", domain: "Automotives" },
+  { name: "Maze Solver", domain: "Robotics" }, // S78A
   { name: "Combat Bot", domain: "Robotics" },
 ] as const;
 
