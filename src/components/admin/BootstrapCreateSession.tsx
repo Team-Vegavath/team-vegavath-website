@@ -9,6 +9,7 @@ interface StallDraft {
   stall_name: string;
   max_occupancy: number;
   max_groups: number; // S73B - how many groups may be at the stall at once
+  time_limit_minutes: number | null; // S77 - group-lead countdown length; null = no timer
   lead_names: string[]; // informational - shown on stall cards, no accounts (S35)
 }
 
@@ -31,6 +32,9 @@ export default function BootstrapCreateSession({
   const [stallName, setStallName] = useState("");
   const [stallOcc, setStallOcc] = useState(1);
   const [stallGroups, setStallGroups] = useState(1);
+  // S77 - free-text minutes; "" means no timer. Kept as a string so the field can
+  // be genuinely blank rather than defaulting to a number the admin did not pick.
+  const [stallTimeLimit, setStallTimeLimit] = useState("");
   const [stallLeadsText, setStallLeadsText] = useState("");
   const [stallError, setStallError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -66,16 +70,22 @@ export default function BootstrapCreateSession({
           stall_name: string;
           max_occupancy: number;
           max_groups?: number;
+          time_limit_minutes?: number | null;
           lead_names: string | null;
         }) => ({
           stall_name: s.stall_name,
-          // occupancy is constrained to 1-3 in this form; clamp legacy values
-          max_occupancy: Math.min(3, Math.max(1, Number(s.max_occupancy) || 1)),
+          // occupancy is constrained to 1-4 in this form (S77); clamp legacy values
+          max_occupancy: Math.min(4, Math.max(1, Number(s.max_occupancy) || 1)),
           // S73B: same clamp. An imported stall whose capacity was raised past 3
           // by the live override comes back as 3 here, because this form cannot
           // represent more - the admin re-raises it after creation. Clamping
           // rather than dropping keeps the intent ("more than one group").
           max_groups: Math.min(3, Math.max(1, Number(s.max_groups) || 1)),
+          // S77 - carry a positive integer through, else no timer
+          time_limit_minutes:
+            Number.isInteger(s.time_limit_minutes) && Number(s.time_limit_minutes) > 0
+              ? Number(s.time_limit_minutes)
+              : null,
           lead_names: s.lead_names
             ? s.lead_names.split(",").map((n) => n.trim()).filter(Boolean).slice(0, 3)
             : [],
@@ -108,6 +118,18 @@ export default function BootstrapCreateSession({
       setStallError("Max 3 lead names per stall.");
       return;
     }
+    // S77 - blank stays blank (no timer); a non-positive or non-integer entry is
+    // rejected here so the draft never carries a value the column would refuse.
+    const trimmedLimit = stallTimeLimit.trim();
+    let timeLimit: number | null = null;
+    if (trimmedLimit) {
+      const n = Number(trimmedLimit);
+      if (!Number.isInteger(n) || n < 1) {
+        setStallError("Time limit must be a whole number of minutes, or blank.");
+        return;
+      }
+      timeLimit = n;
+    }
     setStallError("");
     setStalls([
       ...stalls,
@@ -115,12 +137,14 @@ export default function BootstrapCreateSession({
         stall_name: stallName.trim(),
         max_occupancy: stallOcc,
         max_groups: stallGroups,
+        time_limit_minutes: timeLimit,
         lead_names: leadNames,
       },
     ]);
     setStallName("");
     setStallOcc(1);
     setStallGroups(1);
+    setStallTimeLimit("");
     setStallLeadsText("");
   }
 
@@ -410,14 +434,34 @@ export default function BootstrapCreateSession({
               maxLength={60}
               style={{ flex: "1 1 12rem" }}
             />
-            {/* max occupancy ∙ max groups -- 1/2/3 segmented tiles each, each labeled */}
+            {/* volunteer capacity 1-4 (S77), group capacity 1-3 -- segmented tiles,
+                each labeled; time limit is a free-text minutes field (S77) */}
             <div style={{ display: "flex", flexDirection: "column" }}>
               <span className="admin-label" style={{ marginBottom: "0.2rem" }}>VOLUNTEER CAPACITY</span>
-              <SegmentedCount value={stallOcc} onChange={setStallOcc} label="Volunteer capacity" />
+              <SegmentedCount value={stallOcc} onChange={setStallOcc} max={4} label="Volunteer capacity" />
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
               <span className="admin-label" style={{ marginBottom: "0.2rem" }}>GROUP CAPACITY</span>
               <SegmentedCount value={stallGroups} onChange={setStallGroups} label="Group capacity" />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span className="admin-label" style={{ marginBottom: "0.2rem" }}>TIME LIMIT (MIN)</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="admin-input"
+                value={stallTimeLimit}
+                onChange={(e) => setStallTimeLimit(e.target.value.replace(/[^0-9]/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addStall();
+                  }
+                }}
+                placeholder="none"
+                maxLength={4}
+                style={{ width: "5rem" }}
+              />
             </div>
             <button
               type="button"
@@ -454,6 +498,11 @@ export default function BootstrapCreateSession({
           </p>
           <p className="admin-hint" style={{ marginTop: "0.25rem" }}>
             Group capacity = how many groups can be admitted to the stall at once.
+          </p>
+          <p className="admin-hint" style={{ marginTop: "0.25rem" }}>
+            Time limit (min) = countdown the group lead sees at this stall. Leave
+            blank for no timer. On a multi-group stall, set it longer to cover both
+            groups.
           </p>
           {stallError && <p className="admin-error" style={{ marginTop: "0.5rem" }}>{stallError}</p>}
 
@@ -493,9 +542,12 @@ export default function BootstrapCreateSession({
                   </span>
                   <span
                     className="admin-cell-mono"
-                    title={`${s.max_occupancy} volunteers, ${s.max_groups} groups`}
+                    title={`${s.max_occupancy} volunteers, ${s.max_groups} groups${
+                      s.time_limit_minutes ? `, ${s.time_limit_minutes} min limit` : ", no time limit"
+                    }`}
                   >
                     {s.max_occupancy} vol · {s.max_groups} grp
+                    {s.time_limit_minutes ? ` · ${s.time_limit_minutes} min` : ""}
                   </span>
                   <button
                     type="button"

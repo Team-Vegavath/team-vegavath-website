@@ -29,9 +29,10 @@ export async function POST(
     if (!stallName || stallName.length > 60) {
       return NextResponse.json({ error: "Stall name must be 1–60 characters" }, { status: 400 });
     }
-    // 1-3 matches the segmented occupancy control used at session creation
-    if (![1, 2, 3].includes(maxOccupancy)) {
-      return NextResponse.json({ error: "Occupancy must be 1, 2 or 3" }, { status: 400 });
+    // S77 - 1-4 matches the segmented occupancy control (raised from 3). Late-
+    // added stalls carry no time limit; the column defaults to NULL (no timer).
+    if (![1, 2, 3, 4].includes(maxOccupancy)) {
+      return NextResponse.json({ error: "Occupancy must be 1, 2, 3 or 4" }, { status: 400 });
     }
     if (![1, 2, 3].includes(maxGroups)) {
       return NextResponse.json({ error: "Groups must be 1, 2 or 3" }, { status: 400 });

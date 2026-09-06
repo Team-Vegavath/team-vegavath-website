@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       stall_name: string;
       max_occupancy: number;
       max_groups?: number; // S73B - optional, defaults to 1
+      time_limit_minutes?: number | null; // S77 - optional, null = no timer
       lead_names?: string[];
     }[];
     // visitor groups are created up front; group volunteers are spread over
@@ -42,13 +43,27 @@ export async function POST(req: NextRequest) {
     if (!Number.isInteger(maxGroupSize) || maxGroupSize < 1 || maxGroupSize > 100) {
       return NextResponse.json({ error: "Max group size must be 1–100" }, { status: 400 });
     }
-    if (stalls.some((s) => !s.stall_name?.trim() || ![1, 2, 3].includes(s.max_occupancy))) {
-      return NextResponse.json({ error: "Every stall needs a name and occupancy 1–3" }, { status: 400 });
+    // S77 - occupancy ceiling raised 3 -> 4 (Avions is a 2-in-1 stall needing 4
+    // staffing volunteers). max_groups keeps its own 1-3 setup range below.
+    if (stalls.some((s) => !s.stall_name?.trim() || ![1, 2, 3, 4].includes(s.max_occupancy))) {
+      return NextResponse.json({ error: "Every stall needs a name and occupancy 1–4" }, { status: 400 });
     }
-    // S73B - same 1-3 setup range as occupancy. The wider 1-10 range is reachable
-    // only through the live override route once the session exists.
+    // S73B - 1-3 setup range for groups. The wider 1-10 range is reachable only
+    // through the live override route once the session exists.
     if (stalls.some((s) => s.max_groups !== undefined && ![1, 2, 3].includes(s.max_groups))) {
       return NextResponse.json({ error: "Every stall needs groups 1–3" }, { status: 400 });
+    }
+    // S77 - time limit is optional; when present it must be a positive integer,
+    // matching the column's CHECK (time_limit_minutes > 0).
+    if (
+      stalls.some(
+        (s) =>
+          s.time_limit_minutes !== undefined &&
+          s.time_limit_minutes !== null &&
+          (!Number.isInteger(s.time_limit_minutes) || s.time_limit_minutes < 1)
+      )
+    ) {
+      return NextResponse.json({ error: "Time limit must be a whole number of minutes, or blank" }, { status: 400 });
     }
     for (const s of stalls) {
       // lead names are informational only now (shown on stall cards) -
@@ -69,6 +84,7 @@ export async function POST(req: NextRequest) {
         stall_name: s.stall_name.trim(),
         max_occupancy: s.max_occupancy,
         max_groups: s.max_groups ?? 1,
+        time_limit_minutes: s.time_limit_minutes ?? null,
         stall_number: i + 1,
         lead_names: s.lead_names,
       }))

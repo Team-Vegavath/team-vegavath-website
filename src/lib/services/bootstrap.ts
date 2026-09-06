@@ -49,6 +49,10 @@ export interface BootstrapStall {
   // opposed to max_occupancy, which caps volunteers standing behind it. Nothing
   // enforces it yet - the visit table that admits groups lands in S73C.
   max_groups: number;
+  // S77 (migration 029): optional per-stall time limit, in minutes. NULL means
+  // no timer. The group lead's dashboard counts down from their open visit's
+  // arrived_at; stall volunteers never see it (S77 decision 3).
+  time_limit_minutes: number | null;
   claimed_by: string[] | null;
   // S73B: the queue that replaced queued_by / queued_at. Always present (empty
   // array when nobody is waiting), so callers never null-check it.
@@ -276,6 +280,9 @@ export async function createBootstrapStalls(
     // S73B - optional so existing callers and older seed data keep working; the
     // column's own DEFAULT 1 is the same answer.
     max_groups?: number;
+    // S77 - optional per-stall countdown length in minutes; null/undefined = no
+    // timer. The route validates it; here null just stores as SQL NULL.
+    time_limit_minutes?: number | null;
     stall_number: number;
     lead_names?: string[];
   }[]
@@ -286,9 +293,10 @@ export async function createBootstrapStalls(
     const pos = defaultPositionFor(s.stall_name);
     const leadNames = (s.lead_names ?? []).map((n) => n.trim()).filter(Boolean);
     const rows = await sql`
-      INSERT INTO bootstrap_stalls (session_id, stall_number, stall_name, max_occupancy, max_groups, map_x, map_y, lead_names)
+      INSERT INTO bootstrap_stalls (session_id, stall_number, stall_name, max_occupancy, max_groups, time_limit_minutes, map_x, map_y, lead_names)
       VALUES (${sessionId}, ${s.stall_number}, ${s.stall_name}, ${s.max_occupancy},
               ${s.max_groups ?? 1},
+              ${s.time_limit_minutes ?? null},
               ${pos?.map_x ?? null}, ${pos?.map_y ?? null},
               ${leadNames.length ? leadNames.join(", ") : null})
       RETURNING id, stall_name`;
@@ -406,7 +414,7 @@ async function selectStalls(
 ): Promise<BootstrapStall[]> {
   const rows = await sql`
     SELECT st.id, st.session_id, st.stall_number, st.stall_name,
-           st.max_occupancy, st.max_groups, st.claimed_by,
+           st.max_occupancy, st.max_groups, st.time_limit_minutes, st.claimed_by,
            st.map_x, st.map_y, st.lead_names, st.updated_at,
            CASE
              WHEN coalesce(array_length(st.claimed_by, 1), 0) = 0 THEN 'free'

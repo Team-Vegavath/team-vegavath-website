@@ -1106,6 +1106,7 @@ export default function BootstrapAdminDashboard({
               <SegmentedCount
                 value={newStallOcc}
                 onChange={setNewStallOcc}
+                max={4}
                 label="Max volunteers"
               />
               <SegmentedCount

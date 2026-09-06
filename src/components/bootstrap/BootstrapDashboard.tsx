@@ -13,6 +13,7 @@ import StallCard, {
   waitMinutes,
   type VolunteerStallAction,
 } from "./StallCard";
+import StallTimeLimitCountdown, { CHIME_SRC } from "./StallTimeLimitCountdown";
 import StallVolunteerView from "./StallVolunteerView";
 
 const POLL_MS = 4000;
@@ -409,6 +410,37 @@ export default function BootstrapDashboard({
 
   const secondsAgo = lastUpdated ? Math.max(0, Math.round((now - lastUpdated) / 1000)) : null;
 
+  // S77: the reminder chime. A hidden <audio> lives in the lead view below.
+  // Browsers block programmatic play() until the user has interacted, so we prime
+  // the element on the lead's first tap anywhere (decision 6 -- no visible "enable
+  // sound" step; the tap happens naturally regardless of this feature).
+  const chimeRef = useRef<HTMLAudioElement | null>(null);
+  const playChime = useCallback(() => {
+    const a = chimeRef.current;
+    if (!a) return;
+    try {
+      a.currentTime = 0;
+      void a.play();
+    } catch {
+      // autoplay may still be blocked; the on-screen banner is the real signal
+    }
+  }, []);
+  useEffect(() => {
+    if (volunteerRole !== "lead") return;
+    const prime = () => {
+      const a = chimeRef.current;
+      if (!a) return;
+      a.play()
+        .then(() => {
+          a.pause();
+          a.currentTime = 0;
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("pointerdown", prime, { once: true });
+    return () => window.removeEventListener("pointerdown", prime);
+  }, [volunteerRole]);
+
   // S32 role split - stall volunteers get the simple occupied/free toggle:
   // no MAP button, no queue, no freed/redirect notifications (lead-only).
   if (volunteerRole === "stall") {
@@ -430,11 +462,33 @@ export default function BootstrapDashboard({
     );
   }
 
+  // S77: the lead's current timed visit, derived from the already-polled stalls +
+  // their own group id. A stall with no time_limit_minutes shows no timer, and a
+  // lead who is not at any stall right now has no open occupant row to match.
+  const timedVisit = (() => {
+    if (!myGroupId) return null;
+    for (const s of stalls) {
+      if (s.time_limit_minutes == null) continue;
+      const occ = (s.occupants ?? []).find((o) => o.group_id === myGroupId);
+      if (occ) {
+        return {
+          stallName: s.stall_name,
+          arrivedAt: occ.arrived_at,
+          timeLimitMinutes: s.time_limit_minutes,
+        };
+      }
+    }
+    return null;
+  })();
+
   return (
     <div style={{ minHeight: "100svh", background: BS.bg, color: BS.text }}>
       <style>{`
         @keyframes bs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
       `}</style>
+      {/* S77: primed on first tap (see the effect above); rendered for leads only. */}
+      <audio ref={chimeRef} src={CHIME_SRC} preload="auto" hidden />
+
 
       <header
         style={{
@@ -664,6 +718,19 @@ export default function BootstrapDashboard({
             </button>
           )}
         </div>
+
+        {/* S77: per-stall countdown for the lead's current open visit. Keyed on
+            arrived_at so a move to a new stall remounts it and the fired-reminder
+            flags reset (decision 6). Only present when the stall has a time limit. */}
+        {timedVisit && (
+          <StallTimeLimitCountdown
+            key={`${timedVisit.stallName}-${timedVisit.arrivedAt}`}
+            stallName={timedVisit.stallName}
+            arrivedAt={timedVisit.arrivedAt}
+            timeLimitMinutes={timedVisit.timeLimitMinutes}
+            playChime={playChime}
+          />
+        )}
 
         {/* S73G: manual checklist backup, sitting under the group card next to
             the roster it belongs with. Deliberately understated -- a text link
