@@ -393,7 +393,7 @@ export default function BootstrapCreateSession({
           <label htmlFor="bs-stall-name" className="admin-label">
             Stall name
           </label>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-end" }}>
             <input
               id="bs-stall-name"
               type="text"
@@ -410,9 +410,15 @@ export default function BootstrapCreateSession({
               maxLength={60}
               style={{ flex: "1 1 12rem" }}
             />
-            {/* max occupancy ∙ max groups -- 1/2/3 segmented tiles each */}
-            <SegmentedCount value={stallOcc} onChange={setStallOcc} label="Max volunteers" />
-            <SegmentedCount value={stallGroups} onChange={setStallGroups} label="Max groups" />
+            {/* max occupancy ∙ max groups -- 1/2/3 segmented tiles each, each labeled */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span className="admin-label" style={{ marginBottom: "0.2rem" }}>VOLUNTEER CAPACITY</span>
+              <SegmentedCount value={stallOcc} onChange={setStallOcc} label="Volunteer capacity" />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span className="admin-label" style={{ marginBottom: "0.2rem" }}>GROUP CAPACITY</span>
+              <SegmentedCount value={stallGroups} onChange={setStallGroups} label="Group capacity" />
+            </div>
             <button
               type="button"
               className="btn-outline"
@@ -445,6 +451,9 @@ export default function BootstrapCreateSession({
           </div>
           <p className="admin-hint" style={{ marginTop: "0.5rem" }}>
             Max occupancy = how many volunteers can claim the stall at once.
+          </p>
+          <p className="admin-hint" style={{ marginTop: "0.25rem" }}>
+            Group capacity = how many groups can be admitted to the stall at once.
           </p>
           {stallError && <p className="admin-error" style={{ marginTop: "0.5rem" }}>{stallError}</p>}
 
@@ -482,8 +491,11 @@ export default function BootstrapCreateSession({
                       </span>
                     )}
                   </span>
-                  <span className="admin-cell-mono">
-                    max {s.max_occupancy} · {s.max_groups}g
+                  <span
+                    className="admin-cell-mono"
+                    title={`${s.max_occupancy} volunteers, ${s.max_groups} groups`}
+                  >
+                    {s.max_occupancy} vol · {s.max_groups} grp
                   </span>
                   <button
                     type="button"
