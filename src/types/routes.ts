@@ -27,6 +27,7 @@ export const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: "/events", priority: 0.9 },
   { path: "/projects", priority: 0.8 },
   { path: "/projects/kart", priority: 0.8 },
+  { path: "/projects/maze-solver", priority: 0.7 },
   { path: "/crew", priority: 0.8 },
   { path: "/join", priority: 0.8 },
   { path: "/gallery", priority: 0.7 },

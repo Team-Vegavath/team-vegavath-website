@@ -74,6 +74,27 @@ export default function ProjectsPage() {
               </Link>
 
               <Link
+                href="/projects/maze-solver"
+                className="project-card"
+                style={{ background: "var(--bg-card)", padding: "2.5rem", textDecoration: "none", display: "block", transition: "background 0.15s ease" }}
+              >
+                <p className="label-tech" style={{ color: "var(--accent)", marginBottom: "1rem" }}>
+                  Robotics
+                </p>
+                <h2 className="heading" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                  Maze Solver
+                </h2>
+                <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "1.5rem" }}>
+                  An 8x8 autonomous maze-solving robot. Explore the interactive BFS
+                  shortest-path solver and see the turn-by-turn commands it hands to
+                  the Arduino firmware.
+                </p>
+                <span className="mono" style={{ fontSize: "0.75rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  VIEW PROJECT →
+                </span>
+              </Link>
+
+              <Link
                 href="/projects/combat-bot"
                 className="project-card"
                 style={{ background: "var(--bg-card)", padding: "2.5rem", textDecoration: "none", display: "block", transition: "background 0.15s ease" }}
