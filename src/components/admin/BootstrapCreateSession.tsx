@@ -87,7 +87,7 @@ export default function BootstrapCreateSession({
               ? Number(s.time_limit_minutes)
               : null,
           lead_names: s.lead_names
-            ? s.lead_names.split(",").map((n) => n.trim()).filter(Boolean).slice(0, 3)
+            ? s.lead_names.split(",").map((n) => n.trim()).filter(Boolean).slice(0, 4)
             : [],
         })
       );
@@ -114,8 +114,8 @@ export default function BootstrapCreateSession({
       .split(/[\n,]+/)
       .map((n) => n.trim())
       .filter(Boolean);
-    if (leadNames.length > 3) {
-      setStallError("Max 3 lead names per stall.");
+    if (leadNames.length > 4) {
+      setStallError("Max 4 lead names per stall.");
       return;
     }
     // S77 - blank stays blank (no timer); a non-positive or non-integer entry is
@@ -476,7 +476,7 @@ export default function BootstrapCreateSession({
 
           <div style={{ marginTop: "0.75rem" }}>
             <label htmlFor="bs-stall-leads" className="admin-label">
-              Stall lead names (optional, max 3)
+              Stall lead names (optional, max 4)
             </label>
             <textarea
               id="bs-stall-leads"

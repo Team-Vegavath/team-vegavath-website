@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
       // lead names are informational only now (shown on stall cards) -
       // they no longer create accounts
       const leads = (s.lead_names ?? []).map((n) => String(n).trim()).filter(Boolean);
-      if (leads.length > 3) {
-        return NextResponse.json({ error: "Max 3 lead names per stall" }, { status: 400 });
+      if (leads.length > 4) {
+        return NextResponse.json({ error: "Max 4 lead names per stall" }, { status: 400 });
       }
       if (leads.some((n) => n.length > 100)) {
         return NextResponse.json({ error: "Lead names max 100 chars" }, { status: 400 });
