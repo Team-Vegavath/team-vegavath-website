@@ -10,6 +10,10 @@ import { isNoRegistrationEvent, uploadToR2 } from "@/lib/utils";
 
 interface EventFormProps {
   mode: "create" | "edit";
+  // S82: same contract as SponsorForm's (S62). When present, a successful
+  // save calls this instead of navigating to /admin/events -- the slide-in
+  // panel passes it; the full-page edit route and the "new" page do not.
+  onSuccess?: () => void;
   initialData?: {
     id?: string;
     title?: string;
@@ -34,7 +38,7 @@ function slugify(text: string): string {
     .replace(/-+/g, "-");
 }
 
-export default function EventForm({ mode, initialData }: EventFormProps) {
+export default function EventForm({ mode, onSuccess, initialData }: EventFormProps) {
   const router = useRouter();
 
   const [title, setTitle] = useState(initialData?.title ?? "");
@@ -112,7 +116,11 @@ export default function EventForm({ mode, initialData }: EventFormProps) {
         throw new Error("Failed to save event");
       }
 
-      router.push("/admin/events");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/admin/events");
+      }
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Something went wrong";
       setError(message);

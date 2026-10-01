@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import AdminEditPanel from "@/components/admin/AdminEditPanel";
 import InlineDelete from "@/components/admin/InlineDelete";
 import SponsorForm from "@/components/admin/SponsorForm";
 import type { Sponsor } from "@/types/sponsor";
@@ -33,19 +34,6 @@ export default function SponsorsTable({ sponsors, isViewer }: Props) {
   // off-screen sponsor is harmless -- reopening sets a new one, and the <key>
   // below is what resets the form's internal state between sponsors.
   const [selected, setSelected] = useState<Sponsor | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open]);
 
   return (
     <>
@@ -110,65 +98,34 @@ export default function SponsorsTable({ sponsors, isViewer }: Props) {
         </table>
       </section>
 
-      {/* Rendered only while open: a fixed inset-0 element left mounted would
-          swallow every click on the table behind it. */}
-      {open ? (
-        <button
-          type="button"
-          className="admin-panel-backdrop"
-          aria-label="Close edit panel"
-          onClick={() => setOpen(false)}
-        />
-      ) : null}
-
-      {/* Stays mounted so the transform can transition both ways. `inert` when
-          closed is what keeps the off-screen form out of the tab order and
-          non-clickable -- cheaper and more correct than pointer-events juggling. */}
-      <aside className="admin-panel" data-open={open} inert={!open} aria-label="Edit sponsor">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", padding: "1.75rem" }}>
-          <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
-            <div>
-              <span className="admin-section-label">Edit sponsor</span>
-              <h2 className="admin-page-title" style={{ marginTop: "0.35rem", fontSize: "1.1rem" }}>
-                {selected?.name ?? ""}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="btn-outline mono"
-              style={{ padding: "0.4rem 0.9rem", fontSize: "0.65rem", letterSpacing: "0.16em" }}
-            >
-              CLOSE
-            </button>
-          </header>
-
-          {selected ? (
-            <SponsorForm
-              // Remounts the form when the row changes, so field state never
-              // leaks from the previously edited sponsor.
-              key={selected.id}
-              mode="edit"
-              initialData={{
-                id: selected.id,
-                name: selected.name,
-                tier: selected.tier,
-                website_url: selected.website_url ?? "",
-                description: selected.description ?? "",
-                display_order: selected.display_order,
-                is_active: selected.is_active,
-                logo_url: selected.logo_url,
-              }}
-              onSuccess={() => {
-                setOpen(false);
-                // The page is force-dynamic, so refresh() re-runs getSponsors
-                // and the row updates without a full navigation.
-                router.refresh();
-              }}
-            />
-          ) : null}
-        </div>
-      </aside>
+      {/* S82: panel mechanics live in AdminEditPanel (shared with the
+          announcements, team and events tables). */}
+      <AdminEditPanel open={open} onClose={() => setOpen(false)} label="Edit sponsor" title={selected?.name ?? ""}>
+        {selected ? (
+          <SponsorForm
+            // Remounts the form when the row changes, so field state never
+            // leaks from the previously edited sponsor.
+            key={selected.id}
+            mode="edit"
+            initialData={{
+              id: selected.id,
+              name: selected.name,
+              tier: selected.tier,
+              website_url: selected.website_url ?? "",
+              description: selected.description ?? "",
+              display_order: selected.display_order,
+              is_active: selected.is_active,
+              logo_url: selected.logo_url,
+            }}
+            onSuccess={() => {
+              setOpen(false);
+              // The page is force-dynamic, so refresh() re-runs getSponsors
+              // and the row updates without a full navigation.
+              router.refresh();
+            }}
+          />
+        ) : null}
+      </AdminEditPanel>
     </>
   );
 }

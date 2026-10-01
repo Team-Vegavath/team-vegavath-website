@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import EventForm from "@/components/admin/EventForm";
-import InlineDelete from "@/components/admin/InlineDelete";
+import EventsTable from "@/components/admin/EventsTable";
 import { auth } from "@/lib/auth";
 import { getEvents } from "@/lib/services/events";
 import type { Event } from "@/types/event";
@@ -73,73 +73,19 @@ export default async function AdminEventsPage({
         }
       />
 
-      <section className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th>Registration</th>
-              <th>Slug</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.length > 0 ? (
-              events.map((event) => (
-                <tr key={event.id}>
-                  <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
-                    <Link
-                      href={`/events/${event.slug}`}
-                      target="_blank"
-                      style={{ color: "var(--text-primary)", textDecoration: "none", borderBottom: "1px solid var(--border-strong)" }}
-                    >
-                      {event.title}
-                    </Link>
-                  </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <span className={`status-badge status-${event.status}`}>{event.status}</span>
-                  </td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{formatDate(event.event_date)}</td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap", textTransform: "uppercase" }}>
-                    {event.registration_open ? "OPEN" : "CLOSED"}
-                  </td>
-                  <td className="admin-cell-mono" style={{ whiteSpace: "nowrap" }}>{event.slug}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {isViewer ? (
-                      // Viewers land on the same page, which renders the
-                      // registrations list without the edit form.
-                      <Link href={`/admin/events/${event.id}/edit`} className="admin-row-action">
-                        REGISTRATIONS
-                      </Link>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                        <Link href={`/admin/events/${event.id}/edit`} className="admin-row-action">
-                          EDIT
-                        </Link>
-                        {/* Plain DELETE here soft-deletes (archives): the API's non-permanent
-                            path. Permanent delete lives in the edit page's danger zone. */}
-                        <InlineDelete
-                          endpoint={`/api/admin/events?id=${event.id}`}
-                          confirmMessage={`Archive "${event.title}"? It will be hidden from the public site but can be restored.`}
-                          label="ARCHIVE"
-                        />
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="admin-empty">
-                  No events yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      {/* S82: the table is a client component so EDIT can open the slide-in
+          panel. Dates are formatted here, on the server, exactly as before. */}
+      <EventsTable
+        rows={events.map((event) => ({
+          event,
+          dateLabel: formatDate(event.event_date),
+          // Same computation as /admin/events/[id]/edit.
+          formDate: event.event_date
+            ? new Date(event.event_date).toISOString().slice(0, 10)
+            : "",
+        }))}
+        isViewer={isViewer}
+      />
     </>
   );
 }

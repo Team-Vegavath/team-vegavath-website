@@ -10,6 +10,10 @@ import { uploadToR2 } from "@/lib/utils";
 
 interface MemberFormProps {
   mode: "create" | "edit";
+  // S82: same contract as SponsorForm's (S62). When present, a successful
+  // save calls this instead of navigating to /admin/team -- the slide-in panel
+  // passes it; the full-page edit route and the "new" page do not.
+  onSuccess?: () => void;
   initialData?: {
     id?: string;
     name?: string;
@@ -25,7 +29,7 @@ interface MemberFormProps {
   };
 }
 
-export default function MemberForm({ mode, initialData }: MemberFormProps) {
+export default function MemberForm({ mode, onSuccess, initialData }: MemberFormProps) {
   const router = useRouter();
 
   const [name, setName] = useState(initialData?.name ?? "");
@@ -92,7 +96,11 @@ export default function MemberForm({ mode, initialData }: MemberFormProps) {
         throw new Error(message);
       }
 
-      router.push("/admin/team");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/admin/team");
+      }
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Something went wrong";
       setError(message);
