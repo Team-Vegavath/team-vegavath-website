@@ -72,7 +72,15 @@ export interface Application {
   // Migration 011 - null until an admin assigns a group
   interview_group?: InterviewGroup | null;
   submitted_at: string;
+  // S81, migration 030 - null on every row from the pre-S81 form. `answers`
+  // IS NULL is what identifies an old-form row (scripts/delete-old-applications.sql).
+  course?: string | null;
+  answers?: JoinAnswers | null;
 }
+
+// S81: page 3 + page 4 answers, keyed by the stable question ids in
+// src/lib/utils/joinQuestions.ts. Multi-selects are string arrays.
+export type JoinAnswers = Record<string, string | string[]>;
 
 export const INTERVIEW_GROUPS = ["A", "B", "C", "D"] as const;
 export type InterviewGroup = (typeof INTERVIEW_GROUPS)[number];
@@ -91,4 +99,6 @@ export interface CreateApplicationInput {
   value_addition?: string | null;
   domain_experience?: string | null;
   design_portfolio_url?: string | null;
+  course?: string | null;
+  answers?: JoinAnswers | null;
 }

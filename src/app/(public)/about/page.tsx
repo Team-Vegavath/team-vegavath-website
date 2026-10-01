@@ -296,7 +296,7 @@ export default async function AboutPage() {
                 name: "How can I join Team Vegavath?",
                 acceptedAnswer: {
                   "@type": "Answer",
-                  text: "Applications open annually at vegavath.live/join. The club recruits across six domains: Coding, Automotives, Robotics, Operations, Sponsorship, and Social Media.",
+                  text: "Applications open annually at vegavath.live/join. The club recruits across six domains: Coding, Automotives, Robotics, Operations, Sponsorship, and Design & Social Media.",
                 },
               },
               {
@@ -354,7 +354,7 @@ export default async function AboutPage() {
                 name: "What domains can I join in Team Vegavath?",
                 acceptedAnswer: {
                   "@type": "Answer",
-                  text: "Team Vegavath recruits across six domains: Automotives (kart design and fabrication), Robotics (autonomous systems and embedded hardware), Coding (software, web, and firmware), Operations (event management and logistics), Sponsorship (partnerships and finance), and Social Media (content and outreach).",
+                  text: "Team Vegavath recruits across six domains: Automotives (kart design and fabrication), Robotics (autonomous systems and embedded hardware), Coding (software, web, and firmware), Operations (event management and logistics), Sponsorship (partnerships and finance), and Design & Social Media (design, content and outreach).",
                 },
               },
               {

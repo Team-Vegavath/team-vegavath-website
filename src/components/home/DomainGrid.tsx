@@ -132,7 +132,7 @@ function DomainIcon({ abbr }: { abbr: string }) {
       {/* Broadcast arcs off a solid node. OPEN arcs anchored bottom-left,
           deliberately, so it cannot be confused with OPS's closed centred
           circle once these are down at 24px somewhere. */}
-      {abbr === "SOC" && (
+      {abbr === "D&S" && (
         <>
           <path d="M13 26 A 9 9 0 0 1 22 35" {...common} />
           <path d="M13 19 A 16 16 0 0 1 29 35" {...common} />
@@ -174,9 +174,10 @@ const DOMAINS = [
     description: "Logistics, planning, and execution. We make events happen from concept to cleanup.",
   },
   {
-    abbr: "SOC",
-    name: "Social Media",
-    description: "The club's voice. Photography, content, and the story of everything we build.",
+    // S81: relabelled to match /join. One domain covering design and socials.
+    abbr: "D&S",
+    name: "Design & Social Media",
+    description: "The club's look and voice. Design, photography, content, and the story of everything we build.",
   },
 ] as const;
 

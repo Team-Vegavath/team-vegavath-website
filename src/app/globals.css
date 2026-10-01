@@ -706,7 +706,12 @@ p, label, input, textarea, select, button {
   font: inherit;
 
   position: relative;
-  min-height: 180px;
+  /* S81: 180px -> 192px. "DESIGN & SOCIAL MEDIA" wraps to THREE lines on the
+     narrowest tiles (2 columns at 375px, 6 columns just above 1024px) -- no
+     single word overflows, but at 180px the icon rose to 43px from the top and
+     clipped the 48px watermark. 192px puts it at ~55px. Uniform, like the S69
+     raise, so every tile in the lattice stays the same shape. */
+  min-height: 192px;
   cursor: pointer;
   perspective: 1000px;
 }
@@ -1273,13 +1278,17 @@ p, label, input, textarea, select, button {
   .join-split {
     flex-direction: row;
   }
+  /* S81: stretch to the full height of the form column. This used to be
+     position: sticky + align-self: flex-start, but the sticky never engaged:
+     the global html, body { overflow-x: hidden } makes <body> a scroll
+     container that never scrolls (the S69 .legal-page note, same mechanism).
+     Unnoticed while step 1 fit in one screen; once the form grew taller, the
+     100vh panel ended mid-page. Stretch needs no sticky to look right. */
   .join-brand {
     width: 40%;
     min-height: 100vh;
     padding: 8rem 3rem 3rem;
-    position: sticky;
-    top: 0;
-    align-self: flex-start;
+    align-self: stretch;
   }
   .join-form-panel {
     width: 60%;
@@ -1304,17 +1313,40 @@ p, label, input, textarea, select, button {
   border-bottom-color: var(--accent);
 }
 
+/* S81: the Course dropdown. Same treatment as select.admin-input (S67). */
+select.join-input option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* S81: every domain tile is the same width AND height whatever its label.
+   1fr implicit rows size every row to the tallest one, and the tile min-height
+   below fits a two-line label ("Design & Social Media" at 375px), so a wrapped
+   label never makes its own row taller than the rest. */
 .join-domain-tiles {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
 }
 
+/* Scoped to the domain grid: the Semester and SRN/PRN toggles reuse
+   .join-domain-tile and keep their compact height. */
+.join-domain-tiles > .join-domain-tile {
+  min-height: 4.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
 @media (min-width: 640px) {
   .join-domain-tiles {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

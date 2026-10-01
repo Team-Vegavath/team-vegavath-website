@@ -3,7 +3,8 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import InlineDelete from "@/components/admin/InlineDelete";
-import type { Application, ApplicationStatus, InterviewGroup } from "@/types/settings";
+import { QUESTION_GROUPS, domainLabel, isLinkQuestion } from "@/lib/utils/joinQuestions";
+import type { Application, ApplicationStatus, InterviewGroup, JoinAnswers } from "@/types/settings";
 import { APPLICATION_STATUSES, INTERVIEW_GROUPS } from "@/types/settings";
 
 // S66: the per-stage dot colours that used to live here are now the
@@ -32,10 +33,61 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date);
 }
 
+// S81: display labels ("Social Media" reads "Design & Social Media"); the
+// stored value is unchanged.
 function domainList(app: Application): string {
   return [app.domain_interest, app.domain_interest_2, app.domain_interest_3]
-    .filter(Boolean)
+    .filter((d): d is string => Boolean(d))
+    .map(domainLabel)
     .join(" · ");
+}
+
+const linkStyle: React.CSSProperties = {
+  ...detailBodyStyle,
+  color: "var(--accent)",
+  textDecoration: "none",
+  borderBottom: "1px solid var(--border-strong)",
+  wordBreak: "break-all",
+};
+
+/* S81: the new form's answers, grouped by set. A set renders only if at least
+   one of its questions was answered, which is exactly the selected domains. */
+function AnswerGroups({ answers }: { answers: JoinAnswers }) {
+  return (
+    <>
+      {QUESTION_GROUPS.map(({ title, questions }) => {
+        const answered = questions.filter((q) => answers[q.id] !== undefined);
+        if (!answered.length) return null;
+        return (
+          <div key={title} style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+            <p style={{ ...detailLabelStyle, color: "var(--accent)", marginBottom: 0 }}>{title}</p>
+            {answered.map((q) => {
+              const raw = answers[q.id];
+              const other = q.kind === "multi" && q.otherId ? answers[q.otherId] : undefined;
+              const text = Array.isArray(raw) ? raw.join(", ") : (raw ?? "");
+              return (
+                <div key={q.id}>
+                  <p style={{ ...detailBodyStyle, color: "var(--text-primary)", marginBottom: "0.2rem" }}>{q.label}</p>
+                  {/* The server only stores https links here; the check keeps any
+                      other value from ever becoming an href. */}
+                  {isLinkQuestion(q) && text.startsWith("https://") ? (
+                    <a href={text} target="_blank" rel="noreferrer" style={linkStyle}>
+                      {text}
+                    </a>
+                  ) : (
+                    <p style={detailBodyStyle}>
+                      {text}
+                      {typeof other === "string" && other ? ` (Other: ${other})` : ""}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 interface ApplicationsTableProps {
@@ -390,36 +442,41 @@ export default function ApplicationsTable({
                             <p style={detailBodyStyle}>
                               {app.name} · {app.email} · {app.mobile_number ?? "-"} ·{" "}
                               {app.srn_prn ?? "-"} · Sem {app.semester ?? "-"}
+                              {app.course ? ` · ${app.course}` : ""}
                             </p>
                           </div>
                           <div>
                             <p style={detailLabelStyle}>Domains</p>
                             <p style={detailBodyStyle}>{domainList(app)}</p>
                           </div>
-                          <div>
-                            <p style={detailLabelStyle}>Why join</p>
-                            <p style={detailBodyStyle}>{app.why_join ?? "-"}</p>
-                          </div>
-                          <div>
-                            <p style={detailLabelStyle}>Value add</p>
-                            <p style={detailBodyStyle}>{app.value_addition ?? "-"}</p>
-                          </div>
-                          <div>
-                            <p style={detailLabelStyle}>Experience</p>
-                            <p style={detailBodyStyle}>{app.domain_experience ?? "-"}</p>
-                          </div>
-                          {app.design_portfolio_url && (
-                            <div>
-                              <p style={detailLabelStyle}>Portfolio</p>
-                              <a
-                                href={app.design_portfolio_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ ...detailBodyStyle, color: "var(--accent)", textDecoration: "none", borderBottom: "1px solid var(--border-strong)" }}
-                              >
-                                {app.design_portfolio_url}
-                              </a>
-                            </div>
+                          {/* S81: `answers` is set on every new-form row and NULL on
+                              every old one, so it picks the layout. Old rows render
+                              exactly as before. */}
+                          {app.answers ? (
+                            <AnswerGroups answers={app.answers} />
+                          ) : (
+                            <>
+                              <div>
+                                <p style={detailLabelStyle}>Why join</p>
+                                <p style={detailBodyStyle}>{app.why_join ?? "-"}</p>
+                              </div>
+                              <div>
+                                <p style={detailLabelStyle}>Value add</p>
+                                <p style={detailBodyStyle}>{app.value_addition ?? "-"}</p>
+                              </div>
+                              <div>
+                                <p style={detailLabelStyle}>Experience</p>
+                                <p style={detailBodyStyle}>{app.domain_experience ?? "-"}</p>
+                              </div>
+                              {app.design_portfolio_url && (
+                                <div>
+                                  <p style={detailLabelStyle}>Portfolio</p>
+                                  <a href={app.design_portfolio_url} target="_blank" rel="noreferrer" style={linkStyle}>
+                                    {app.design_portfolio_url}
+                                  </a>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>

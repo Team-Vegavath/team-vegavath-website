@@ -1,6 +1,8 @@
 import type { PoolVolunteer } from "@/lib/services/bootstrap";
 import type { Application } from "@/types/settings";
 
+import { QUESTION_GROUPS } from "./joinQuestions";
+
 /**
  * S73K: what an export CONTAINS, in one place per dataset.
  *
@@ -43,22 +45,45 @@ export function toCsv(table: ExportTable): string {
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
 
+// S81: one column per question on the new form (plus one for each "Other"
+// text), headed "<set>: <question>". Columns exist for every set, not just the
+// selected ones, so every row has the same shape; an unanswered cell is empty.
+const ANSWER_COLUMNS = QUESTION_GROUPS.flatMap(({ title, questions }) =>
+  questions.flatMap((q) => {
+    const col = { header: `${title}: ${q.label}`, id: q.id };
+    return q.kind === "multi" && q.otherId
+      ? [col, { header: `${col.header} (Other)`, id: q.otherId }]
+      : [col];
+  })
+);
+
+// S81: this export is the backup taken before old applications are deleted, so
+// it carries EVERY column of the table -- including `id`, the FY25
+// `portfolio_url`, and the full submitted timestamp, which "Submitted" alone
+// rounds to a date. The old question columns stay alongside the new answers:
+// old rows fill the former, new rows the latter. The test pins this against a
+// fixture of every field.
 export function applicationsTable(apps: Application[]): ExportTable {
   return {
     name: "vegavath-applications",
     tab: "Applications",
     headers: [
-      "Name", "Email", "Mobile", "SRN/PRN", "Semester",
+      "ID", "Name", "Email", "Mobile", "SRN/PRN", "Semester", "Course",
       "Domain 1", "Domain 2", "Domain 3",
-      "Why Join", "Value Add", "Experience", "Portfolio",
-      "Status", "Interview Group", "Submitted",
+      "Why Join", "Value Add", "Experience", "Portfolio", "Portfolio (FY25)",
+      "Status", "Interview Group", "Submitted", "Submitted At (UTC)",
+      ...ANSWER_COLUMNS.map((c) => c.header),
     ],
     rows: apps.map((a) => [
-      a.name, a.email, a.mobile_number, a.srn_prn, a.semester,
+      a.id, a.name, a.email, a.mobile_number, a.srn_prn, a.semester, a.course,
       a.domain_interest, a.domain_interest_2, a.domain_interest_3,
       a.why_join, a.value_addition, a.domain_experience,
-      a.design_portfolio_url, a.status, a.interview_group,
-      shortDate(a.submitted_at),
+      a.design_portfolio_url, a.portfolio_url, a.status, a.interview_group,
+      shortDate(a.submitted_at), new Date(a.submitted_at).toISOString(),
+      ...ANSWER_COLUMNS.map((c) => {
+        const v = a.answers?.[c.id];
+        return Array.isArray(v) ? v.join(", ") : v;
+      }),
     ]),
   };
 }

@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createApplication } from "@/lib/services/applications";
 import { getSetting } from "@/lib/services/settings";
-import { isValidEmail, isValidUrl } from "@/lib/utils";
+import { isValidEmail } from "@/lib/utils";
+import { COURSES, DOMAINS, SHORT_ANSWER_MAX, parseJoinAnswers } from "@/lib/utils/joinQuestions";
 import { normalisePhone } from "@/lib/utils/phone";
 import { normaliseSrnPrn } from "@/lib/utils/srn";
 import type { ApplicationDomain } from "@/types/settings";
 
-// FY26 domains ∙ must stay in sync with JoinClient DOMAINS and the CHECK
-// constraints in migrations/004_application_new_fields.sql.
-const VALID_DOMAINS = [
-  "Coding",
-  "Automotives",
-  "Sponsorship",
-  "Robotics",
-  "Operations",
-  "Social Media",
-] as const;
+// FY26 domains ∙ S81: one list shared with JoinClient (lib/utils/joinQuestions);
+// it must still match the CHECK constraints in migrations/004.
+const VALID_DOMAINS: readonly string[] = DOMAINS;
 
 const VALID_SEMESTERS = ["1", "3", "5"] as const;
 
@@ -55,10 +49,8 @@ export async function POST(req: NextRequest) {
     // either, since both are valid identifiers for the same applicant.
     const srn_prn = srn_prn_raw === null ? null : normaliseSrnPrn(srn_prn_raw);
     const semester = optionalString(body.semester);
-    const why_join = optionalString(body.why_join);
-    const value_addition = optionalString(body.value_addition);
-    const domain_experience = optionalString(body.domain_experience);
-    const design_portfolio_url = optionalString(body.design_portfolio_url);
+    const course_choice = optionalString(body.course);
+    const course_other = optionalString(body.course_other);
 
     if (!name || name.length < 2 || name.length > 100) {
       return NextResponse.json(
@@ -74,7 +66,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!VALID_DOMAINS.includes(domain_interest as ApplicationDomain)) {
+    if (!VALID_DOMAINS.includes(domain_interest)) {
       return NextResponse.json(
         { error: "Please select a valid domain" },
         { status: 400 }
@@ -82,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
 
     for (const extra of [domain_interest_2, domain_interest_3]) {
-      if (extra !== null && !VALID_DOMAINS.includes(extra as ApplicationDomain)) {
+      if (extra !== null && !VALID_DOMAINS.includes(extra)) {
         return NextResponse.json(
           { error: "Please select a valid domain" },
           { status: 400 }
@@ -113,13 +105,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (design_portfolio_url !== null && !isValidUrl(design_portfolio_url)) {
+    // S81: course is one of the five options; "Other" carries its own text,
+    // which is what gets stored.
+    if (!(COURSES as readonly string[]).includes(course_choice ?? "")) {
       return NextResponse.json(
-        { error: "Portfolio link must start with https://" },
+        { error: "Please select your course" },
         { status: 400 }
       );
     }
+    if (course_choice === "Other" && !course_other) {
+      return NextResponse.json(
+        { error: "Please type your course" },
+        { status: 400 }
+      );
+    }
+    if (course_other !== null && course_other.length > SHORT_ANSWER_MAX) {
+      return NextResponse.json(
+        { error: `Course must be under ${SHORT_ANSWER_MAX} characters` },
+        { status: 400 }
+      );
+    }
+    const course = course_choice === "Other" ? course_other : course_choice;
 
+    // S81: pages 3 + 4. Validates the general questions and ONLY the selected
+    // domains' sets; answers for any other domain are dropped. Empty links pass.
+    const parsed = parseJoinAnswers(
+      body.answers,
+      [domain_interest, domain_interest_2, domain_interest_3].filter((d) => d !== null)
+    );
+    if ("error" in parsed) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+
+    // S81: why_join / value_addition / domain_experience / design_portfolio_url
+    // are no longer asked. The columns stay (old rows, the backup) and new rows
+    // leave them NULL -- everything new lives in `answers`.
     const application = await createApplication({
       name,
       email,
@@ -130,10 +150,8 @@ export async function POST(req: NextRequest) {
       mobile_number,
       srn_prn,
       semester: semester as "1" | "3" | "5" | null,
-      why_join,
-      value_addition,
-      domain_experience,
-      design_portfolio_url,
+      course,
+      answers: parsed.answers,
     });
 
     return NextResponse.json({ success: true, id: application.id });

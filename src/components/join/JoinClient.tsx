@@ -6,21 +6,41 @@ import Link from "next/link";
 
 import { ConsentNotice } from "@/components/ui/ConsentNotice";
 import { HyperText } from "@/components/ui/hyper-text";
+import {
+  COURSES,
+  DOMAINS,
+  DOMAIN_LABELS,
+  GENERAL_QUESTIONS,
+  LINK_MAX,
+  LINK_RULES,
+  LONG_ANSWER_MAX,
+  MIN_ANSWER,
+  SHORT_ANSWER_MAX,
+  isLinkQuestion,
+  optionsFor,
+  pickedOptions,
+  setTitle,
+  setsFor,
+  visibleQuestions,
+  type Question,
+} from "@/lib/utils/joinQuestions";
 import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 import { PRN_PATTERN, SRN_PATTERN, type SrnPrnKind } from "@/lib/utils/srn";
+import type { ApplicationDomain, JoinAnswers } from "@/types/settings";
 
-/* FY26 recruitment domains. These six values are what /api/join and the DB
-   CHECK constraints accept (requires migrations/004_application_new_fields.sql
-   applied to Neon); do not change them without a matching backend change. */
-const DOMAINS = [
-  "Coding",
-  "Automotives",
-  "Sponsorship",
-  "Robotics",
-  "Operations",
-  "Social Media",
-] as const;
-type Domain = typeof DOMAINS[number];
+/* FY26 recruitment domains. S81: DOMAINS, their display labels and every page
+   3/4 question now live in lib/utils/joinQuestions, shared with /api/join, so
+   the form and the server validate the same rules. The stored domain values
+   still have to match the DB CHECKs in migrations/004. */
+type Domain = ApplicationDomain;
+
+/* S81: the two recruitment tracks at the top of step 4. Only a track that
+   contains one of the applicant's domains is shown, naming only their domains
+   -- nothing about domains they did not pick (owner decision). */
+const PROCESS_TRACKS: { domains: readonly Domain[]; stages: readonly string[] }[] = [
+  { domains: ["Social Media", "Operations", "Sponsorship"], stages: ["Application Form", "Interview"] },
+  { domains: ["Coding", "Robotics", "Automotives"], stages: ["Application Form", "Domain-Specific Test", "Interview"] },
+];
 
 const SEMESTERS = [
   { value: "1", label: "1st" },
@@ -55,10 +75,8 @@ type FormData = {
   mobile_number: string;
   srn_prn: string;
   semester: "" | "1" | "3" | "5";
-  why_join: string;
-  value_addition: string;
-  domain_experience: string;
-  design_portfolio_url: string;
+  course: "" | (typeof COURSES)[number];
+  course_other: string;
   website: string; // honeypot
 };
 
@@ -75,12 +93,25 @@ const labelStyle: React.CSSProperties = {
   marginBottom: "0.5rem",
 };
 
-const hintStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "0.65rem",
-  letterSpacing: "0.1em",
-  color: "var(--text-muted)",
-  marginTop: "0.5rem",
+/* S81: pages 3 and 4 ask full-sentence questions. Tracked mono caps
+   (labelStyle) is fine for "Full name" but unreadable at that length, so the
+   questions get the body face in sentence case. Page 1 keeps labelStyle. */
+const questionStyle: React.CSSProperties = {
+  display: "block",
+  padding: 0,
+  fontFamily: "var(--font-space), sans-serif",
+  fontSize: "0.98rem",
+  fontWeight: 500,
+  lineHeight: 1.5,
+  color: "var(--text-primary)",
+  marginBottom: "0.5rem",
+};
+
+const helpStyle: React.CSSProperties = {
+  fontSize: "0.85rem",
+  lineHeight: 1.55,
+  color: "var(--text-secondary)",
+  marginBottom: "0.5rem",
 };
 
 const textareaStyle: React.CSSProperties = {
@@ -90,8 +121,28 @@ const textareaStyle: React.CSSProperties = {
   lineHeight: 1.6,
 };
 
+/* S81: the site's callout treatment (card, hairline border, accent rule -- as
+   on /sponsors). Neutral on purpose: not --error, not --warning. */
+const noteStyle: React.CSSProperties = {
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
+  borderLeft: "2px solid var(--accent)",
+  padding: "0.95rem 1.1rem",
+};
+
 function Req() {
   return <span style={{ color: "var(--accent)" }}> *</span>;
+}
+
+function Optional() {
+  return <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}> (optional)</span>;
+}
+
+// S81: module scope, not inline in the component. Once S81 made JoinClient
+// analysable by the React compiler, it flagged the global write
+// (react-hooks/immutability); out here it is plain browser code.
+function markApplied() {
+  document.cookie = "vg_applied=1; max-age=" + 60 * 60 * 24 * 30 + "; path=/; SameSite=Lax";
 }
 
 type Props = {
@@ -105,12 +156,14 @@ export default function JoinClient({ recruitmentOpen }: Props) {
     mobile_number: "",
     srn_prn: "",
     semester: "",
-    why_join: "",
-    value_addition: "",
-    domain_experience: "",
-    design_portfolio_url: "",
+    course: "",
+    course_other: "",
     website: "",
   });
+  // S81: every page 3/4 answer, keyed by question id. Kept across domain
+  // changes so going Back does not wipe anything; submit sends only the
+  // selected domains' answers.
+  const [answers, setAnswers] = useState<JoinAnswers>({});
   const [idKind, setIdKind] = useState<SrnPrnKind>("SRN");
   const activeIdKind = ID_KINDS.find((k) => k.value === idKind) ?? ID_KINDS[0];
   const [selectedDomains, setSelectedDomains] = useState<Domain[]>([]);
@@ -130,10 +183,21 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
+
+  const setAnswer = (id: string, value: string | string[]) =>
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+  const textAnswer = (id: string) => {
+    const v = answers[id];
+    return typeof v === "string" ? v : "";
+  };
+  // What is on screen right now: general questions + selected sets, minus
+  // anything a Design / Social Media or Automotives / Robotics checkbox hides.
+  // The same walk /api/join runs, so "shown" means the same thing on both sides.
+  const visible = visibleQuestions(selectedDomains, answers);
 
   const toggleDomain = (d: Domain) => {
     setSelectedDomains((prev) => {
@@ -154,11 +218,34 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   };
 
   /* Native validation (required / type / pattern) covers the text fields;
-     only the tile selectors need JS checks here. */
+     only the tile selectors and checkbox groups need JS checks here. */
   const validateStep = (s: Step): string | null => {
-    if (s === 1 && !form.semester) return "Select your current semester.";
-    if (s === 2 && selectedDomains.length === 0) return "Pick at least one domain.";
+    if (s === 1 && !form.semester) return "Please pick your current semester.";
+    if (s === 2 && selectedDomains.length === 0) return "Please pick at least one domain.";
+    if (s === 4) {
+      const unpicked = visible.find(
+        (q) => q.kind === "multi" && q.required && pickedOptions(q, selectedDomains, answers[q.id]).length === 0
+      );
+      if (unpicked) return `Please pick at least one option for "${unpicked.label}"`;
+    }
     return null;
+  };
+
+  /* Only VISIBLE questions are sent, so a deselected domain's set, or a Design
+     question after unticking Design, is dropped here. The server applies the
+     same filter (parseJoinAnswers) rather than trusting this one. */
+  const answersPayload = (): JoinAnswers => {
+    const payload: JoinAnswers = {};
+    for (const q of visible) {
+      if (q.kind === "multi") {
+        const picked = pickedOptions(q, selectedDomains, answers[q.id]);
+        if (picked.length) payload[q.id] = picked;
+        if (q.otherId && picked.includes("Other")) payload[q.otherId] = textAnswer(q.otherId);
+      } else if (answers[q.id] !== undefined) {
+        payload[q.id] = answers[q.id] as string;
+      }
+    }
+    return payload;
   };
 
   const submitApplication = async () => {
@@ -174,25 +261,21 @@ export default function JoinClient({ recruitmentOpen }: Props) {
           mobile_number: form.mobile_number,
           srn_prn: form.srn_prn,
           semester: form.semester,
+          course: form.course,
+          course_other: form.course === "Other" ? form.course_other : null,
           domain_interest: selectedDomains[0],
           domain_interest_2: selectedDomains[1] ?? null,
           domain_interest_3: selectedDomains[2] ?? null,
-          why_join: form.why_join,
-          value_addition: form.value_addition,
-          domain_experience: form.domain_experience,
-          design_portfolio_url: selectedDomains.includes("Social Media")
-            ? form.design_portfolio_url
-            : null,
+          answers: answersPayload(),
           website: form.website, // honeypot
         }),
       });
       const data = await res.json() as { success?: boolean; error?: string };
       if (!res.ok) {
-        setErrorMsg(data.error ?? "Something went wrong");
+        setErrorMsg(data.error ?? "Something went wrong on our side. Please try again.");
         setStatus("error");
       } else {
-        document.cookie =
-          "vg_applied=1; max-age=" + (60 * 60 * 24 * 30) + "; path=/; SameSite=Lax";
+        markApplied();
         setStatus("success");
       }
     } catch {
@@ -278,7 +361,118 @@ export default function JoinClient({ recruitmentOpen }: Props) {
     );
   }
 
-  const socialMediaSelected = selectedDomains.includes("Social Media");
+  // Selected domains' question sets, in tile order. Automotives and Robotics
+  // share one set; its title names only the ones picked.
+  const domainSets = setsFor(selectedDomains);
+
+  // Process tracks narrowed to the applicant's own domains; empty tracks vanish.
+  const myTracks = PROCESS_TRACKS.flatMap((track) => {
+    const mine = track.domains.filter((d) => selectedDomains.includes(d));
+    return mine.length ? [{ mine, stages: track.stages }] : [];
+  });
+
+  /* S81: one renderer for every page 3/4 question, driven by the shared
+     definitions, so required / maxLength / pattern here are the same values
+     /api/join enforces. Link inputs never get `required`. */
+  const renderQuestion = (q: Question) => {
+    const inputId = `join-${q.id}`;
+
+    if (q.kind === "multi") {
+      // Effective selection: a stale tick for a domain since deselected on
+      // step 2 does not count, matching what the server will accept.
+      const picked = pickedOptions(q, selectedDomains, answers[q.id]);
+      const otherId = q.otherId;
+      return (
+        <fieldset key={q.id} style={{ border: "none", padding: 0, margin: 0, minWidth: 0 }}>
+          <legend style={questionStyle}>
+            {q.label}
+            {q.required ? <Req /> : <Optional />}
+          </legend>
+          {q.help && <p style={helpStyle}>{q.help}</p>}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.8rem 1rem", marginTop: "0.35rem" }}>
+            {optionsFor(q, selectedDomains).map((o) => (
+              <label key={o} style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.92rem", color: "var(--text-secondary)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={picked.includes(o)}
+                  onChange={(e) => {
+                    setAnswer(q.id, e.target.checked ? [...picked, o] : picked.filter((x) => x !== o));
+                    clearError();
+                  }}
+                  style={{ accentColor: "var(--accent)", width: "1rem", height: "1rem", margin: 0, flexShrink: 0 }}
+                />
+                {o}
+              </label>
+            ))}
+          </div>
+          {otherId && picked.includes("Other") && (
+            <input
+              id={`join-${otherId}`}
+              type="text"
+              value={textAnswer(otherId)}
+              onChange={(e) => setAnswer(otherId, e.target.value)}
+              required
+              maxLength={SHORT_ANSWER_MAX}
+              aria-label={`${q.label} Other`}
+              placeholder="Tell us what else"
+              className="join-input"
+              style={{ marginTop: "0.9rem" }}
+            />
+          )}
+        </fieldset>
+      );
+    }
+
+    if (q.kind === "text") {
+      return (
+        <div key={q.id}>
+          <label htmlFor={inputId} style={questionStyle}>
+            {q.label}
+            {q.required ? <Req /> : <Optional />}
+          </label>
+          {q.help && <p style={helpStyle}>{q.help}</p>}
+          <textarea
+            id={inputId}
+            value={textAnswer(q.id)}
+            onChange={(e) => setAnswer(q.id, e.target.value)}
+            required={q.required}
+            // Native minLength only fires on a non-empty value, so an optional
+            // answer can still be left blank -- the same rule as the server.
+            minLength={MIN_ANSWER}
+            maxLength={LONG_ANSWER_MAX}
+            rows={4}
+            className="join-input"
+            style={textareaStyle}
+          />
+        </div>
+      );
+    }
+
+    // Link fields: always optional. An empty value skips `pattern` entirely,
+    // so leaving the field blank can never block the form. Pattern, tooltip and
+    // placeholder come from LINK_RULES, the same row /api/join validates with.
+    const rule = LINK_RULES[q.kind];
+    return (
+      <div key={q.id}>
+        <label htmlFor={inputId} style={questionStyle}>
+          {q.label}
+          <Optional />
+        </label>
+        <input
+          id={inputId}
+          type="url"
+          value={textAnswer(q.id)}
+          onChange={(e) => setAnswer(q.id, e.target.value)}
+          maxLength={LINK_MAX}
+          pattern={rule.pattern}
+          title={`Use ${rule.hint}, or leave it empty`}
+          placeholder={rule.placeholder}
+          className="join-input"
+        />
+        {q.help && <p style={{ ...helpStyle, marginTop: "0.5rem", marginBottom: 0 }}>{q.help}</p>}
+      </div>
+    );
+  };
 
   return (
     <main className="join-split" style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
@@ -308,7 +502,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
           <p className="heading" style={{ fontWeight: 600, fontSize: "0.85rem", lineHeight: 1.9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary)" }}>
             Coding · Automotives · Sponsorship
             <br />
-            Robotics · Operations · Social Media
+            Robotics · Operations · {DOMAIN_LABELS["Social Media"]}
           </p>
         </div>
       </div>
@@ -396,6 +590,23 @@ export default function JoinClient({ recruitmentOpen }: Props) {
 
             {step === 1 && (
               <>
+                {/* S81: owner-requested note, shown before anything is filled in.
+                    Firm about low-effort and AI-written answers, warm for everyone
+                    else. The AI line is repeated, quieter, above the submit button. */}
+                <div role="note" style={noteStyle}>
+                  <p style={{ fontWeight: 600, fontSize: "0.92rem", color: "var(--text-primary)" }}>
+                    Before you start
+                  </p>
+                  <p style={{ marginTop: "0.3rem", fontSize: "0.88rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                    Our domain leads read every application, and there are no right or wrong
+                    answers, just honest ones. Take your time. Applications with one-word or
+                    low-effort answers may not be taken forward.
+                  </p>
+                  <p style={{ marginTop: "0.5rem", fontSize: "0.82rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                    {"We'd rather hear from you than from an AI, so please write your answers yourself. Responses that are clearly AI-generated won't be considered."}
+                  </p>
+                </div>
+
                 <div>
                   <label htmlFor="join-name" style={labelStyle}>
                     Full name<Req />
@@ -541,6 +752,46 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     ))}
                   </div>
                 </div>
+
+                {/* S81: Course. "Other" reveals a required free-text box, and the
+                    server stores that text as `course`. */}
+                <div>
+                  <label htmlFor="join-course" style={labelStyle}>
+                    Course<Req />
+                  </label>
+                  <select
+                    id="join-course"
+                    name="course"
+                    value={form.course}
+                    onChange={handleChange}
+                    required
+                    className="join-input"
+                  >
+                    <option value="" disabled>
+                      Select your course
+                    </option>
+                    {COURSES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  {form.course === "Other" && (
+                    <input
+                      id="join-course-other"
+                      type="text"
+                      name="course_other"
+                      value={form.course_other}
+                      onChange={handleChange}
+                      required
+                      maxLength={SHORT_ANSWER_MAX}
+                      aria-label="Your course"
+                      placeholder="Your course"
+                      className="join-input"
+                      style={{ marginTop: "0.75rem" }}
+                    />
+                  )}
+                </div>
               </>
             )}
 
@@ -566,7 +817,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                           opacity: !isSelected && selectedDomains.length >= MAX_DOMAINS ? 0.5 : 1,
                         }}
                       >
-                        {d}
+                        {DOMAIN_LABELS[d]}
                       </button>
                     );
                   })}
@@ -577,85 +828,82 @@ export default function JoinClient({ recruitmentOpen }: Props) {
               </div>
             )}
 
-            {step === 3 && (
-              <>
-                <div>
-                  <label htmlFor="join-why" style={labelStyle}>
-                    Why do you want to join Vegavath?<Req />
-                  </label>
-                  <textarea
-                    id="join-why"
-                    name="why_join"
-                    value={form.why_join}
-                    onChange={handleChange}
-                    required
-                    rows={4}
-                    className="join-input"
-                    style={textareaStyle}
-                  />
-                  <p style={hintStyle}>Be specific.</p>
-                </div>
-
-                <div>
-                  <label htmlFor="join-value" style={labelStyle}>
-                    What makes you a valuable addition to the team?<Req />
-                  </label>
-                  <textarea
-                    id="join-value"
-                    name="value_addition"
-                    value={form.value_addition}
-                    onChange={handleChange}
-                    required
-                    rows={4}
-                    className="join-input"
-                    style={textareaStyle}
-                  />
-                  <p style={hintStyle}>Skills, mindset, what you bring.</p>
-                </div>
-              </>
-            )}
+            {step === 3 && <>{GENERAL_QUESTIONS.map(renderQuestion)}</>}
 
             {step === 4 && (
               <>
+                {/* S81 F1: always shown, listing only the applicant's own tracks. */}
+                <section
+                  aria-labelledby="join-process-heading"
+                  style={{ background: "var(--bg-card)", border: "1px solid var(--border)", padding: "1.25rem 1.25rem 1.4rem" }}
+                >
+                  <h3 id="join-process-heading" className="heading" style={{ fontSize: "0.95rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Recruitment Process
+                  </h3>
+                  <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                    {"Here's what the process looks like for the domains you picked:"}
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1.1rem" }}>
+                    {myTracks.map(({ mine, stages }) => (
+                      <div key={mine.join()} style={{ borderLeft: "2px solid var(--accent)", paddingLeft: "0.9rem" }}>
+                        <p className="mono" style={{ fontSize: "0.68rem", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.6, color: "var(--text-primary)" }}>
+                          {mine.map((d) => DOMAIN_LABELS[d]).join(" · ")}
+                        </p>
+                        <p style={{ marginTop: "0.3rem", fontSize: "0.9rem", lineHeight: 1.5, color: "var(--text-secondary)" }}>
+                          {stages.map((s) => `-> ${s}`).join(" ")}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
                 <div>
-                  <label htmlFor="join-experience" style={labelStyle}>
-                    {"Describe your experience in the domains you've chosen."}<Req />
-                  </label>
-                  <textarea
-                    id="join-experience"
-                    name="domain_experience"
-                    value={form.domain_experience}
-                    onChange={handleChange}
-                    required
-                    rows={5}
-                    className="join-input"
-                    style={textareaStyle}
-                  />
-                  <p style={hintStyle}>{"Enter 'None' if you have no prior experience."}</p>
+                  <h3 className="heading" style={{ fontSize: "clamp(1.1rem, 2.4vw, 1.3rem)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Domain Specific Questions
+                  </h3>
+                  <p style={{ marginTop: "0.5rem", fontSize: "0.95rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                    A few questions about the domains you picked.
+                  </p>
                 </div>
 
-                {socialMediaSelected && (
-                  <div>
-                    <label htmlFor="join-design-portfolio" style={labelStyle}>
-                      Portfolio link (required for Social Media)<Req />
-                    </label>
-                    <input
-                      id="join-design-portfolio"
-                      type="text"
-                      name="design_portfolio_url"
-                      value={form.design_portfolio_url}
-                      onChange={handleChange}
-                      required
-                      placeholder="Google Drive link (set access to: anyone with link)"
-                      className="join-input"
-                    />
-                  </div>
-                )}
+                {/* Only visible questions render, so only they are validated --
+                    native `required` ignores fields that are not in the DOM. */}
+                {domainSets.map((set) => (
+                  <section
+                    key={set.domains.join()}
+                    style={{ display: "flex", flexDirection: "column", gap: "2.25rem", borderTop: "1px solid var(--border)", paddingTop: "1.75rem" }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                      <h4 className="heading" style={{ fontSize: "0.9rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)" }}>
+                        {setTitle(set, selectedDomains)}
+                      </h4>
+                      {/* S81 F2: only on the sets that carry a link field. */}
+                      {set.questions.some(isLinkQuestion) && (
+                        <div role="note" style={noteStyle}>
+                          <p style={{ fontWeight: 600, fontSize: "0.92rem", color: "var(--text-primary)" }}>
+                            {"No portfolio ready? That's okay."}
+                          </p>
+                          <p style={{ marginTop: "0.3rem", fontSize: "0.88rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                            Links are optional and just a bonus. Everyone is evaluated fairly, with or without one.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {set.questions.filter((q) => visible.includes(q)).map(renderQuestion)}
+                  </section>
+                ))}
               </>
             )}
 
             {status === "error" && (
               <p style={{ color: "var(--error)", fontSize: "0.875rem" }}>{errorMsg}</p>
+            )}
+
+            {/* S81: the closing half of the page 1 AI line -- one quiet line, step 4 only. */}
+            {step === 4 && (
+              <p style={{ fontSize: "0.85rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
+                {"One last thing before you submit: please make sure these answers are your own. Clearly AI-written responses won't be considered."}
+              </p>
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>

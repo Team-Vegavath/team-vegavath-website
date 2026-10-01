@@ -77,8 +77,9 @@ export default function LegalPage() {
                 <ul className="legal-list">
                   <li>
                     <strong>Club application (/join):</strong>{" "}
-                    name, email address, mobile number, SRN or PRN, semester, your written answers
-                    about why you want to join, and any portfolio links you choose to share.
+                    name, email address, mobile number, SRN or PRN, semester, course, the domains
+                    you choose, your written answers to the application questions, and any optional
+                    portfolio, GitHub, GitLab or Google Drive links you choose to share.
                   </li>
                   <li>
                     <strong>Event registration:</strong>{" "}
@@ -264,7 +265,7 @@ export default function LegalPage() {
                   Team Vegavath is a student-run technical club at PES University, Electronic City
                   Campus (PESU ECC). We organize workshops, hackathons, tech talks, and other
                   events across six domains: Coding, Automotives, Robotics, Sponsorship,
-                  Operations, and Social Media. Participation is voluntary and subject to these
+                  Operations, and Design & Social Media. Participation is voluntary and subject to these
                   terms.
                 </p>
               </section>

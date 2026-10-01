@@ -105,6 +105,38 @@ describe("column alignment", () => {
     }
   });
 
+  // S81: the export is the backup taken before old applications are deleted.
+  // Every field gets a distinct value so a dropped column cannot hide behind a
+  // null; `Required<>` makes a field added to Application later fail the
+  // typecheck here until it is added -- and then this test checks it is exported.
+  it("applicationsTable exports every Application field", () => {
+    const full: Required<Application> = {
+      id: "id-1", name: "name-1", email: "email-1",
+      domain_interest: "Coding", domain_interest_2: "d2-1", domain_interest_3: "d3-1",
+      portfolio_url: "legacy-portfolio-1", mobile_number: "mobile-1",
+      srn_prn: "srn-1", semester: "5", why_join: "why-1", value_addition: "value-1",
+      domain_experience: "exp-1", design_portfolio_url: "design-portfolio-1",
+      status: "interview", interview_group: "C",
+      submitted_at: "2026-08-17T10:00:00.000Z",
+      course: "course-1",
+      answers: {
+        general_why_vegavath: "answer-1",
+        dsm_comfortable_with: ["Reels", "Other"],
+        dsm_comfortable_other: "other-1",
+        cad_auto_link: "cad-link-1",
+      },
+    };
+    const [row] = applicationsTable([full]).rows;
+    for (const [key, value] of Object.entries(full)) {
+      if (key !== "answers") expect(row).toContain(value);
+    }
+    // S81: answers are one column per question; multi-selects joined with ", ".
+    expect(row).toContain("answer-1");
+    expect(row).toContain("Reels, Other");
+    expect(row).toContain("other-1");
+    expect(row).toContain("cad-link-1");
+  });
+
   it("poolVolunteersTable gives every row exactly as many cells as there are headers", () => {
     const t = poolVolunteersTable([poolVolunteer]);
     for (const row of t.rows) {

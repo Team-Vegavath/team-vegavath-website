@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Join Us",
   description:
-    "Apply to join Team Vegavath at PESU ECC. We recruit across Automotives, Robotics, Coding, Operations, Sponsorship and Social Media.",
+    "Apply to join Team Vegavath at PESU ECC. We recruit across Automotives, Robotics, Coding, Operations, Sponsorship and Design & Social Media.",
   alternates: { canonical: "/join" },
   openGraph: {
     title: "Join Team Vegavath",
