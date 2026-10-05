@@ -310,6 +310,6 @@ Features:
 
 ---
 
-Built by Team Vegavath
+Built by [@UltraBot05](https://github.com/UltraBot05) at Team Vegavath.
 
 Based on a custom license. Please check the license file for permissions.
