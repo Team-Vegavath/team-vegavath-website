@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { GENERAL_QUESTIONS, LINK_RULES, parseJoinAnswers, setTitle, QUESTION_SETS } from "./joinQuestions";
+import {
+  DOMAINS,
+  GENERAL_QUESTIONS,
+  JOIN_DOMAINS,
+  LINK_RULES,
+  QUESTION_SETS,
+  TRACKS,
+  domainLabel,
+  orderedDomainLabels,
+  parseJoinAnswers,
+  setTitle,
+  sortDomains,
+} from "./joinQuestions";
 
 /**
  * S81: parseJoinAnswers is the server half of /join's page 3 + page 4 rules.
@@ -21,6 +33,11 @@ const social = {
 };
 
 const DRIVE = "https://drive.google.com/file/d/1AbC-dEf_GhIjKlMnOpQrStUvWxYz0123/view";
+
+// S82B: Operations and Sponsorship are one domain, so picking it always needs
+// the two (required) Operations answers; Sponsorship's question stays optional.
+const OS = "Operations & Sponsorship";
+const ops = { ops_running_events: "Clear roles and a plan", ops_experience: "No experience" };
 
 const ok = (raw: unknown, domains: string[]) => {
   const result = parseJoinAnswers(raw, domains);
@@ -46,19 +63,27 @@ describe("parseJoinAnswers -- domains", () => {
   it("rejects a missing required general answer", () => {
     const rest: Record<string, string> = { ...general };
     delete rest.general_why_vegavath;
-    expect(parseJoinAnswers(rest, ["Sponsorship"])).toHaveProperty("error");
+    expect(parseJoinAnswers({ ...rest, ...ops }, [OS])).toHaveProperty("error");
   });
 
   it("drops a deselected domain's answers and ignores unknown keys", () => {
-    const answers = ok({ ...general, ops_experience: "ran a fest", injected: "x" }, ["Sponsorship"]);
-    expect(answers).toEqual(general);
+    const code = { code_experience: "a CLI tool" };
+    const answers = ok({ ...general, ...code, ...ops, injected: "x" }, ["Coding"]);
+    expect(answers).toEqual({ ...general, ...code });
   });
 
   it("enforces each selected set's required answers", () => {
-    expect(parseJoinAnswers(general, ["Operations"])).toHaveProperty("error");
+    expect(parseJoinAnswers(general, [OS])).toHaveProperty("error"); // Operations half
     expect(parseJoinAnswers(general, ["Coding"])).toHaveProperty("error");
     expect(parseJoinAnswers(general, ["Robotics"])).toHaveProperty("error");
-    expect(parseJoinAnswers(general, ["Sponsorship"])).toHaveProperty("answers"); // all optional
+    // The Sponsorship half is optional: Operations answers alone are enough.
+    expect(ok({ ...general, ...ops }, [OS])).not.toHaveProperty("spon_experience");
+  });
+
+  it("reads a pre-S82B key as no current domain -- the route rejects it first", () => {
+    // /api/join only accepts DOMAINS, so old keys never reach the parser from
+    // the form; if they did, they would select no question set.
+    expect(ok(general, ["Operations", "Sponsorship"])).toEqual(general);
   });
 
   it("accepts only GitHub / GitLab links for the Coding profile link", () => {
@@ -72,20 +97,21 @@ describe("parseJoinAnswers -- domains", () => {
   });
 
   it("rejects a filled-in answer under 10 characters, required or optional", () => {
+    const base = { ...general, ...ops };
     for (const lazy of [".", "idk", "no", "123456789"]) {
-      expect(parseJoinAnswers({ ...general, general_why_vegavath: lazy }, ["Sponsorship"]))
+      expect(parseJoinAnswers({ ...base, general_why_vegavath: lazy }, [OS]))
         .toHaveProperty("error");
-      expect(parseJoinAnswers({ ...general, spon_experience: lazy }, ["Sponsorship"]))
+      expect(parseJoinAnswers({ ...base, spon_experience: lazy }, [OS]))
         .toHaveProperty("error");
     }
     // Exactly 10 passes; padding does not count, because the server trims.
-    expect(ok({ ...general, spon_experience: "1234567890" }, ["Sponsorship"]))
+    expect(ok({ ...base, spon_experience: "1234567890" }, [OS]))
       .toHaveProperty("spon_experience", "1234567890");
-    expect(parseJoinAnswers({ ...general, spon_experience: "   idk      " }, ["Sponsorship"]))
+    expect(parseJoinAnswers({ ...base, spon_experience: "   idk      " }, [OS]))
       .toHaveProperty("error");
     // An optional answer can still be left empty, and "No experience" clears the bar.
-    expect(ok({ ...general, spon_experience: "" }, ["Sponsorship"])).not.toHaveProperty("spon_experience");
-    expect(ok({ ...general, spon_experience: "No experience" }, ["Sponsorship"]))
+    expect(ok({ ...base, spon_experience: "" }, [OS])).not.toHaveProperty("spon_experience");
+    expect(ok({ ...base, spon_experience: "No experience" }, [OS]))
       .toHaveProperty("spon_experience", "No experience");
   });
 
@@ -98,8 +124,8 @@ describe("parseJoinAnswers -- domains", () => {
   });
 
   it("rejects an answer over the max length", () => {
-    const long = { ...general, general_why_vegavath: "x".repeat(2001) };
-    expect(parseJoinAnswers(long, ["Sponsorship"])).toHaveProperty("error");
+    const long = { ...general, ...ops, general_why_vegavath: "x".repeat(2001) };
+    expect(parseJoinAnswers(long, [OS])).toHaveProperty("error");
   });
 });
 
@@ -192,5 +218,68 @@ describe("setTitle", () => {
   it("names only the selected domains, or all of them with no selection", () => {
     expect(cadSet && setTitle(cadSet, ["Robotics"])).toBe("Robotics");
     expect(cadSet && setTitle(cadSet)).toBe("Automotives & Robotics");
+  });
+});
+
+/**
+ * S82B: the fixed domain order and the merged Operations & Sponsorship domain.
+ * Everything on /join and in the admin derives from JOIN_DOMAINS, so pinning
+ * the list pins every consumer.
+ */
+describe("JOIN_DOMAINS -- one ordered list", () => {
+  it("is exactly the five domains, in the fixed order", () => {
+    expect(JOIN_DOMAINS.map((d) => d.label)).toEqual([
+      "Automotives",
+      "Robotics",
+      "Coding",
+      "Design & Social Media",
+      "Operations & Sponsorship",
+    ]);
+    expect(DOMAINS).toEqual(["Automotives", "Robotics", "Coding", "Social Media", OS]);
+  });
+
+  it("groups the test track first, then the interview track", () => {
+    expect(TRACKS).toEqual(["test", "interview"]);
+    const byTrack = (t: string) => JOIN_DOMAINS.filter((d) => d.track === t).map((d) => d.label);
+    expect(byTrack("test")).toEqual(["Automotives", "Robotics", "Coding"]);
+    expect(byTrack("interview")).toEqual(["Design & Social Media", "Operations & Sponsorship"]);
+  });
+
+  it("orders question sets by their first domain, with branch sub-headings on the merged two", () => {
+    expect(QUESTION_SETS.map((s) => setTitle(s))).toEqual([
+      "Automotives & Robotics",
+      "Coding",
+      "Design & Social Media",
+      "Operations & Sponsorship",
+    ]);
+    const headings = (id: string) =>
+      QUESTION_SETS.find((s) => s.id === id)?.branches.map((b) => b.heading ?? null);
+    expect(headings("dsm")).toEqual([null, "Social Media", "Design"]);
+    expect(headings("ops_spon")).toEqual(["Operations / Logistics", "Sponsorship"]);
+  });
+
+  it("keeps every S81 answer id", () => {
+    const ids = QUESTION_SETS.flatMap((s) => s.branches.flatMap((b) => b.questions.map((q) => q.id)));
+    for (const id of ["ops_running_events", "ops_experience", "spon_experience", "dsm_tracks", "cad_auto_link", "code_profile_link"]) {
+      expect(ids).toContain(id);
+    }
+  });
+});
+
+describe("domain display -- old keys read as the merged domain", () => {
+  it("labels pre-S82B Operations / Sponsorship as Operations & Sponsorship", () => {
+    expect(domainLabel("Operations")).toBe(OS);
+    expect(domainLabel("Sponsorship")).toBe(OS);
+    expect(domainLabel("Social Media")).toBe("Design & Social Media");
+    expect(domainLabel("Programming")).toBe("Programming"); // FY25 passes through
+  });
+
+  it("orders an application's domains and collapses an old Operations + Sponsorship pair", () => {
+    expect(orderedDomainLabels(["Sponsorship", "Coding", "Operations"])).toEqual(["Coding", OS]);
+    expect(orderedDomainLabels([OS, null, "Automotives"])).toEqual(["Automotives", OS]);
+  });
+
+  it("sorts submitted picks into JOIN_DOMAINS order regardless of click order", () => {
+    expect(sortDomains([OS, "Coding", "Automotives"])).toEqual(["Automotives", "Coding", OS]);
   });
 });

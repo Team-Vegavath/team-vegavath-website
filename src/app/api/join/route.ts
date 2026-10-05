@@ -8,7 +8,10 @@ import { normaliseSrnPrn } from "@/lib/utils/srn";
 import type { ApplicationDomain } from "@/types/settings";
 
 // FY26 domains ∙ S81: one list shared with JoinClient (lib/utils/joinQuestions);
-// it must still match the CHECK constraints in migrations/004.
+// it must still match the CHECK constraints, widened for S82B's merged
+// "Operations & Sponsorship" in migrations/031. Only the five current keys are
+// accepted; the pre-S82B "Operations" / "Sponsorship" stay valid in the DB for
+// old rows but can no longer be submitted.
 const VALID_DOMAINS: readonly string[] = DOMAINS;
 
 const VALID_SEMESTERS = ["1", "3", "5"] as const;

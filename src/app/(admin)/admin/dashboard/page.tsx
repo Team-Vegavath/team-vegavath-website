@@ -12,6 +12,7 @@ import { getGalleryItemsLimited } from "@/lib/services/gallery";
 import { getAllSettings } from "@/lib/services/settings";
 import { getSponsors } from "@/lib/services/sponsors";
 import { getMembers } from "@/lib/services/team";
+import { orderedDomainLabels } from "@/lib/utils/joinQuestions";
 import type { Application, SiteSettings } from "@/types/settings";
 import type { Event } from "@/types/event";
 import type { GalleryItem } from "@/types/gallery";
@@ -187,7 +188,10 @@ export default async function AdminDashboardPage() {
                 <tr key={application.id}>
                   <td className="admin-td-primary" style={{ whiteSpace: "nowrap", fontWeight: 500 }}>{application.name}</td>
                   <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.email}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{application.domain_interest}</td>
+                  {/* S82B: first domain in /join order, as its display label. */}
+                  <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
+                    {orderedDomainLabels([application.domain_interest, application.domain_interest_2, application.domain_interest_3])[0] ?? "-"}
+                  </td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     <span className={`status-badge status-${application.status}`}>
                       {application.status}

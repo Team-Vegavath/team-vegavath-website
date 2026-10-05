@@ -1,7 +1,7 @@
 import type { PoolVolunteer } from "@/lib/services/bootstrap";
 import type { Application } from "@/types/settings";
 
-import { QUESTION_GROUPS } from "./joinQuestions";
+import { QUESTION_GROUPS, orderedDomainLabels } from "./joinQuestions";
 
 /**
  * S73K: what an export CONTAINS, in one place per dataset.
@@ -45,16 +45,23 @@ export function toCsv(table: ExportTable): string {
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN");
 
+// Always exactly three Domain cells, so the columns after them never shift.
+const padTo3 = (labels: string[]) => [labels[0] ?? null, labels[1] ?? null, labels[2] ?? null];
+
 // S81: one column per question on the new form (plus one for each "Other"
 // text), headed "<set>: <question>". Columns exist for every set, not just the
 // selected ones, so every row has the same shape; an unanswered cell is empty.
-const ANSWER_COLUMNS = QUESTION_GROUPS.flatMap(({ title, questions }) =>
-  questions.flatMap((q) => {
-    const col = { header: `${title}: ${q.label}`, id: q.id };
-    return q.kind === "multi" && q.otherId
-      ? [col, { header: `${col.header} (Other)`, id: q.otherId }]
-      : [col];
-  })
+// S82B: in /join order, and a merged domain's branch is named in the header
+// ("Operations & Sponsorship (Sponsorship): ...") so the halves stay separable.
+const ANSWER_COLUMNS = QUESTION_GROUPS.flatMap(({ title, branches }) =>
+  branches.flatMap((b) =>
+    b.questions.flatMap((q) => {
+      const col = { header: `${title}${b.heading ? ` (${b.heading})` : ""}: ${q.label}`, id: q.id };
+      return q.kind === "multi" && q.otherId
+        ? [col, { header: `${col.header} (Other)`, id: q.otherId }]
+        : [col];
+    })
+  )
 );
 
 // S81: this export is the backup taken before old applications are deleted, so
@@ -76,7 +83,9 @@ export function applicationsTable(apps: Application[]): ExportTable {
     ],
     rows: apps.map((a) => [
       a.id, a.name, a.email, a.mobile_number, a.srn_prn, a.semester, a.course,
-      a.domain_interest, a.domain_interest_2, a.domain_interest_3,
+      // S82B: display labels in /join order; an old Operations + Sponsorship
+      // pair collapses to one "Operations & Sponsorship", leaving a blank after.
+      ...padTo3(orderedDomainLabels([a.domain_interest, a.domain_interest_2, a.domain_interest_3])),
       a.why_join, a.value_addition, a.domain_experience,
       a.design_portfolio_url, a.portfolio_url, a.status, a.interview_group,
       shortDate(a.submitted_at), new Date(a.submitted_at).toISOString(),

@@ -8,19 +8,22 @@ import { ConsentNotice } from "@/components/ui/ConsentNotice";
 import { HyperText } from "@/components/ui/hyper-text";
 import {
   COURSES,
-  DOMAINS,
-  DOMAIN_LABELS,
   GENERAL_QUESTIONS,
+  JOIN_DOMAINS,
   LINK_MAX,
   LINK_RULES,
   LONG_ANSWER_MAX,
   MIN_ANSWER,
   SHORT_ANSWER_MAX,
+  TRACKS,
+  TRACK_STAGES,
   isLinkQuestion,
   optionsFor,
   pickedOptions,
+  setQuestions,
   setTitle,
   setsFor,
+  sortDomains,
   visibleQuestions,
   type Question,
 } from "@/lib/utils/joinQuestions";
@@ -28,19 +31,12 @@ import { PHONE_PATTERN, onDigitsChange } from "@/lib/utils/phone";
 import { PRN_PATTERN, SRN_PATTERN, type SrnPrnKind } from "@/lib/utils/srn";
 import type { ApplicationDomain, JoinAnswers } from "@/types/settings";
 
-/* FY26 recruitment domains. S81: DOMAINS, their display labels and every page
-   3/4 question now live in lib/utils/joinQuestions, shared with /api/join, so
-   the form and the server validate the same rules. The stored domain values
-   still have to match the DB CHECKs in migrations/004. */
+/* Recruitment domains. S82B: the five domains, their ORDER, labels, test track
+   and question sets all come from JOIN_DOMAINS in lib/utils/joinQuestions --
+   the tiles, brand panel, Recruitment Process block and page 4 below never
+   restate the order. Shared with /api/join, so the form and the server validate
+   the same rules; stored keys must match the CHECKs in migrations/031. */
 type Domain = ApplicationDomain;
-
-/* S81: the two recruitment tracks at the top of step 4. Only a track that
-   contains one of the applicant's domains is shown, naming only their domains
-   -- nothing about domains they did not pick (owner decision). */
-const PROCESS_TRACKS: { domains: readonly Domain[]; stages: readonly string[] }[] = [
-  { domains: ["Social Media", "Operations", "Sponsorship"], stages: ["Application Form", "Interview"] },
-  { domains: ["Coding", "Robotics", "Automotives"], stages: ["Application Form", "Domain-Specific Test", "Interview"] },
-];
 
 const SEMESTERS = [
   { value: "1", label: "1st" },
@@ -119,6 +115,19 @@ const textareaStyle: React.CSSProperties = {
   minHeight: "120px",
   fontFamily: "var(--font-space), sans-serif",
   lineHeight: 1.6,
+};
+
+/* S82B: a merged domain's branch ("Operations / Logistics", "Design") inside its
+   page 4 set. One step below the accent set title: tracked mono over a hairline. */
+const branchHeadingStyle: React.CSSProperties = {
+  fontSize: "0.72rem",
+  fontWeight: 500,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  color: "var(--text-primary)",
+  borderBottom: "1px solid var(--border)",
+  paddingBottom: "0.5rem",
+  marginBottom: "1.5rem",
 };
 
 /* S81: the site's callout treatment (card, hairline border, accent rule -- as
@@ -251,6 +260,10 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   const submitApplication = async () => {
     setStatus("submitting");
     setErrorMsg("");
+    // S82B: stored in JOIN_DOMAINS order, not click order. The form never asks
+    // for a ranking, so click order carried no meaning -- and a fixed order
+    // means domain_interest/_2/_3 read the same way in the admin and export.
+    const [d1, d2, d3] = sortDomains(selectedDomains);
     try {
       const res = await fetch("/api/join", {
         method: "POST",
@@ -263,9 +276,9 @@ export default function JoinClient({ recruitmentOpen }: Props) {
           semester: form.semester,
           course: form.course,
           course_other: form.course === "Other" ? form.course_other : null,
-          domain_interest: selectedDomains[0],
-          domain_interest_2: selectedDomains[1] ?? null,
-          domain_interest_3: selectedDomains[2] ?? null,
+          domain_interest: d1,
+          domain_interest_2: d2 ?? null,
+          domain_interest_3: d3 ?? null,
           answers: answersPayload(),
           website: form.website, // honeypot
         }),
@@ -365,10 +378,11 @@ export default function JoinClient({ recruitmentOpen }: Props) {
   // share one set; its title names only the ones picked.
   const domainSets = setsFor(selectedDomains);
 
-  // Process tracks narrowed to the applicant's own domains; empty tracks vanish.
-  const myTracks = PROCESS_TRACKS.flatMap((track) => {
-    const mine = track.domains.filter((d) => selectedDomains.includes(d));
-    return mine.length ? [{ mine, stages: track.stages }] : [];
+  // Process tracks narrowed to the applicant's own domains, in JOIN_DOMAINS
+  // order; a track with none of their domains vanishes.
+  const myTracks = TRACKS.flatMap((track) => {
+    const mine = JOIN_DOMAINS.filter((d) => d.track === track && selectedDomains.includes(d.key));
+    return mine.length ? [{ track, mine, stages: TRACK_STAGES[track] }] : [];
   });
 
   /* S81: one renderer for every page 3/4 question, driven by the shared
@@ -497,12 +511,17 @@ export default function JoinClient({ recruitmentOpen }: Props) {
         </h1>
         <div style={{ marginTop: "auto" }}>
           <p className="mono" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "0.6rem" }}>
-            Six domains
+            {JOIN_DOMAINS.length} domains
           </p>
+          {/* S82B: one line per track, in JOIN_DOMAINS order -- the same
+              grouping the Recruitment Process block uses on step 4. */}
           <p className="heading" style={{ fontWeight: 600, fontSize: "0.85rem", lineHeight: 1.9, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary)" }}>
-            Coding · Automotives · Sponsorship
-            <br />
-            Robotics · Operations · {DOMAIN_LABELS["Social Media"]}
+            {TRACKS.map((track, i) => (
+              <Fragment key={track}>
+                {i > 0 ? <br /> : null}
+                {JOIN_DOMAINS.filter((d) => d.track === track).map((d) => d.label).join(" · ")}
+              </Fragment>
+            ))}
           </p>
         </div>
       </div>
@@ -801,23 +820,25 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                   Domains of interest<Req />
                 </p>
                 <div className="join-domain-tiles" role="group" aria-label="Domains of interest">
-                  {DOMAINS.map((d) => {
-                    const isSelected = selectedDomains.includes(d);
+                  {/* S82B: one tile per JOIN_DOMAINS entry, in its order. A
+                      merged domain is ONE tile and one stored value. */}
+                  {JOIN_DOMAINS.map(({ key, label }) => {
+                    const isSelected = selectedDomains.includes(key);
                     return (
                       <button
-                        key={d}
+                        key={key}
                         type="button"
                         className="join-domain-tile"
                         aria-pressed={isSelected}
                         onClick={() => {
-                          toggleDomain(d);
+                          toggleDomain(key);
                           clearError();
                         }}
                         style={{
                           opacity: !isSelected && selectedDomains.length >= MAX_DOMAINS ? 0.5 : 1,
                         }}
                       >
-                        {DOMAIN_LABELS[d]}
+                        {label}
                       </button>
                     );
                   })}
@@ -844,10 +865,10 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     {"Here's what the process looks like for the domains you picked:"}
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1.1rem" }}>
-                    {myTracks.map(({ mine, stages }) => (
-                      <div key={mine.join()} style={{ borderLeft: "2px solid var(--accent)", paddingLeft: "0.9rem" }}>
+                    {myTracks.map(({ track, mine, stages }) => (
+                      <div key={track} style={{ borderLeft: "2px solid var(--accent)", paddingLeft: "0.9rem" }}>
                         <p className="mono" style={{ fontSize: "0.68rem", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.6, color: "var(--text-primary)" }}>
-                          {mine.map((d) => DOMAIN_LABELS[d]).join(" · ")}
+                          {mine.map((d) => d.label).join(" · ")}
                         </p>
                         <p style={{ marginTop: "0.3rem", fontSize: "0.9rem", lineHeight: 1.5, color: "var(--text-secondary)" }}>
                           {stages.map((s) => `-> ${s}`).join(" ")}
@@ -870,7 +891,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                     native `required` ignores fields that are not in the DOM. */}
                 {domainSets.map((set) => (
                   <section
-                    key={set.domains.join()}
+                    key={set.id}
                     style={{ display: "flex", flexDirection: "column", gap: "2.25rem", borderTop: "1px solid var(--border)", paddingTop: "1.75rem" }}
                   >
                     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -878,7 +899,7 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                         {setTitle(set, selectedDomains)}
                       </h4>
                       {/* S81 F2: only on the sets that carry a link field. */}
-                      {set.questions.some(isLinkQuestion) && (
+                      {setQuestions(set).some(isLinkQuestion) && (
                         <div role="note" style={noteStyle}>
                           <p style={{ fontWeight: 600, fontSize: "0.92rem", color: "var(--text-primary)" }}>
                             {"No portfolio ready? That's okay."}
@@ -889,7 +910,28 @@ export default function JoinClient({ recruitmentOpen }: Props) {
                         </div>
                       )}
                     </div>
-                    {set.questions.filter((q) => visible.includes(q)).map(renderQuestion)}
+                    {/* S82B: branches render in order. A headed branch (the
+                        merged domains' halves) shows its sub-heading only when
+                        at least one of its questions is visible. */}
+                    {set.branches.map((branch, i) => {
+                      const shown = branch.questions.filter((q) => visible.includes(q));
+                      if (!shown.length) return null;
+                      const questions = (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2.25rem" }}>
+                          {shown.map(renderQuestion)}
+                        </div>
+                      );
+                      return branch.heading ? (
+                        <div key={branch.heading}>
+                          <h5 className="mono" style={branchHeadingStyle}>
+                            {branch.heading}
+                          </h5>
+                          {questions}
+                        </div>
+                      ) : (
+                        <Fragment key={i}>{questions}</Fragment>
+                      );
+                    })}
                   </section>
                 ))}
               </>

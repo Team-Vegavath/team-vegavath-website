@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import InlineDelete from "@/components/admin/InlineDelete";
-import { QUESTION_GROUPS, domainLabel, isLinkQuestion } from "@/lib/utils/joinQuestions";
+import { QUESTION_GROUPS, isLinkQuestion, orderedDomainLabels, type Question } from "@/lib/utils/joinQuestions";
 import type { Application, ApplicationStatus, InterviewGroup, JoinAnswers } from "@/types/settings";
 import { APPLICATION_STATUSES, INTERVIEW_GROUPS } from "@/types/settings";
 
@@ -34,12 +34,10 @@ function formatDate(value: string): string {
 }
 
 // S81: display labels ("Social Media" reads "Design & Social Media"); the
-// stored value is unchanged.
+// stored value is unchanged. S82B: in the fixed /join order, with a pre-S82B
+// "Operations" / "Sponsorship" row shown (once) as "Operations & Sponsorship".
 function domainList(app: Application): string {
-  return [app.domain_interest, app.domain_interest_2, app.domain_interest_3]
-    .filter((d): d is string => Boolean(d))
-    .map(domainLabel)
-    .join(" · ");
+  return orderedDomainLabels([app.domain_interest, app.domain_interest_2, app.domain_interest_3]).join(" · ");
 }
 
 const linkStyle: React.CSSProperties = {
@@ -50,39 +48,57 @@ const linkStyle: React.CSSProperties = {
   wordBreak: "break-all",
 };
 
-/* S81: the new form's answers, grouped by set. A set renders only if at least
-   one of its questions was answered, which is exactly the selected domains. */
+function Answer({ q, answers }: { q: Question; answers: JoinAnswers }) {
+  const raw = answers[q.id];
+  const other = q.kind === "multi" && q.otherId ? answers[q.otherId] : undefined;
+  const text = Array.isArray(raw) ? raw.join(", ") : (raw ?? "");
+  return (
+    <div>
+      <p style={{ ...detailBodyStyle, color: "var(--text-primary)", marginBottom: "0.2rem" }}>{q.label}</p>
+      {/* The server only stores https links here; the check keeps any
+          other value from ever becoming an href. */}
+      {isLinkQuestion(q) && text.startsWith("https://") ? (
+        <a href={text} target="_blank" rel="noreferrer" style={linkStyle}>
+          {text}
+        </a>
+      ) : (
+        <p style={detailBodyStyle}>
+          {text}
+          {typeof other === "string" && other ? ` (Other: ${other})` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* S81: the new form's answers, grouped by set, in /join order. A set renders
+   only if at least one of its questions was answered, which is exactly the
+   selected domains. S82B: a merged domain's answers sit under the same branch
+   sub-headings the form shows ("Operations / Logistics", "Sponsorship"); a
+   branch with no answers shows no heading. */
 function AnswerGroups({ answers }: { answers: JoinAnswers }) {
   return (
     <>
-      {QUESTION_GROUPS.map(({ title, questions }) => {
-        const answered = questions.filter((q) => answers[q.id] !== undefined);
+      {QUESTION_GROUPS.map(({ title, branches }) => {
+        const answered = branches
+          .map((b) => ({ heading: b.heading, questions: b.questions.filter((q) => answers[q.id] !== undefined) }))
+          .filter((b) => b.questions.length);
         if (!answered.length) return null;
         return (
           <div key={title} style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
             <p style={{ ...detailLabelStyle, color: "var(--accent)", marginBottom: 0 }}>{title}</p>
-            {answered.map((q) => {
-              const raw = answers[q.id];
-              const other = q.kind === "multi" && q.otherId ? answers[q.otherId] : undefined;
-              const text = Array.isArray(raw) ? raw.join(", ") : (raw ?? "");
-              return (
-                <div key={q.id}>
-                  <p style={{ ...detailBodyStyle, color: "var(--text-primary)", marginBottom: "0.2rem" }}>{q.label}</p>
-                  {/* The server only stores https links here; the check keeps any
-                      other value from ever becoming an href. */}
-                  {isLinkQuestion(q) && text.startsWith("https://") ? (
-                    <a href={text} target="_blank" rel="noreferrer" style={linkStyle}>
-                      {text}
-                    </a>
-                  ) : (
-                    <p style={detailBodyStyle}>
-                      {text}
-                      {typeof other === "string" && other ? ` (Other: ${other})` : ""}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+            {answered.map((b) => (
+              <Fragment key={b.heading ?? b.questions[0]?.id}>
+                {b.heading ? (
+                  <p style={{ ...detailLabelStyle, color: "var(--text-secondary)", marginBottom: 0, borderBottom: "1px solid var(--border)", paddingBottom: "0.35rem" }}>
+                    {b.heading}
+                  </p>
+                ) : null}
+                {b.questions.map((q) => (
+                  <Answer key={q.id} q={q} answers={answers} />
+                ))}
+              </Fragment>
+            ))}
           </div>
         );
       })}

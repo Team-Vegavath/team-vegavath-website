@@ -18,19 +18,23 @@ export interface SiteSettings {
   github_url: string;
 }
 
-// FY26 recruitment domains - must stay in sync with JoinClient DOMAINS,
-// /api/join VALID_DOMAINS, and the CHECKs in migrations/004.
+// Current /join domains (S82B: five). The ordered source of truth is
+// JOIN_DOMAINS in src/lib/utils/joinQuestions.ts; these keys must also be
+// allowed by the CHECKs in migrations/031.
 export type ApplicationDomain =
-  | "Coding"
   | "Automotives"
-  | "Sponsorship"
   | "Robotics"
-  | "Operations"
-  | "Social Media";
+  | "Coding"
+  | "Social Media"
+  | "Operations & Sponsorship";
 
-// FY25 values still present on rows submitted before migration 004, plus
-// the long FY26 name used before Session 19 shortened it to "Sponsorship".
+// Values still allowed on stored rows but no longer offered by /join:
+// "Operations" / "Sponsorship" (separate domains until S82B merged them --
+// shown under "Operations & Sponsorship"), the FY25 names from before
+// migration 004, and the long FY26 name Session 19 shortened.
 export type LegacyApplicationDomain =
+  | "Operations"
+  | "Sponsorship"
   | "Automotive"
   | "Design"
   | "Media"

@@ -1323,18 +1323,23 @@ select.join-input option {
    1fr implicit rows size every row to the tallest one, and the tile min-height
    below fits a two-line label ("Design & Social Media" at 375px), so a wrapped
    label never makes its own row taller than the rest. */
+/* S82B: five tiles leave an empty cell (2 cols: 2+2+1, 3 cols: 3+2). The 1px
+   lattice used to be the container's --border background showing through the
+   gaps, so that empty cell painted as a solid ghost tile. Each tile now draws
+   its own 1px line (box-shadow below); in the 1px gap two neighbours' lines
+   coincide, so the lattice looks the same and an empty cell is just page. */
 .join-domain-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 1fr;
   gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
+  padding: 1px; /* room for the outer edge of the tiles' 1px lines */
 }
 
 /* Scoped to the domain grid: the Semester and SRN/PRN toggles reuse
    .join-domain-tile and keep their compact height. */
 .join-domain-tiles > .join-domain-tile {
+  box-shadow: 0 0 0 1px var(--border);
   min-height: 4.75rem;
   display: flex;
   align-items: center;
