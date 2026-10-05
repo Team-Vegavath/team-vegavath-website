@@ -5,10 +5,10 @@ fresh set of cloud accounts to a running production deployment. It assumes
 zero prior context. Follow the sections in order.
 
 Stack: Next.js 16 (App Router, TypeScript strict) on Vercel, Neon Postgres,
-Cloudflare R2 for media, NextAuth v5 for admin auth, and Google Gemini for
-AI summaries.
+Cloudflare R2 for media, NextAuth v5 for admin auth, Google Gemini for
+AI summaries, and the Google Sheets API for the on-demand admin exports.
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 Note on env var naming: the code uses `R2_*` variable names. Any
 `CLOUDFLARE_*` names you may see in older docs are stale -- follow the
@@ -85,12 +85,26 @@ R2 client is built in `src/lib/r2.ts`; the public hostname is also used by
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Google Gemini API key, used by the bootstrap session summarize route (`src/app/api/admin/bootstrap/sessions/[id]/summarize/route.ts`). | Google AI Studio -> Get API key. |
 
+### Google Sheets export (S73K, rewritten S74A)
+
+Read only in `src/lib/services/googleExport.ts`. Both are optional: when either is
+missing or unusable, the "Export to Google Sheets" buttons report "not configured"
+and make no network call. The CSV exports never depend on these.
+
+| Variable | Purpose | Where to get it |
+| --- | --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | Base64 of a Google service account's JSON key (raw JSON does not survive `.env` quoting). Scope used: `auth/spreadsheets`. Never logged -- a decode failure is swallowed rather than printed, because the input IS the secret. | Google Cloud console -> IAM -> Service accounts -> Keys -> Add key (JSON); then `base64` the file. Enable the Google Sheets API on that project. |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | The ONE spreadsheet exports write into. A service account cannot own files (no storage quota), so a human creates the sheet (`Vegavath_Exports`) and shares it with the service account's email as **Editor**; each dataset gets its own tab, cleared and rewritten on every export. | The id between `/d/` and `/edit` in the sheet's URL. |
+
+`GOOGLE_DRIVE_FOLDER_ID` (from S73K) is dead since S74A and can be deleted.
+
 ### Public / maintenance flags
 
 | Variable | Purpose | Where to get it |
 | --- | --- | --- |
 | `NEXT_PUBLIC_MAINTENANCE_MODE` | Emergency override in `src/middleware.ts`. When set to the string `true`, all public pages rewrite to `/maintenance` regardless of DB state. Optional -- omit or set anything other than `true` for normal operation. | You set it. Normal DB-driven maintenance is toggled from the admin panel (`site_settings` key `maintenance_mode`); this env flag is the last resort when the DB is down. |
 | `DOCS_PASSWORD` | Shared secret gating `/docs`, enforced in `src/middleware.ts` and `/api/docs/auth`. **WARNING: `/docs` FAILS OPEN when this is unset.** If it goes missing in Vercel the documentation is public again with no error and no signal -- the robots disallow is the only remaining layer. Never hardcode or log the value. | You choose it. Set it in Vercel for every environment you deploy. |
+| `NEXT_PUBLIC_SHOW_VIEWER_INVITES` | Shows the godfather-only reusable "open viewer invite" link on `/admin/accounts` (S67). Set to `true` **only in the production Vercel project**: an open registration link minted against the draft or a local database is a live credential path into that environment. Unset everywhere else. Inlined at build time, so a change needs a redeploy. | You set it. |
 
 Note: `NODE_ENV` is also referenced in code but is set automatically by
 Next.js and Vercel (`development` locally, `production` on deploy). Do not
@@ -116,7 +130,8 @@ per AGENTS.md the migration files are gitignored (see the
 `.gitignore`), so a fresh clone from Git may not contain them -- obtain them
 from a teammate or an existing checkout if absent.
 
-Apply every file in ascending order, 001 through 017:
+Apply every file in ascending order, 001 through 031 (all 31 are applied to the
+live database as of 2026-10-05):
 
 1. `001_initial_schema.sql`
 2. `002_add_coding_domain.sql`
@@ -135,6 +150,26 @@ Apply every file in ascending order, 001 through 017:
 15. `015_bootstrap_stall_leads_groupsize.sql`
 16. `016_volunteer_selfregister.sql`
 17. `017_feedback_extra.sql`
+18. `018_events_hackathons.sql`
+19. `019_viewer_role_and_event_registrations.sql`
+20. `020_open_invite_tokens.sql`
+21. `021_bootstrap_prereg.sql`
+22. `022_posts.sql`
+23. `023_posts_categories.sql`
+24. `024_post_thumbnails.sql`
+25. `025_stall_switch_request.sql`
+26. `026_announcements.sql`
+27. `027_stall_queue_capacity.sql`
+28. `028_stall_visits.sql`
+29. `029_stall_time_limit.sql`
+30. `030_application_course_answers.sql`
+31. `031_operations_sponsorship_domain.sql`
+
+Deploy order matters for new ones: apply a migration BEFORE the code that uses
+it deploys, or the matching feature 500s (the file header says so when it
+applies). A migration whose feature is gated off can sit unapplied with nothing
+failing loudly -- when a query fails on a column, check the column exists in
+prod before reading the code that names it (AGENTS.md, from the S76D incident).
 
 How to apply: paste each file's contents into the Neon SQL Editor and run,
 or use `psql "<DATABASE_URL>" -f migrations/001_initial_schema.sql` and
@@ -180,6 +215,9 @@ including SELECTs, before running it, per the project rules.
 6. Deploy. The build must complete with zero errors; `next.config.ts` does
    not ignore build or lint errors, so any TypeScript or ESLint failure will
    fail the deploy.
+7. Tests (S75): `npm test` runs the Vitest suite (`vitest.config.mts`, Node
+   environment, pure-function tests only -- nothing touches the database).
+   Vercel does not run it; run it locally before pushing.
 
 ## 7. Post-deploy checklist
 
@@ -193,7 +231,7 @@ including SELECTs, before running it, per the project rules.
    and the plaintext password whose bcrypt hash you stored in
    `ADMIN_PASSWORD_HASH`. This must work even before any DB admin accounts
    exist, because the godfather is an env-based fallback.
-4. Verify migrations: if login or admin pages error, confirm all 17
+4. Verify migrations: if login or admin pages error, confirm all 31
    migrations ran in order (missing columns such as `token_version` point to
    a skipped migration).
 5. Media check: upload or view an image and confirm it loads from the R2

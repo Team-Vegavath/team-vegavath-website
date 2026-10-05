@@ -1,6 +1,6 @@
 # Architecture
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 This is the system-level orientation for the Team Vegavath website. Read it
 before touching the codebase. It explains what the app is, why each piece of
@@ -18,12 +18,17 @@ audiences from the same deployment:
 
 - **Public site** -- the marketing and information surface: home, about,
   events, gallery, crew, sponsors, a blog at `/posts`, an F1 stats section,
-  per-project build pages at `/projects`, a multi-step "join" application
-  form, and legal pages. Anonymous visitors, read-mostly, heavily cached.
+  per-project build pages at `/projects` (including the interactive maze
+  solver, S78), a homepage announcement slot (S73E), a 4-step "join"
+  application form (rebuilt S81, S82B), and legal pages. Anonymous visitors,
+  read-mostly, heavily cached.
 - **Admin panel** -- a protected back office at `/admin` where club staff
-  manage events, gallery media, sponsors, team members, milestones, incoming
-  applications, admin accounts, and site settings (including a maintenance
-  toggle). Guarded by NextAuth.
+  manage events, gallery media, sponsors, team members, posts, milestones, the
+  homepage announcement, incoming applications (with CSV and Google Sheets
+  export), admin accounts, a QR tool, and site settings (including a
+  maintenance toggle). Editing a row opens a shared slide-in panel
+  (`AdminEditPanel`, S82); creating one keeps its own full page. Guarded by
+  NextAuth.
 - **Bootstrap event-day system** -- a self-contained subsystem for a live
   5-day campus showcase event called "Bootstrap." Volunteers log in at
   `/bootstrap` to a per-day stall dashboard, visitors check in via per-lead QR
@@ -40,14 +45,21 @@ All four share the same database (Neon Postgres), the same media store
 (Cloudflare R2), and the same middleware, but they are otherwise separate
 concerns with separate access control.
 
-There are exactly **two outbound egress points**, and both are deliberate:
-`src/lib/services/f1.ts` calls Jolpica for the F1 section (one choke-point
-helper, null on failure, long revalidate windows, and a DB kill switch that
-reads as OFF when the row is missing), and the Bootstrap feedback summarize
-route calls Google Gemini. The Gemini one predates f1.ts, sits in a route
-rather than a service, and therefore has no kill switch and returns 502
-rather than null. It is the exception to copy away from, not toward. A third
-egress point needs approval.
+There are exactly **three outbound egress points**, all deliberate:
+
+1. `src/lib/services/f1.ts` calls Jolpica for the F1 section: one choke-point
+   helper, null on failure, long revalidate windows, and a DB kill switch that
+   reads as OFF when the row is missing. **This is the shape to copy.**
+2. `src/lib/services/googleExport.ts` (S73K, rewritten S74A) calls the Google
+   Sheets API, only when an admin presses "Export to Google Sheets". It follows
+   f1.ts's shape: in a service, every failure caught and returned as data, and
+   OFF (no network call) when its two env vars are missing.
+3. The Bootstrap feedback summarize route calls Google Gemini. It predates
+   f1.ts, sits in a route rather than a service, and therefore has no kill
+   switch and returns 502 rather than null. It is the exception to copy away
+   from, not toward.
+
+A fourth egress point needs approval.
 
 ## 2. Tech stack and why
 
@@ -61,7 +73,9 @@ egress point needs approval.
 | Database | Neon serverless Postgres via `@neondatabase/serverless` | HTTP-based Postgres driver that works from Edge and serverless functions with no connection pool to manage. Cold-start caveat below. |
 | Object storage | Cloudflare R2 via `@aws-sdk/client-s3` | S3-compatible, cheap egress. Holds all images, videos, and the 3D model. Binaries never go in git. |
 | Auth | NextAuth v5 beta (Credentials) | Admin login only. DB-backed multi-admin plus an env "godfather" fallback account. JWT sessions. See section 4. |
-| AI | Google Gemini (`gemini-1.5-flash`) | On-demand summaries of Bootstrap feedback for club leadership. Called directly over REST, not an SDK. |
+| AI | Google Gemini (`gemini-3.5-flash`) | On-demand summaries of Bootstrap feedback for club leadership. Called directly over REST, not an SDK. |
+| Exports | Google Sheets API via `googleapis` | On-demand admin exports of applications and the volunteer pool into one pre-shared sheet (S73K, S74A). CSV downloads need no Google setup. |
+| Tests | Vitest (`npm test`, S75) | Unit tests for the pure helpers in `src/lib/utils/` and `src/lib/maze/`. No test touches the database -- there is no staging DB, only live Neon. Any string fed to an HTML `pattern` attribute is also tested to compile under the RegExp `v` flag (S76B). |
 | Hosting | Vercel | Native Next.js host: ISR, image optimization CDN, Edge middleware, per-route serverless functions. |
 
 ## 3. Directory structure
@@ -70,51 +84,72 @@ egress point needs approval.
 src/
   app/
     (public)/            # Public routes, share public chrome
-      page.tsx           #   home
-      about/  events/  events/[slug]/  gallery/  crew/  sponsors/
-      join/              #   4-step application form
+      page.tsx           #   home (incl. the announcement slot, S73E)
+      about/  events/  events/[slug]/  events/[slug]/register/
+      gallery/  crew/  sponsors/  posts/  posts/[slug]/  f1/
+      projects/          #   index + kart/  combat-bot/  maze-solver/ (S78)
+      join/              #   4-step application form (S81, S82B)
       legal/
     (admin)/
       admin/             # Protected admin panel (AdminShell chrome)
         page.tsx         #   login
         dashboard/  events/  events/[id]/edit/  gallery/  sponsors/
-        team/  milestones/  applications/  accounts/  settings/
+        sponsors/[id]/edit/  team/  team/[id]/edit/  posts/  milestones/
+        announcements/ (S73E)  applications/  accounts/  profile/  qr/
+        settings/
         bootstrap/       #   Bootstrap session admin + AI summary
     (docs)/
       docs/  docs/[slug]/  # In-app documentation viewer
+    docs/login/          # /docs password page (outside the (docs) group on purpose)
     admin/               # PUBLIC token-gated pages, NO AdminShell, NOT the panel:
       invite/[name]/[token]/          #   admin self-registration (S27)
+      register/                       #   open viewer invite (S48)
       [username]/credentials/[token]/ #   password reset (S29)
     bootstrap/           # Volunteer event-day system (own cookie auth)
       page.tsx           #   volunteer login + stall dashboard
       feedback/          #   public visitor feedback form
       checkin/[token]/   #   public per-lead QR check-in (S33)
-      register/stall/    #   volunteer self-registration (S35)
-      register/group/
+      checklist/[id]/    #   a group's stall checklist (S73D)
+      register/stall/    #   stall-volunteer registration, session-gated (S74B)
+      register/group/    #   group-lead registration, session-gated
+      register/pool/     #   always-open pre-registration with a role choice (S74B)
     maintenance/         # Static maintenance page
     api/
-      admin/             #   /api/admin/* -- session-guarded write endpoints
+      admin/             #   /api/admin/* -- session-guarded endpoints
       bootstrap/         #   /api/bootstrap/* -- volunteer + public endpoints
-      ...                #   other public API routes
+      ...                #   other public API routes (join, events register, docs auth)
   components/
     layout/              # Navbar, Footer, PageTransition, RacingCursor
-    home/ about/ events/ gallery/ crew/ sponsors/ join/
-    admin/               # Admin panels, tables, forms
-    bootstrap/           # Stall cards/grid, dashboards, login, campus map SVG
+    home/ about/ events/ gallery/ crew/ sponsors/ join/ posts/ f1/ legal/
+    projects/            # Maze solver (S78)
+    docs/                # Docs viewer chrome
+    admin/               # Admin panels, tables, forms, AdminEditPanel (S82)
+    bootstrap/           # Stall cards/grid, dashboards, login, checklist, campus map SVG
     ui/                  # Shared primitives (Reveal, Container, etc.)
   lib/
     db.ts                # Neon connection ONLY (exports `sql`)
     r2.ts                # R2 S3 client ONLY
     auth.ts              # NextAuth config ONLY
-    utils.ts             # Shared utilities
-    utils/               # More focused helpers (e.g. phone.ts)
+    docs-config.ts       # /docs nav order
+    utils.ts             # Shared utilities (slugify, dates, uploadToR2, ...)
+    utils/               # Pure, DB-free helpers -- safe to import from client components
+      phone.ts  srn.ts   #   phone / SRN / PRN validation (S73F, S76B)
+      group.ts           #   groupLabel: "Group A" -> "Group 1" (S73K)
+      exportTables.ts    #   what each CSV / Sheets export contains (S73K)
+      joinQuestions.ts   #   the /join domains (ONE ordered list), questions, rules (S81, S82B)
+      driveLink.ts  codeHostLink.ts  # Drive / GitHub / GitLab link validators (S81)
+      *.test.ts          #   Vitest unit tests (S75)
+    maze/                # Maze solver logic + tests (S78)
     services/            # ALL SQL lives here (see contract below)
-      events.ts  team.ts  gallery.ts  sponsors.ts  applications.ts
-      settings.ts  admin.ts  about.ts  bootstrap.ts
-  types/                 # TypeScript interfaces only
-  middleware.ts          # Maintenance rewrite + admin route protection
+      events.ts  team.ts  gallery.ts  sponsors.ts  applications.ts  posts.ts
+      settings.ts  admin.ts  about.ts  bootstrap.ts  announcements.ts
+      f1.ts              #   Jolpica egress (no SQL)
+      googleExport.ts    #   Google Sheets egress (no SQL)
+  types/                 # TypeScript interfaces + constants shared with client code
+  middleware.ts          # Maintenance rewrite, /docs gate, admin route protection
 
-migrations/              # Numbered SQL (001-025), applied to Neon MANUALLY
+migrations/              # Numbered SQL (001-031), applied to Neon MANUALLY
+vitest.config.mts        # Test runner config (S75); `npm test`
 ```
 
 **Architecture contract (enforced):**
@@ -296,10 +331,31 @@ clean.
 Used in exactly one place: `POST /api/admin/bootstrap/sessions/[id]/summarize`
 (admin-only, session-checked in-route). It pulls raw Bootstrap feedback via
 the service layer, builds a prompt with computed averages, and calls
-`gemini-1.5-flash` over REST at `generativelanguage.googleapis.com` using
+`gemini-3.5-flash` over REST at `generativelanguage.googleapis.com` using
 `GEMINI_API_KEY`. It returns a 250-350 word leadership summary plus the
 response count and averages. Missing key returns 503; upstream errors return
 502 -- the feature degrades gracefully and never blocks the panel.
+
+The prompt is built only from anonymised feedback fields (ratings, free text,
+stall name); no visitor id, name, phone or PRN, and no request headers or
+cookies, reach the outbound call (verified S73F).
+
+### Google Sheets (on-demand admin exports)
+
+`src/lib/services/googleExport.ts`, called only by the two "Export to Google
+Sheets" routes (applications, and the Bootstrap volunteer pool). It writes into
+ONE pre-shared spreadsheet (`GOOGLE_SHEETS_SPREADSHEET_ID`), one tab per dataset,
+clearing the tab and rewriting it on each export. It never creates files: a
+service account has no storage quota and cannot own any (the S73K approach of
+converting an uploaded CSV failed with `403 storageQuotaExceeded`; S74A
+replaced it). Scope `auth/spreadsheets`; cells written with
+`valueInputOption: RAW`, so applicant text starting with `=` stays text rather
+than becoming a formula. Errors surface Google's own `code`/`reason`/`message`
+fields only -- never the raw error object, whose config carries the
+`Authorization` header. Both export routes carry the viewer guard because they
+write to a shared file; viewers keep the CSV downloads, which never touch this
+module. What each export contains is defined once in
+`src/lib/utils/exportTables.ts`, shared by the CSV and Sheets destinations.
 
 ## 7. Rendering strategy
 
@@ -307,12 +363,14 @@ Per-route caching, chosen for the audience of each surface:
 
 | Strategy | Routes | Rationale |
 | --- | --- | --- |
-| **ISR** (`revalidate: 60-120`) | `/`, `/about`, `/events`, `/gallery`, `/crew`, `/sponsors` | Public, read-mostly, high traffic. Serve cached HTML, refresh in the background. |
-| **SSR** (no cache) | `/join`, `/events/[slug]`, `/admin/*`, `/bootstrap` | Per-request or personalized/authenticated data that must always be fresh. |
+| **ISR** (`revalidate: 60-120`) | `/` and `/events` (60); `/about`, `/gallery`, `/crew`, `/sponsors`, `/legal` (120) | Public, read-mostly, high traffic. Serve cached HTML, refresh in the background. |
+| **ISR, longer** | `/posts` (300), `/posts/[slug]` (600), `/projects`, `/projects/kart`, `/projects/maze-solver` (3600) | Content that changes rarely. |
+| **ISR, kill-switch** | every `/f1` page (60) | NOT a freshness number: the page must re-render often enough for the `f1_enabled` kill switch to bite within a minute. Upstream calls are throttled separately by the per-fetch windows in `services/f1.ts`. Do not raise it. |
+| **SSR** (no cache) | `/join`, `/events/[slug]`, `/events/[slug]/register`, `/admin/*`, `/bootstrap/*` | Per-request or personalized/authenticated data that must always be fresh. |
 | **Static** | `/maintenance`, 404, error pages | No data; prerendered once. |
 
 **Middleware** (`src/middleware.ts`) runs on all non-static paths (matcher
-excludes `_next` internals and any path with a dot). Two jobs:
+excludes `_next` internals and any path with a dot). Three jobs:
 
 1. **Maintenance rewrite.** If maintenance mode is on, public routes rewrite to
    `/maintenance`. The flag is read from the `site_settings` table (key
@@ -322,4 +380,7 @@ excludes `_next` internals and any path with a dot). Two jobs:
    DB is down. `/admin`, `/api`, and `/maintenance` stay reachable so
    maintenance can be turned off from the panel, and a DB failure fails open
    (site stays up).
-2. **Admin route protection.** As described in section 4a.
+2. **`/docs` gate (S52B).** A shared-password cookie (`DOCS_PASSWORD`), checked
+   before the admin gate. It FAILS OPEN when the env var is unset -- see the
+   deployment guide.
+3. **Admin route protection.** As described in section 4a.

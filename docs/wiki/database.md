@@ -1,9 +1,9 @@
 # Database Schema
 
-_Current as of Session 72D (2026-08-12). Migrations 001-025 are all applied._
+_Current as of Session 82C (2026-10-05). Migrations 001-031 are all applied._
 
 This document describes the full Team Vegavath Postgres schema (Neon), reconstructed
-by applying all 25 migration files in `migrations/` cumulatively, in numeric order.
+by applying all 31 migration files in `migrations/` cumulatively, in numeric order.
 Migrations are the source of truth. None are auto-applied -- each is run manually
 against the live Neon database before the matching code deploys.
 
@@ -17,13 +17,13 @@ is available for all UUID primary keys.
 Tables are grouped into two areas:
 - Core site tables: `events`, `event_registrations`, `posts`, `team_members`,
   `gallery_items`, `sponsors`, `applications`, `site_settings`, `milestones`,
-  `admin_accounts`, `admin_invite_tokens`, `admin_password_reset_tokens`,
-  `admin_login_log`.
+  `announcements`, `admin_accounts`, `admin_invite_tokens`,
+  `admin_password_reset_tokens`, `admin_login_log`.
 - Bootstrap event-day tables: `bootstrap_sessions`, `bootstrap_stalls`,
-  `bootstrap_volunteers`, `bootstrap_groups`, `bootstrap_visitors`,
-  `bootstrap_feedback`.
+  `bootstrap_volunteers`, `bootstrap_groups`, `bootstrap_stall_queue`,
+  `bootstrap_stall_visits`, `bootstrap_visitors`, `bootstrap_feedback`.
 
-Total: 19 tables.
+Total: 22 tables.
 
 Note: there is no dedicated `about` table. About-page and contact content is
 stored as key/value rows in `site_settings`.
@@ -243,7 +243,7 @@ Constraint: `CHECK (tier IN ('premium', 'community'))`.
 
 Purpose: "Join Us" recruitment submissions with up to three domain choices and a status pipeline.
 
-Created: 001. Modified: 002, 003, 004, 005, 011 (this is the most-evolved table).
+Created: 001. Modified: 002, 003, 004, 005, 011, 030, 031 (this is the most-evolved table).
 
 Evolution summary:
 - 001: base table with `domain_interest` (FY25 domains) and 4-value `status`.
@@ -252,6 +252,8 @@ Evolution summary:
 - 004: added FY26 form fields (`mobile_number`, `srn_prn`, `semester`, `why_join`, `value_addition`, `domain_experience`, `design_portfolio_url`); rewrote all three domain CHECKs to accept FY26 names plus FY25 legacy values.
 - 005: expanded `status` CHECK for the recruitment pipeline.
 - 011: added `interview_group`.
+- 030 (S81): added `course` and `answers` (JSONB). The rebuilt /join form stores every page 3/4 answer in `answers`, keyed by stable question id (`src/lib/utils/joinQuestions.ts`). The old question columns (`why_join`, `value_addition`, `domain_experience`, `design_portfolio_url`, `portfolio_url`) are no longer written; they stay for old rows until a later cleanup drops them. `answers IS NULL` identifies a pre-S81 row.
+- 031 (S82B): re-created the three domain CHECKs to add 'Operations & Sponsorship' (Operations and Sponsorship merged into one /join domain). Every older value stays allowed, so no row was rewritten.
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -272,20 +274,25 @@ Evolution summary:
 | domain_experience | TEXT | nullable. Added in 004 |
 | design_portfolio_url | TEXT | nullable. Added in 004 |
 | interview_group | TEXT | nullable, CHECK in ('A','B','C','D') or NULL. Added in 011 |
+| course | TEXT | nullable. Added in 030. One of the /join course options, or the applicant's own text for "Other" |
+| answers | JSONB | nullable. Added in 030. Object keyed by question id; multi-selects are string arrays. NULL on every pre-S81 row |
 
 Indexes: `idx_applications_date(submitted_at DESC)`; `idx_applications_interview_group(interview_group) WHERE interview_group IS NOT NULL` (added in 011).
 
-Domain CHECK (final, after 004 -- applies identically to `domain_interest`, `domain_interest_2`, `domain_interest_3`):
+Domain CHECK (final, after 031 -- applies identically to `domain_interest`, `domain_interest_2`, `domain_interest_3`):
 
 ```sql
 CHECK (domain_interest IN (
-  'Coding', 'Automotives', 'Sponsorship',
-  'Robotics', 'Operations', 'Social Media',
-  -- FY25 legacy values (existing rows)
+  'Automotives', 'Robotics', 'Coding', 'Social Media', 'Operations & Sponsorship',
+  -- Pre-S82B values (separate domains until S82B merged them)
+  'Operations', 'Sponsorship',
+  -- FY25 legacy values
   'Automotive', 'Design', 'Media', 'Marketing', 'Programming',
   'Sponsorship & Finance'
 ))
 ```
+
+/join offers only the first five. "Social Media" is stored but shown as "Design & Social Media"; a stored "Operations" or "Sponsorship" is shown as "Operations & Sponsorship". New submissions store the domains in the fixed /join order (Automotives, Robotics, Coding, Design & Social Media, Operations & Sponsorship), not click order. The one ordered list is `JOIN_DOMAINS` in `src/lib/utils/joinQuestions.ts`.
 
 Status CHECK (final, after 005):
 
@@ -334,6 +341,35 @@ Created: 010. Modified: none.
 | created_at | TIMESTAMPTZ | NOT NULL, default now() |
 
 No FKs, no CHECKs.
+
+---
+
+### announcements
+
+Purpose: the homepage announcement slot (S73E). Admin-managed at
+`/admin/announcements`; the homepage shows ONE: the first active row by
+`display_order` (`getActiveAnnouncement`, `LIMIT 1`). Separate desktop and mobile
+images so each can be cropped for its own aspect ratio.
+
+Created: 026. Modified: none.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | UUID | PK, default `gen_random_uuid()` |
+| title | TEXT | NOT NULL |
+| body | TEXT | nullable |
+| image_url_desktop | TEXT | nullable. R2 URL |
+| image_url_mobile | TEXT | nullable. R2 URL |
+| cta_label | TEXT | nullable. Button text; shown only with `cta_href` |
+| cta_href | TEXT | nullable |
+| is_active | BOOLEAN | NOT NULL, default false |
+| display_order | INTEGER | NOT NULL, default 0 |
+| created_at | TIMESTAMPTZ | NOT NULL, default now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, default now() |
+
+Index: `idx_announcements_active(is_active, display_order)`. No FKs, no CHECKs.
+Nothing in the schema stops two rows being active at once; the `LIMIT 1` read is
+what makes only one show.
 
 ---
 
@@ -434,7 +470,8 @@ Index: `idx_login_log_time(attempted_at DESC)`.
 ## Bootstrap event-day tables
 
 The Bootstrap system runs live event-day operations: stall status, volunteer
-logins, visitor check-in via QR, and feedback. A single session is active at a time.
+logins, visitor check-in via QR, visitor groups with a per-stall queue (027) and a
+visit log (028), and feedback. A single session is active at a time.
 
 ### bootstrap_sessions
 
@@ -457,9 +494,11 @@ No CHECKs. Referenced by nearly every other bootstrap table.
 
 ### bootstrap_stalls
 
-Purpose: stalls within a session, each with occupancy status, queue ownership, and map position.
+Purpose: stalls within a session, each with occupancy status, group capacity, an optional time limit, and map position.
 
-Created: 007. Modified: 008 (`queued_by`, `map_x`, `map_y`), 009 (`queued_at`), 015 (`lead_names`).
+Created: 007. Modified: 008 (`queued_by`, `map_x`, `map_y`), 009 (`queued_at`), 015 (`lead_names`), 027 (`max_groups`), 029 (`time_limit_minutes`, occupancy ceiling 3 -> 4).
+
+Since 027 (S73B) the queue is its own table, `bootstrap_stall_queue`, and releasing a stall no longer clears it. `queued_by` and `queued_at` below are kept but are now **unwritten and unread** -- left so 027 stays reversible mid-event; dropping them is a later cleanup.
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -468,14 +507,16 @@ Created: 007. Modified: 008 (`queued_by`, `map_x`, `map_y`), 009 (`queued_at`), 
 | stall_number | INTEGER | NOT NULL. Display order only |
 | stall_name | TEXT | NOT NULL. e.g. "Go-Kart", "BMW Display" |
 | status | TEXT | NOT NULL, default 'free', CHECK in ('free','occupied','queued') |
-| max_occupancy | INTEGER | NOT NULL, default 1, CHECK BETWEEN 1 AND 3 |
+| max_occupancy | INTEGER | NOT NULL, default 1, CHECK BETWEEN 1 AND 4 (ceiling raised from 3 in 029). Volunteer capacity |
 | claimed_by | TEXT[] | nullable. Array of volunteer usernames |
 | updated_at | TIMESTAMPTZ | NOT NULL, default now() |
-| queued_by | TEXT | nullable. Added in 008. Who set the queue (only they can clear it) |
+| queued_by | TEXT | nullable. Added in 008. **Unused since 027** (was: who set the queue) |
 | map_x | FLOAT | nullable. Added in 008. Percent 0-100 from top-left of map image |
 | map_y | FLOAT | nullable. Added in 008 |
-| queued_at | TIMESTAMPTZ | nullable. Added in 009. When queue was set, for wait ranking/alerts |
-| lead_names | TEXT | nullable. Added in 015. Comma-separated stall lead names (informational) |
+| queued_at | TIMESTAMPTZ | nullable. Added in 009. **Unused since 027** (was: when the queue was set) |
+| lead_names | TEXT | nullable. Added in 015. Comma-separated stall lead names (informational; the UI caps it at 4 names since S78B) |
+| max_groups | INTEGER | NOT NULL, default 1, CHECK BETWEEN 1 AND 10. Added in 027. How many visitor groups may be at the stall at once |
+| time_limit_minutes | INTEGER | nullable, CHECK NULL or > 0. Added in 029. Per-stall time limit; drives the group lead's countdown. NULL = no timer |
 
 Relationships: `session_id` -> `bootstrap_sessions(id)`, ON DELETE CASCADE.
 
@@ -483,9 +524,17 @@ Constraints:
 
 ```sql
 CHECK (status IN ('free', 'occupied', 'queued'))
-CHECK (max_occupancy BETWEEN 1 AND 3)
+CHECK (max_occupancy BETWEEN 1 AND 4)               -- bootstrap_stalls_max_occupancy_check, re-created in 029
+CHECK (max_groups BETWEEN 1 AND 10)                 -- bootstrap_stalls_max_groups_range, 027
+CHECK (time_limit_minutes IS NULL OR time_limit_minutes > 0)  -- 029
 UNIQUE (session_id, stall_number)
 ```
+
+`status` is **derived on read** since S73B (`selectStalls` in
+`src/lib/services/bootstrap.ts`): nobody in `claimed_by` -> `free`; claimed with
+rows in `bootstrap_stall_queue` -> `queued`; claimed, empty queue -> `occupied`. An
+empty stall with groups still queued reads `free`. The stored column is still
+written so the table reads sensibly in the Neon console, but nothing reads it.
 
 Index: `idx_bootstrap_stalls_session(session_id)`.
 
@@ -567,6 +616,69 @@ Relationships: `session_id` -> `bootstrap_sessions(id)` ON DELETE CASCADE; `team
 Constraint: `UNIQUE (session_id, name)`.
 
 Index: `idx_bootstrap_groups_session(session_id)`.
+
+`name` is still stored as "Group A", "Group B", ... -- it is the
+`UNIQUE(session_id, name)` join key `createBootstrapGroups` relies on. Since S73K no
+UI renders it raw: `groupLabel` (`src/lib/utils/group.ts`) shows "Group A" as
+"Group 1", matching the group numbers volunteers already see.
+
+---
+
+### bootstrap_stall_queue
+
+Purpose: the per-stall waiting list (S73B). One row per group waiting at a stall,
+in `queued_at` order. Also reused by the admin's advisory auto-distribution (S73D):
+a row the distribute pass wrote with `accepted_at IS NULL` is a suggestion, and the
+lead's "HEADING THERE" sets `accepted_at`. Releasing a stall no longer clears its
+queue.
+
+Created: 027. Modified: none.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | UUID | PK, default `gen_random_uuid()` |
+| stall_id | UUID | NOT NULL, FK -> bootstrap_stalls(id) ON DELETE CASCADE |
+| group_id | UUID | NOT NULL, FK -> bootstrap_groups(id) ON DELETE CASCADE |
+| volunteer_id | UUID | nullable, FK -> bootstrap_volunteers(id) ON DELETE SET NULL. Who tapped it; display only |
+| queued_at | TIMESTAMPTZ | NOT NULL, default now() |
+| accepted_at | TIMESTAMPTZ | nullable. Set when a lead accepts an advisory placement |
+
+Constraint: `UNIQUE (stall_id, group_id)` -- also the idempotent double-tap guard.
+
+Index: `idx_stall_queue_stall_time(stall_id, queued_at)`.
+
+---
+
+### bootstrap_stall_visits
+
+Purpose: one row per group visit to a stall (S73C). `left_at IS NULL` means the
+group is at the stall right now, so this table is also the occupancy record -- no
+separate occupancy table exists. Feeds the students' checklist and the leads'
+roster.
+
+Created: 028. Modified: none.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | UUID | PK, default `gen_random_uuid()` |
+| session_id | UUID | NOT NULL, FK -> bootstrap_sessions(id) ON DELETE CASCADE. Denormalised from the stall so "which stalls has my group visited" is one index hit |
+| stall_id | UUID | NOT NULL, FK -> bootstrap_stalls(id) ON DELETE CASCADE |
+| group_id | UUID | NOT NULL, FK -> bootstrap_groups(id) ON DELETE CASCADE |
+| volunteer_id | UUID | nullable, FK -> bootstrap_volunteers(id) ON DELETE SET NULL. Who logged the arrival |
+| arrived_at | TIMESTAMPTZ | NOT NULL, default now(). The stall time-limit countdown (029) runs from here |
+| left_at | TIMESTAMPTZ | nullable. NULL = still at the stall |
+
+Constraint: `UNIQUE (stall_id, group_id)` -- both an idempotent re-tap guard and a
+**hard revisit ban**: a group that has been through a stall can never get a second
+row for it.
+
+Indexes: `idx_stall_visits_session_group(session_id, group_id)`;
+`idx_stall_visits_stall_open(stall_id) WHERE left_at IS NULL`.
+
+Two writers: the stall volunteer's arrival/release taps, and the manual checklist
+override (S73G) used by leads and the admin as a backup path. A manual tick writes
+an already-closed row (`arrived_at` = `left_at` = now()); a manual clear deletes a
+closed row. The admin's end-of-event sweep closes any row still open.
 
 ---
 
@@ -658,6 +770,12 @@ CHECK (join_likelihood BETWEEN 1 AND 5)  -- added 017
 | 023_posts_categories | posts (category CHECK narrowed to 3, DEFAULT changed to 'motorsport') |
 | 024_post_thumbnails | posts (thumbnail_url) |
 | 025_stall_switch_request | bootstrap_volunteers (switch_requested_stall_id, switch_requested_at) |
+| 026_announcements | announcements (new) |
+| 027_stall_queue_capacity | bootstrap_stall_queue (new), bootstrap_stalls (max_groups) |
+| 028_stall_visits | bootstrap_stall_visits (new) |
+| 029_stall_time_limit | bootstrap_stalls (time_limit_minutes, max_occupancy CHECK ceiling 3 -> 4) |
+| 030_application_course_answers | applications (course, answers JSONB) |
+| 031_operations_sponsorship_domain | applications (all 3 domain CHECKs add 'Operations & Sponsorship') |
 
 ### Reading migration 025 before you touch the switch-request code
 

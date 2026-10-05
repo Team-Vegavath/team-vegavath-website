@@ -1,6 +1,6 @@
 # Public Components
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 Per-file reference for the public and shared React components of the Team
 Vegavath website (Next.js 16 App Router, TypeScript strict). These are the
@@ -281,39 +281,37 @@ naive array index would open the wrong slide.
 
 ## home/DomainGrid.tsx
 
-**Purpose.** Client component: the six clickable domain tiles on the home page,
-each opening an animated modal popup with that domain's description.
+**Purpose.** Client component: the six domain flip cards on the home and about
+pages (one component, both pages). Clicking a card rotates it in place to show
+the description on its back face (S69 -- this replaced an earlier modal popup).
 
-**Props.** None (exported as a named `DomainGrid`).
+**Props.** None (named export `DomainGrid`).
 
-**State.**
-- `activeDomain: DOMAIN | null` -- the domain whose modal is open, or null.
+**State.** `flipped: string | null` -- the name of the open card. Flipping a new
+card closes the open one: assigning the name IS the close.
 
-`DOMAINS` is a module constant of six entries -- Coding (COD), Automotives
-(AUT), Sponsorship & Finance (S&F), Robotics (ROB), Operations (OPS), Social
-Media (SOC) -- each with `abbr`, `name`, and `description`.
+`DOMAINS` is a module constant of six entries -- Coding (COD), Automotives (AUT),
+Sponsorship & Finance (S&F), Robotics (ROB), Operations (OPS), Design & Social
+Media (D&S) -- each with `abbr`, `name` and `description`. S81 relabelled the
+last one from "Social Media" (watermark SOC -> D&S, matching S&F) to match /join.
+This list is deliberately separate from the /join domain list (`JOIN_DOMAINS`):
+the homepage describes the club's six areas, /join has its own five
+recruitment domains (S82B).
 
-**Key functions.** Two effects:
-- An Escape-key listener that closes the modal (added only while a domain is
-  active).
-- A body-scroll lock (`document.body.style.overflow = "hidden"`) while a modal
-  is open, restored on close/unmount.
+**Render logic.** Each card is a real `<button aria-pressed>` with a front face
+(a faint abbreviation watermark top-right, an inline SVG `DomainIcon` keyed by
+`abbr` (S71A), and the name) and a back face (abbreviation tag + description).
+The flip is a CSS `rotateY` on `.domain-flip-inner` (framer-motion is no longer
+used here). A styled `:focus-visible` ring replaces the UA's default (S70).
 
-Tiles are keyboard-accessible: `role="button"`, `tabIndex=0`, and Enter/Space
-open the modal. No API calls.
+**Notable.** Every card is the same fixed size: `.domain-flip` is `min-height:
+192px` in globals.css (raised from 180px in S81 so "DESIGN & SOCIAL MEDIA",
+which wraps to three lines on the narrowest tiles, never pushes its icon into
+the watermark). The icons are inline SVG, not R2 images, because the front face
+turns accent on hover and an accent-coloured image would vanish into it.
 
-**Render logic.** Always renders the `.domain-grid` of tiles (each showing the
-abbreviation and full name). Inside `AnimatePresence`, when `activeDomain` is
-set, it renders a fading backdrop plus a scaling `role="dialog"` card. The card
-is positioned with framer-motion `x`/`y: "-50%"` (not a raw CSS transform)
-because framer owns the transform while animating scale and would otherwise
-drop the centring translate. The card shows a large faint watermark of the
-abbreviation, a close button, the domain name, and its description.
-
-**Why it exists.** Communicates the club's six domains interactively on the
-landing page. The `x`/`y` centring detail is a deliberate workaround for a
-framer-motion transform conflict; the scroll lock and Escape handling make the
-popup behave like a proper modal.
+**Why it exists.** Communicates the club's six domains interactively without a
+modal; the back face holds the description the old modal used to.
 
 ---
 
@@ -544,79 +542,82 @@ without a static list. The modulo and `??` guard keep `index` always in range.
 
 ## join/JoinClient.tsx
 
-**Purpose.** Client component: the four-step recruitment application form on
-/join, driven by a single `<form>` element. Includes a closed-recruitment
-gate, a cookie-based already-applied deterrent, a honeypot, domain tiles, and a
-success screen.
+**Purpose.** Client component: the four-step recruitment application on /join
+(rebuilt S81, reordered S82B), one `<form>` element. Includes the
+closed-recruitment screen, a cookie-based already-applied deterrent, a honeypot,
+and a success screen.
 
-**Props.**
-- `recruitmentOpen: boolean` -- when false, the whole form is replaced by a
-  "recruitment closed" screen.
+**Props.** `recruitmentOpen: boolean` -- false replaces everything with the
+"recruitment closed" screen.
 
-`DOMAINS` (six values: Coding, Automotives, Sponsorship, Robotics, Operations,
-Social Media) and `SEMESTERS` (1st/3rd/5th) are module constants; the comment
-notes these must stay in sync with `/api/join` and the DB CHECK constraints
-(migration 004).
+**Single source of truth.** Domains, their ORDER, labels, test tracks, question
+sets, every question, the courses and the link rules all come from
+`src/lib/utils/joinQuestions.ts` (`JOIN_DOMAINS`, `TRACKS` / `TRACK_STAGES`,
+`QUESTION_SETS`, `GENERAL_QUESTIONS`, `COURSES`, `LINK_RULES`). `/api/join` validates
+against the same module, and `visibleQuestions(domains, answers)` is the one walk
+both sides use to decide what is shown -- so a required flag, a max length, an
+option list or a show/hide rule cannot differ between the form and the server.
+Nothing in this component restates the domain order.
 
 **State.**
-- `form: FormData` -- all text fields: name, email, mobile_number, srn_prn,
-  semester, why_join, value_addition, domain_experience,
-  design_portfolio_url, and `website` (the honeypot).
-- `selectedDomains: Domain[]` -- chosen domains, capped at `MAX_DOMAINS` (3).
-- `step: Step` -- current step, 1-4.
-- `status` -- "idle" | "submitting" | "success" | "error".
-- `errorMsg: string` -- the current validation/submit error text.
-- `alreadyApplied: boolean` -- set from a cookie check on mount.
+- `form` -- name, email, mobile_number, srn_prn, semester, course, course_other,
+  and `website` (the honeypot).
+- `answers: JoinAnswers` -- every page 3/4 answer keyed by question id. Kept across
+  domain changes, so going Back loses nothing; only visible questions are sent.
+- `idKind` -- the SRN / PRN toggle (S73F). `selectedDomains` (max 3), `step`,
+  `status`, `errorMsg`, `alreadyApplied`.
 
 **Steps.**
-1. WHO ARE YOU -- name, email, mobile (pattern-validated), SRN/PRN, and a
-   semester tile group.
-2. WHERE YOU WANT TO BUILD -- the domain tile selector (1-3, with a live
-   count and dimmed tiles once the cap is hit).
-3. WHY VEGAVATH -- why_join and value_addition textareas.
-4. YOUR EXPERIENCE -- domain_experience textarea, plus a conditional portfolio
-   link field that appears (and is required) only when "Social Media" is
-   selected.
+1. WHO ARE YOU -- a "Before you start" note (answers are read; one-word or
+   low-effort answers may not be taken forward; please do not use AI), name,
+   email, mobile (10 digits, filtered as typed), SRN / PRN with its toggle,
+   semester tiles, and **Course** (`B.Tech CSE` / `AIML` / `ECE` / `BBA` / `Other`,
+   Other revealing a required text box).
+2. WHERE YOU WANT TO BUILD -- five equal-size tiles in the fixed order
+   (Automotives, Robotics, Coding, Design & Social Media, Operations &
+   Sponsorship), 1-3 picks. A merged domain is ONE tile and one stored value.
+3. WHY VEGAVATH -- the four general questions.
+4. YOUR EXPERIENCE -- the **Recruitment Process** block, listing only the tracks
+   that contain one of the applicant's domains and naming only those (test track:
+   Application Form -> Domain-Specific Test -> Interview; interview track:
+   Application Form -> Interview); then "Domain Specific Questions": each selected
+   domain's set, in order. Automotives and Robotics share one set (titled with
+   only the picked ones); the two merged domains show **branch sub-headings**
+   ("Social Media" / "Design", "Operations / Logistics" / "Sponsorship"), each shown
+   only once one of its questions is visible. Sets with a link field open with the
+   "No portfolio ready? That's okay." note. A quiet no-AI reminder sits above
+   SUBMIT.
 
 **Key functions.**
-- `handleChange(e)` -- generic controlled-input updater keyed by input name.
-- `toggleDomain(d)` -- adds/removes a domain, silently ignoring clicks past the
-  3-domain cap.
-- `clearError()` -- clears the error and resets status from "error" to "idle".
-- `goBack()` -- decrements the step (floored at 1).
-- `validateStep(s)` -- JS validation for the tile selectors only (step 1 needs
-  a semester; step 2 needs >=1 domain); text fields rely on native
-  required/type/pattern validation.
-- `submitApplication()` -- POSTs to **`/api/join`** with the full payload
-  (domains mapped to `domain_interest`, `domain_interest_2`,
-  `domain_interest_3`; `design_portfolio_url` sent only if Social Media is
-  chosen; `website` honeypot included). On success it sets a `vg_applied=1`
-  cookie (30-day max-age) and flips status to "success"; on non-OK it shows the
-  server error; network failures show a generic message.
-- `handleSubmit(e)` -- one submit handler for all steps: runs `validateStep`,
-  then either advances the step or (on step 4) calls `submitApplication`.
+- `renderQuestion(q)` -- one renderer for every question: textareas (`minLength`
+  10 and `maxLength` 2000 -- `minLength` only fires on a non-empty value, so an
+  optional answer can stay blank), checkbox groups (options from `optionsFor`, an
+  "Other" text box when ticked), and link inputs (`type="url"` with the
+  `LINK_RULES` pattern, placeholder and hint; never `required`, and an empty value
+  skips `pattern`).
+- `validateStep(s)` -- the JS checks native validation cannot do: a semester
+  (step 1), at least one domain (step 2), at least one option for each visible
+  required checkbox group (step 4).
+- `answersPayload()` -- only VISIBLE questions' answers, with multi-selects
+  filtered through what is actually offered; a deselected domain's set, or a
+  Design question after unticking Design, is dropped here (and again server-side).
+- `submitApplication()` -- POSTs `/api/join` with the domains sorted into
+  `JOIN_DOMAINS` order (`sortDomains`, S82B -- the form never asks for a ranking,
+  so click order carried no meaning), `course` / `course_other`, and `answers`. On
+  success `markApplied()` (module scope -- the React compiler flags a global write
+  inside a component) sets the 30-day `vg_applied` cookie.
+- `handleSubmit(e)` -- one handler for every step: `validateStep`, then advance or
+  submit.
 
-A mount effect reads `document.cookie` and, if `vg_applied=` is present, sets
-`alreadyApplied`.
+**Render logic.** Closed screen / success screen / the split layout: a branding
+panel ("JOIN THE TEAM", "5 domains", one line per track from `TRACKS`) and the
+form panel with the numbered step indicator, the current step, an error line,
+and NEXT / SUBMIT APPLICATION / Back. If `alreadyApplied`, the panel shows an
+"already applied this cycle" message instead.
 
-**Render logic.**
-- If `!recruitmentOpen` -> a "Recruitment is currently closed" screen with an
-  Instagram link and a back-home link.
-- Else if `status === "success"` -> an "Application received / You're on the
-  grid" confirmation screen.
-- Else the split layout: a branding panel ("JOIN THE TEAM", six domains) and
-  the form panel. If `alreadyApplied`, the form panel shows an "already applied
-  this cycle" message instead of the form. Otherwise it renders the step
-  indicator (Step N of 4 plus progress bars), the current step's fields, an
-  inline error line when `status === "error"`, and the submit button (label
-  cycles NEXT -> SUBMIT APPLICATION -> SUBMITTING...) with a Back button from
-  step 2 on. The honeypot `website` input is hidden and rendered on every step.
-
-**Why it exists.** Splitting the long application into four steps reduces
-drop-off and lets each step validate before advancing. The cookie check is
-explicitly a casual-spam deterrent only (clearing cookies bypasses it) -- the
-server (`/api/join`) stays the source of truth via the honeypot and validation.
-The Social-Media-only portfolio field keeps the form short for everyone else.
+**Why it exists.** Four short steps reduce drop-off and validate as they go;
+only the questions for the domains an applicant chose are asked. The cookie is a
+casual deterrent only -- `/api/join` stays the source of truth.
 
 ---
 
@@ -915,7 +916,9 @@ it is, plus anything non-obvious.
 The native event registration form behind `/events/[slug]/register`, which
 replaced the old external Google Form link. Validation lives server-side:
 unknown event 404s, closed registration 409s, duplicate email 409s matched
-case-insensitively.
+case-insensitively. Phone and SRN/PRN use the shared validators (S73F); the
+phone field is capped at 10 and digit-filtered as typed (S73I, S76B), with
+generic example values (S73H).
 
 ### posts/InstagramEmbed.tsx
 Renders an Instagram post embed inside a blog post body.
@@ -942,8 +945,10 @@ GLB. As with `KartModelWrapper`, this renders on **all** viewports; the mobile
 placeholder was removed deliberately and must not be reintroduced.
 
 ### home/ProjectsTeaser.tsx
-Homepage teaser linking into `/projects`, populated dynamically rather than
-from a hardcoded list.
+Homepage teaser linking into `/projects`, from a hardcoded `PROJECTS` roster:
+Go-Kart (Automotives), Maze Solver (Robotics, added S78A), Combat Bot
+(Robotics). Add a project here when its page ships. Scroll-linked motion via
+framer-motion's `useScroll`.
 
 ### home/TypewriterSubtitle.tsx
 Typewriter animation for the hero tagline.
@@ -990,3 +995,29 @@ DPDP consent notice shown alongside forms that collect personal data.
 Reuse note: this `ui/` set is exactly the "reuse before inventing" surface that
 `CLAUDE.md` calls the number-one failure mode. Check here before writing a new
 reveal, button, cursor, or blur.
+
+## Components added since S72D (S73-S82)
+
+### home/AnnouncementBanner.tsx
+The homepage announcement slot (S73E). A **server component** by design: one
+active slot, no rotation, nothing to make interactive. The home page renders it
+only when `getActiveAnnouncement()` returned a row, so there is no empty state.
+Shows the title, optional body, a CTA button only when both `cta_label` and
+`cta_href` are set, and separate desktop and mobile images (`image_url_desktop` /
+`image_url_mobile`) so each can be cropped for its own aspect ratio; with only
+one set, that one is used at every size. Turning an announcement off takes up to
+a minute to disappear (the home page is `revalidate = 60`), by design.
+
+### projects/MazeSolver.tsx, projects/MazeGrid.tsx, projects/useMazeSolver.ts
+The `/projects/maze-solver` demo (S78). The maze is FIXED: an 8x8 grid of wall
+bitmasks in `src/lib/maze/data.ts`. A visitor chooses the start and goal cells
+(a Start / Goal select mode) and the robot's starting heading, presses Solve,
+and watches the BFS frontier expand and the shortest path animate; the panel
+then shows the path as (x, y) cells, the absolute directions, the robot command
+sequence (copyable), the move count and the final heading, with Replay and
+Reset. `MazeGrid` draws the cells and walls; `useMazeSolver` owns only the
+timers and React state (`ROBOT_STEP_MS` and friends, tuned for a TV-legible booth
+pace). The solving itself is pure TypeScript in `src/lib/maze/` -- `bfs` in
+`solve.ts`, `pathToAbsoluteDirections` / `absoluteDirectionsToRobotCommands` in
+`directions.ts` -- with Vitest tests (`solve.test.ts`).
+

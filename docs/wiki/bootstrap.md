@@ -6,10 +6,10 @@ Everything below is drawn from the source: the service layer
 (`src/lib/services/bootstrap.ts`), the pages under `src/app/bootstrap/`, the
 admin dashboard under `src/app/(admin)/admin/bootstrap/`, the API routes under
 `src/app/api/bootstrap/` and `src/app/api/admin/bootstrap/`, the components in
-`src/components/bootstrap/`, migrations `007`-`017` plus `021` and `025`, and
-the design record in `docs/bootstrap-spec.md`.
+`src/components/bootstrap/`, migrations `007`-`017`, `021`, `025` and
+`027`-`029`, and the design record in `docs/bootstrap-spec.md`.
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 > Terminology note: `docs/bootstrap-spec.md` has a "CURRENT STATE (Session 38)"
 > block at the top that supersedes the older "FABLE NOTES" design record below
@@ -24,6 +24,16 @@ _Current as of Session 72D (2026-08-12)._
 > all checked server-side rather than only in the UI. See "Stall ownership
 > and the switch-request flow" below. Migration `025` backs this and is
 > applied.
+
+> Event-day rebuild (S73B-S78B): the stall board is now built around GROUPS.
+> A stall's status is derived on read; the queue is a table of waiting groups
+> (`bootstrap_stall_queue`, migration `027`) that releasing never clears; a
+> stall volunteer names which group arrived, which writes a visit row
+> (`bootstrap_stall_visits`, `028`) that is also the occupancy record and feeds
+> each student's checklist and the lead's roster; and stalls carry a group
+> capacity (`max_groups`, `027`) and an optional time limit that runs a
+> countdown on the lead's phone (`time_limit_minutes`, `029`). Migrations
+> `027`-`029` are applied (every migration through `031` is).
 
 ---
 
@@ -40,14 +50,16 @@ The system coordinates three moving parts on the day:
 
 1. Volunteers -- the people running stalls and walking groups around.
 2. Stalls -- physical stations (Go-Kart, BMW Display, Avions, Engines, etc.)
-   whose live status (free / occupied / queued) volunteers keep updated.
-3. Visitors and groups -- freshers who check in via QR into a lettered group
-   walked by a "lead" volunteer, and later leave feedback.
+   whose live state -- which groups are at them, which are waiting -- volunteers
+   keep updated.
+3. Visitors and groups -- freshers who check in via QR into a numbered group
+   walked by a "lead" volunteer, follow their group's stall checklist, and later
+   leave feedback.
 
 What it is NOT: it is not a recruitment data-entry tool. Students who want to
 apply to the club scan a separate banner QR that points at `/join` (unrelated
-to Bootstrap). Bootstrap only tracks stall status, group logistics, visitor
-check-ins, and post-event feedback. The traditional fallback if the system
+to Bootstrap). Bootstrap only tracks stall status, group logistics and stall
+visits, visitor check-ins, and post-event feedback. The traditional fallback if the system
 fails is a Google Sheet on the captive portal.
 
 ### Why polling, not WebSockets
@@ -71,8 +83,8 @@ role TEXT NOT NULL DEFAULT 'stall' CHECK (role IN ('stall', 'lead'))
 
 | Role | What they do | UI they get |
 | --- | --- | --- |
-| `stall` | Stationed at one stall all day. | `StallVolunteerView.tsx` -- a stripped-down view: pick your stall once, then a single OCCUPIED/FREE toggle. No queue, no map, no notifications. |
-| `lead` | Walks a visitor group around. | The full `BootstrapDashboard.tsx` -- stall grid, SVG map button, queue actions, freed-stall/redirect notifications, classroom-mode toggle, a group number, and a personal QR check-in link. |
+| `stall` | Stationed at one stall all day. | `StallVolunteerView.tsx` -- locked to their assigned stall (S72B): GROUP ARRIVED (name the group), RELEASE / GROUP LEFT, and a switch request. No queue, no map, no notifications. |
+| `lead` | Walks a visitor group around. | The full `BootstrapDashboard.tsx` -- stall grid, map, queue actions, advisory placements, freed-stall/redirect notifications, classroom mode, the group number and headcount, the roster, the manual checklist, the stall countdown, and a personal QR check-in link. |
 
 The role is assigned at registration time (stall registrants get `'stall'`,
 group registrants get `'lead'`) and can be flipped afterward by an admin via
@@ -123,10 +135,16 @@ for the stall variant). It POSTs to `POST /api/bootstrap/register/stall` or
 
 Shared server-side rules in both routes:
 
-- Phone is normalised by `src/lib/utils/phone.ts` (`normalisePhone`): strips
-  `+91`/`91`, spaces, and punctuation, and must resolve to exactly 10 digits.
-- SRN must match `/^[a-zA-Z0-9]+$/` (letters and digits only) so it stays
-  typeable as a username. Name max 100, SRN max 30.
+- Phone is normalised by `src/lib/utils/phone.ts` (`normalisePhone`): keeps
+  digits only, strips a `91` country code and a leading trunk `0`, and must
+  resolve to exactly 10 digits.
+- SRN / PRN goes through `normaliseSrnPrn` (`src/lib/utils/srn.ts`, S73F):
+  whitespace stripped, uppercased, and it must match the real SRN shape
+  (`PES1UG21CS999`) or PRN shape (`PES1201912345`). Both are alphanumeric, so
+  the lowercased value stays typeable as a username. Name max 100. The forms
+  feed the same pattern sources into the HTML `pattern` attribute, so the
+  browser and the API cannot drift, and phone fields are capped at 10 and
+  filtered to digits as typed (S73I, S76B).
 - There must be an active session, or the route returns 404 "Registration is
   not open yet."
 - One account per SRN per session -- a duplicate returns 409 ("This SRN is
@@ -147,9 +165,9 @@ longer fit) / `registerGroupVolunteer` do the following:
   `/bootstrap`, a low-stakes internal tool, and the admin tables display the
   code so a volunteer who loses it can be told what it is.
 - Stall registrants are stored with `role = 'stall'` and their chosen stall in
-  `suggested_stall_id`. Important: registering does NOT claim the stall. It
-  stays FREE until the volunteer logs in and taps OCCUPIED when the first group
-  arrives.
+  `suggested_stall_id`. Important: registering does NOT claim the stall, and
+  neither does logging in (S72B). It stays FREE until the volunteer logs the
+  first group's arrival.
 - Group registrants are stored with `role = 'lead'` and a stable
   `checkin_token = randomBytes(20).toString("hex")` for their QR link.
 - S74B: a POOL registrant is stored with whichever of those two roles they picked,
@@ -178,18 +196,36 @@ The admin UI (`BootstrapCreateSession.tsx`) is a 2-step wizard:
 
 - Step 1: session name, number of visitor groups (1-26, default 4), and max
   visitors per group (1-100, default 20).
-- Step 2: add stalls one at a time -- stall name, max occupancy as a 1/2/3
-  segmented tile, and optional lead names (max 3, informational only, shown on
-  the stall card -- they do NOT create accounts anymore). Stalls can be
-  reordered with up/down arrows and removed before submitting.
+- Step 2: add stalls one at a time -- stall name; volunteer capacity
+  (`max_occupancy`, 1-4 since S77) and group capacity (`max_groups`, 1-3 at
+  setup, S73B) as two clearly labelled segmented pickers (S76G); an optional
+  time limit in whole minutes (S77, blank = no timer); and optional lead names
+  (max 4 since S78B, informational only, shown on the stall card -- they do NOT
+  create accounts). A past session's stall list can be imported as a starting
+  point (S49). Stalls can be reordered with up/down arrows and removed before
+  submitting.
 
 It POSTs to `POST /api/admin/bootstrap/sessions` (admin-guarded via `auth()` +
 `isAdmin`). That route calls, in order, `createBootstrapSession(name,
 maxGroupSize)`, `createBootstrapStalls(...)`, and
-`createBootstrapGroups(sessionId, groupCount)`. It creates NO volunteer
-accounts. On success the wizard shows the two registration links
-(`/bootstrap/register/stall` and `/bootstrap/register/group`) for the admin to
-share, replacing the old credentials CSV.
+`createBootstrapGroups(sessionId, groupCount)`, then
+`autoAssignPoolMembers(sessionId)`, which pulls pre-registered pool volunteers
+into the new session: a pooled stall volunteer whose typed preferred stall
+matches a new stall name (punctuation and case ignored) lands on that stall, and
+every pooled lead is claimed unconditionally. It creates NO new accounts. On
+success the wizard shows three registration links -- `/bootstrap/register/stall`
+and `/bootstrap/register/group` (open while the session is active) and the
+always-open `/bootstrap/register/pool` -- plus how many pool volunteers were
+auto-assigned.
+
+### Edit while live (S49, S73B)
+
+`PATCH /api/admin/bootstrap/sessions/[id]` renames a session or changes its
+visitor cap. `POST` / `DELETE /api/admin/bootstrap/sessions/[id]/stalls` adds
+or deletes a stall (an occupied stall cannot be deleted, 409).
+`PATCH /api/admin/bootstrap/stalls/[id]/max-groups` changes a stall's group
+capacity live, 1-10. Lowering a capacity gates new arrivals only; it never
+evicts groups already at the stall.
 
 When stalls are created, `createBootstrapStalls` tries to pre-fill each stall's
 map pin from `DEFAULT_STALL_POSITIONS` by matching keywords in the stall name
@@ -339,8 +375,11 @@ The page renders one of four states in `BootstrapCheckin.tsx`:
 - No context (bad token or no active session) -> "Not started yet".
 - Group already at capacity (`visitor_count >= max_group_size`) -> "This group
   is full!".
-- Otherwise a form: full name, PRN/SRN, phone (all required client-side).
-- After a successful POST -> a "Welcome! You're in {group}" screen.
+- Otherwise a form: full name, PRN/SRN, phone (all required; the shared SRN/PRN
+  and phone validators, S73F).
+- After a successful POST -> a "Welcome!" screen naming the group (as "Group
+  1", never a letter, S73K) with a link to the student's own checklist,
+  `/bootstrap/checklist/{visitorId}`, and a COPY button (S73D).
 
 `POST /api/bootstrap/checkin/[token]` re-resolves the context and calls
 `checkinVisitorToGroup`, whose capacity check and INSERT are a single statement:
@@ -358,71 +397,141 @@ gets 409 "This group is full!".
 `bootstrap_visitors` stores `name`, `prn`, `phone`, an optional `group_id`, and
 `arrived_at` (migration `014`).
 
+### The student checklist (S73D)
+
+`/bootstrap/checklist/[id]` is public; `[id]` is the visitor's own
+`bootstrap_visitors` row id, returned as `visitorId` by the check-in POST. The
+page is force-dynamic and renders `BootstrapChecklist` (a server component: a
+reload is the refresh) from `getVisitorChecklistContext`: the group, "N OF M
+STALLS DONE", and every stall marked DONE, HERE NOW (an open visit) or NOT YET.
+A bad id gets the same dead end as a bad check-in link, so the page never
+confirms whether a visitor exists. The data is the group's visit rows, so it is
+exactly as accurate as the stall volunteers' taps -- which is why the manual
+checklist backup below exists.
+
 ---
 
 ## Stall Dashboard (What a Volunteer Sees)
 
 `BootstrapDashboard.tsx` is the client component behind `/bootstrap` for a
 logged-in volunteer. It polls `GET /api/bootstrap/stalls` every 4 seconds. That
-endpoint returns all stalls for the volunteer's session plus per-volunteer
-extras: `mySuggestion` (admin stall suggestion), `volunteerRole`,
-`checkinToken`, `groupNumber`, and `inClassroom`. The role decides the whole
-view.
+endpoint returns all stalls for the volunteer's session -- each with its
+derived status, `occupants` (the groups at it, from open visits), its `queue`,
+`max_groups` and `time_limit_minutes` -- plus per-volunteer extras:
+`mySuggestion` / `mySuggestionId` (the assigned stall), the pending switch
+request, `volunteerNames` (display names only, never login codes),
+`myGroupId` and `myGroupSize` (leads), `volunteerRole`, `checkinToken`,
+`groupNumber`, and `inClassroom`. The role decides the whole view.
+
+**Stall status is derived on read** (`selectStalls`, S73B): nobody in
+`claimed_by` -> free; someone on it with groups queued -> queued; someone on it
+with an empty queue -> occupied. An empty stall with groups still waiting reads
+free. The stored `status` column is still written, so the table reads sensibly
+in the Neon console, but nothing reads it.
 
 ### Role = stall (`StallVolunteerView.tsx`)
 
-The simplest possible UI. A grid of stalls; tap one to claim it, which sets it
-OCCUPIED and pins it as "my stall" in local state (so it is remembered even
-after the volunteer marks it FREE, since release drops them from `claimed_by`).
-From then on a single big button toggles Mark occupied / Mark free. A "Switch
-stall" link releases and returns to the picker. No queue, map, or notifications.
+Locked to the assigned stall (S72B); with no assignment they see "waiting for
+an assignment", never a picker. The stall's card shows its status, **HERE NOW**
+(the groups at the stall, from open visits, S73C) and the volunteers on it.
+
+- **Group arrived** -- shown only while the stall has group capacity left
+  (`max_groups`). Opens "Which group just arrived?", listing the groups that
+  have NOT visited this stall yet (`GET /api/bootstrap/stalls/[id]/groups`;
+  queued groups sort first as a hint, not a turn order). Picking one logs the
+  visit and claims the stall. If every group has been, an escape claims the
+  stall with no visit row.
+- **Release** -- with one group here, a single tap that closes its visit. With
+  several, **Group left** opens "Which group is leaving?" (the groups here now)
+  so one group leaving never closes another's visit. The volunteer steps off the
+  stall only when the last group has gone. When a tap would take them off the
+  stall, a native confirm names anyone else still holding it and the groups
+  still waiting there.
+- **Request switch** -- the only multi-stall list left; it raises a switch
+  request instead of moving (see below).
+
+No queue, map, or notifications.
 
 ### Role = lead (full dashboard)
 
 - A header with the volunteer's display name, a "LIVE / Xs ago" freshness
   indicator, a CLASSROOM MODE toggle, a MAP button, and Sign out.
-- A "Your group" card (Group N or "Not assigned yet").
+- A "Your group" card: Group N (or "Not assigned yet"), the headcount with a
+  tap-to-open **roster** (S73D, `GET /api/bootstrap/roster`: names and SRN/PRN
+  only, never phones; the group comes from the cookie, so there is no id to
+  tamper with), and a **CHECKLIST** button opening the manual checklist backup
+  (S73G, below).
+- A **countdown** (S77, `StallTimeLimitCountdown`) while the group is at a stall
+  that has a time limit: computed from the visit's `arrived_at` on every tick
+  (never a tick count, which iOS Safari breaks by pausing background tabs),
+  amber under 4 minutes, red under 2 and when over time, with a chime once at 4
+  minutes and once at 2 minutes left. A threshold crossed while the tab was
+  hidden is marked fired and never plays late. The chime is primed on the lead's
+  first tap, because browsers block audio until the user interacts.
+- **Advisory placements** (S73D): a card for each stall the admin's distribute
+  pass placed this group at, with HEADING THERE (`accept_queued`) and NOT NOW
+  (`unqueue`).
 - A "Your group check-in link" card with the QR overlay.
 - The stall grid via `StallGrid` + `StallCard`.
 
 ### StallCard actions (the queue rules)
 
-`StallCard.tsx` computes which buttons to show from the stall status and
-whether the current user is in `claimed_by` / is the `queued_by` owner (rules
-from Session 25):
+`StallCard.tsx` shows each stall's status, its lead names, the volunteers on it,
+**Here now:** (groups at the stall) and **Waiting:** (every queued group in
+order, with its wait in minutes). Group names render through `groupLabel`
+("Group 1", S73K). The buttons (`volunteerButtons`, S73B):
 
-- `free` -> CLAIM (accent).
-- `occupied`, mine -> RELEASE + MARK QUEUED.
-- `occupied`, not mine, room left (`claimed_by.length < max_occupancy`) -> JOIN
-  + MARK QUEUED.
-- `queued`, I set the queue -> BACK TO OCCUPIED (and RELEASE if I also hold it).
-- `queued`, I hold it but did not queue it -> RELEASE only.
-- `queued`, neither -> read-only.
+- **Stall volunteers** -- claim / release only: nobody here -> Claim; on it ->
+  Release; others on it with room (`claimed_by.length < max_occupancy`) -> Join.
+  (In practice a stall volunteer sees `StallVolunteerView` instead.)
+- **Leads** -- their group is queued here -> Leave queue (`unqueue`); otherwise,
+  if someone is at the stall -> Mark queued (`mark_queued`). A lead whose group
+  is queued at a stall that just went free still gets Leave queue, because
+  release no longer clears the queue.
 
-Actions PATCH `/api/bootstrap/stalls/[id]` with `{ action }` where action is one
-of `claim | release | mark_queued | unqueue`. The route calls
-`updateStallStatus`, which implements each as a targeted SQL update:
+Actions PATCH `/api/bootstrap/stalls/[id]` with `{ action, group_id? }`, where
+action is `claim | release | mark_queued | unqueue | accept_queued`. Every rule
+is enforced in the route, not just the UI:
 
-- `claim`: appends the username to `claimed_by` (idempotent via a CASE guard),
-  status -> occupied.
-- `release`: removes the username; if nobody is left the stall goes free; always
-  clears `queued_by`/`queued_at`.
-- `mark_queued`: only fires on an occupied stall (a status guard so a stale card
-  cannot queue a just-freed stall); sets `queued_by` and `queued_at = now()`.
-  Any volunteer may queue any occupied stall (cooperative signal).
-- `unqueue`: only fires on a queued stall; back to occupied, clears the queue.
+- **Claim / release are stall-volunteer only, on their own stall** (403
+  otherwise). A claim with `group_id` records the visit FIRST
+  (`recordStallVisit`), then the claim, so a rejected visit leaves nothing
+  half-done. The visit INSERT carries its own guards: stall and group in the
+  caller's session, and fewer open visits than `max_groups`. Its
+  `UNIQUE(stall_id, group_id)` makes a double-tap harmless and is also a **hard
+  revisit ban**: "That group has already been to this stall" (409), "This stall
+  is already at its group capacity" (409). Release closes the named group's visit
+  ("Say which group is leaving", 400, when several are here and none is named)
+  and never clears the queue.
+- **Queue actions are lead-only** and write `bootstrap_stall_queue`. The group is
+  resolved server-side from the cookie, never from the body, so one lead cannot
+  queue or unqueue another's group. `addToQueue` guards in SQL: stall and group
+  in the caller's session, and somebody actually at the stall ("Nobody is at that
+  stall right now - head over instead", 409). The queue's
+  `UNIQUE(stall_id, group_id)` turns a double-tap into a no-op.
+  `accept_queued` confirms an admin placement; declining is plain `unqueue`.
 
-If a guarded action updates 0 rows (it raced a state change) the service returns
-the current row so the UI resyncs instead of erroring. The card also shows a
-wait timer next to a queued stall (`queued_at`), turning yellow past 20 minutes.
+If a guarded write updates 0 rows (it raced a state change) the service returns
+the current row so the UI resyncs instead of erroring.
 
 ### Freed-stall notifications and connection state
 
 For leads, each poll diffs the previous snapshot. When a stall transitions to
-free, the dashboard shows a toast; if the current user was the one queued on it
-(`queued_by === username`), the toast is emphasised ("... IS FREE -- YOUR GROUP
-CAN HEAD OVER"). Three consecutive failed polls flip a red "CONNECTION ISSUES -
-RETRYING..." banner.
+free, the dashboard shows a toast; if the lead's group is still in that stall's
+queue (read from the CURRENT row's queue, S73B), the toast is emphasised ("... IS
+FREE -- YOUR GROUP CAN HEAD OVER"). A lead who left the queue gets nothing. Three
+consecutive failed polls flip a red "CONNECTION ISSUES - RETRYING..." banner.
+
+### Manual checklist backup (S73G)
+
+When a stall volunteer forgets to log a visit, a lead (CHECKLIST on the group
+card, `GET` / `PATCH /api/bootstrap/checklist/manual`, own group only) or an
+admin (the Visitor Groups table,
+`/api/admin/bootstrap/sessions/[id]/groups/[groupId]/checklist`) can tick or
+clear stalls in `ManualChecklistPanel`, one shared control. A tick writes an
+already-closed visit row (`arrived_at` = `left_at` = now); a clear deletes a
+closed row. A stall the group is currently AT cannot be cleared here (409) --
+that belongs to the stall volunteer's release.
 
 ### Stall ownership and the switch-request flow (S72B / S72C)
 
@@ -441,11 +550,14 @@ every rule server-side. What holds now:
   `POST /api/bootstrap/switch-request`; an admin approves or denies it via
   `PATCH /api/admin/bootstrap/volunteers/[id]/switch-request`. Migration `025`
   adds `switch_requested_stall_id` and `switch_requested_at` to back it.
-- **Releasing a stall now asks for confirmation**, and the queue wipe that
-  accompanies it is scoped to the actual claimant rather than clearing more
-  than it should.
-- **A stall is auto-marked OCCUPIED when its volunteer logs in**, which
-  removes a manual step that was routinely forgotten on the day.
+- **Releasing a stall asks for confirmation** when the tap takes the volunteer
+  off it, naming anyone else who still holds it and the groups still waiting.
+  (S72C also scoped the queue wipe that used to accompany a release; since S73B
+  a release never touches the queue at all.)
+- **Logging in no longer marks a stall occupied** (S72B section G). Login used
+  to make the first tap a claim, which the board read as "a group is here". An
+  assigned volunteer now lands on their own stall's card while it is still
+  FREE, and occupancy starts only when they log a group's arrival.
 
 Known carry-over, unfixed: `assignGroupNumbers` can share a `group_number`
 between two leads when leads outnumber groups, which is why
@@ -496,12 +608,11 @@ There are two distinct "suggestion" mechanisms. Do not confuse them.
 
 ### 1. Automatic proximity redirect (client-side, leads only)
 
-Migrations `008`/`009` gave stalls map coordinates (`map_x`, `map_y`) and queue
-timing (`queued_by`, `queued_at`). On each poll, `BootstrapDashboard` looks for
-stalls that just freed with NO group already waiting (`queued_by == null`) while
-the current lead is queued somewhere else. It ranks those freed stalls by
-distance from the lead's queued stall and surfaces the nearest as "-> {name} is
-free and nearby". The distance is aspect-ratio corrected: percentage deltas are
+Migration `008` gave stalls map coordinates (`map_x`, `map_y`). On each poll,
+`BootstrapDashboard` looks for stalls that just freed with NO group waiting in
+their queue while the lead's group is queued somewhere else. It ranks those
+freed stalls by distance from the stall the group is queued at and surfaces the
+nearest as "-> {name} is free and nearby" (auto-dismissed after 12 seconds). The distance is aspect-ratio corrected: percentage deltas are
 scaled by the map's pixel dimensions (1024 x 419) so the metric is isotropic
 rather than overweighting the vertical axis. These suggestions are suppressed
 while the lead is in classroom mode.
@@ -577,6 +688,9 @@ Public page `src/app/bootstrap/feedback/page.tsx` renders
 - Q4 Likelihood to join Vegavath, 1-5.
 - Q5 Free-text suggestions (max 1000 chars).
 
+Its QR code is generated from the admin QR tool, `/admin/qr`, which lists
+`/bootstrap/feedback` since S76D (shareable, but not in the sitemap).
+
 It POSTs to `POST /api/bootstrap/feedback`. The route validates ranges (overall
 1-10 required; stall rating and join likelihood 1-5 if present), verifies any
 `stall_id` belongs to the active session, and calls `submitBootstrapFeedback`.
@@ -610,7 +724,7 @@ a SUMMARISE FEEDBACK button. It:
    the API).
 2. Computes average overall and join scores and builds a compact text prompt.
 3. Calls Google's Gemini 3.5 Flash
-   (`generativelanguage.googleapis.com/.../gemini-1.5-flash:generateContent`),
+   (`generativelanguage.googleapis.com/.../gemini-3.5-flash:generateContent`),
    requiring `GEMINI_API_KEY` (503 if unset), asking for a ~250-350 word
    leadership summary with fixed sections (Overall Experience, What Worked, What
    Needs Improvement, Stall Insights, Recruitment Signal, Top 3 Actionable
@@ -629,25 +743,40 @@ though middleware already guards `/admin` -- both layers are kept per the
 architecture contract. It loads all sessions and branches:
 
 - No active session -> `BootstrapSessions.tsx`: a table of sessions (name,
-  created date, stall count, status) with CREATE SESSION, plus ACTIVATE and
-  DELETE for inactive rows, and a stale-session nudge after 7 days.
+  created date, stall count, status) with CREATE SESSION, plus ACTIVATE, edit
+  and DELETE for inactive rows, and a stale-session nudge after 7 days; and the
+  **pre-registration pool** (see below).
 - Active session -> `BootstrapAdminDashboard.tsx`: the live control panel.
+
+Viewers see both read-only: every write control, including the Sheets export,
+is hidden, and every mutating route returns 403 for them.
 
 `BootstrapAdminDashboard` polls `GET /api/admin/bootstrap/sessions/[id]` every 4
 seconds, which returns stalls, volunteers, and groups together. It provides:
 
+- Header actions: **DISTRIBUTE GROUPS** (S73D, below), **END ALL VISITS** (S73C,
+  below), and **DEACTIVATE SESSION**.
+- Long-wait alerts, one per waiting GROUP (S73B -- it used to be one per stall),
+  from each queue entry's `queued_at`.
 - A stats bar: FREE / OCCUPIED / QUEUED counts and ACTIVE VOLUNTEERS count.
-- Long-wait alerts for any queue past 15 minutes (derived from polled data).
 - The shared feedback URL (`{origin}/bootstrap/feedback`). Per-lead check-in
   URLs are NOT shown here -- they live on each lead's own dashboard.
-- The stall grid where clicking a card opens an override form: pick status,
-  edit `claimed_by` as a comma-separated list, then Apply override ->
+- Add / remove stalls while live (S49).
+- The **stall table**: the volunteers behind each stall, the live group-capacity
+  control (1-10), the groups AT the stall, and the queue in order -- including
+  advisory placements not yet accepted. Expanding a stall opens the override
+  form: pick a status, edit `claimed_by` as a comma-separated list, Apply ->
   `PATCH /api/admin/bootstrap/stalls/[id]` (no conflict check; freeing always
-  clears `claimed_by`).
+  clears `claimed_by`). Because status is derived, the override's real effect is
+  on `claimed_by`; an admin cannot "mark a stall queued" -- the queue is groups.
+- **Visitor Groups** (S73G): Group, Lead, Checked in, and a CHECKLIST action
+  opening the same `ManualChecklistPanel` the leads use.
 - Two volunteer tables split by role (Stall Volunteers and Group Volunteers).
   Each shows name, username, stall or group, phone, the plaintext login code, an
-  ACTIVE / LOGGED OUT badge, and UNLOCK for active accounts. The group table
-  also has the SUGGEST STALL dropdown and an IN CLASS indicator.
+  ACTIVE / LOGGED OUT badge, UNLOCK for active accounts, RESET CODE, an inline
+  details editor (name / phone / SRN), and the role change. The group table also
+  has the SUGGEST STALL dropdown and an IN CLASS indicator; pending switch
+  requests get APPROVE / deny.
 - The feedback section (summary tiles, per-stall table, recent suggestions,
   REFRESH, and SUMMARISE FEEDBACK).
 - A collapsible "Stall positions on map" pin-drop editor.
@@ -658,24 +787,39 @@ Session-scoped, all under `/api/admin/bootstrap/`:
 
 | Route | Method | Purpose |
 | --- | --- | --- |
-| `sessions` | POST | Create session + stalls + groups. |
+| `sessions` | POST | Create session + stalls + groups, then auto-assign the pool. |
 | `sessions/[id]` | GET | Live poll: stalls + volunteers + groups. |
+| `sessions/[id]` | PATCH | Rename / change the visitor cap (S49). |
 | `sessions/[id]` | DELETE | Delete an inactive session (cascades). |
 | `sessions/[id]/active` | PATCH | Activate (deactivates others) / deactivate. |
+| `sessions/[id]/stalls` | POST, DELETE | Add a stall to a live session / delete one (S49). |
+| `sessions/[id]/distribute` | POST | Advisory auto-distribution of groups across stalls (S73D). |
+| `sessions/[id]/sweep-visits` | POST | Close every still-open visit (S73C). |
+| `sessions/[id]/groups/[groupId]/checklist` | GET, PATCH | Admin manual checklist for one group (S73G). |
 | `sessions/[id]/feedback` | GET | Feedback summary. |
 | `sessions/[id]/summarize` | POST | Gemini AI feedback summary. |
 | `sessions/[id]/groups` | POST | Ensure N groups, then auto-batch unassigned visitors round-robin. |
 | `sessions/[id]/visitors` | GET | Full visitor list, newest first. |
 | `sessions/[id]/map` | PATCH | Set the session map image URL. |
 | `stalls/[id]` | PATCH | Admin status/`claimed_by` override. |
+| `stalls/[id]/max-groups` | PATCH | Live group capacity, 1-10 (S73B). |
 | `stalls/[id]/position` | PATCH | Set/clear a stall's map pin. |
+| `volunteers/[id]` | PATCH, DELETE | Correct a volunteer's name / phone / SRN (S55); delete a pool entry (S55B). |
+| `volunteers/[id]/assign` | PATCH | Pull a pool member into a session, at a stall (S49). |
+| `volunteers/[id]/reset-code` | POST | Issue a new login code (S55C). |
 | `volunteers/[id]/unlock` | PATCH | Clear a stuck session token. |
 | `volunteers/[id]/role` | PATCH | Flip a volunteer between `stall` and `lead`. |
 | `volunteers/[id]/suggest` | PATCH | Point a volunteer at a stall (or clear). |
+| `volunteers/[id]/switch-request` | PATCH | Approve / deny a stall switch request (S72C). |
+| `volunteers/pool/export` | GET | CSV of the whole pre-registration pool (S73K). |
+| `volunteers/pool/export/google` | POST | The pool into the shared Google Sheet (S73K). |
+| `volunteers/pool/delete-all` | POST | Wipe the pool between events (S73K). |
 | `groups/[id]/lead` | PATCH | Assign / clear a group's team lead. |
 
 Every one of these begins by calling `auth()` and returning 401 unless
-`session.user.isAdmin`.
+`session.user.isAdmin`, and every mutating one then returns 403 for a viewer
+(S47). Request and response details for each are in
+[API Routes -- File Reference](/docs/files-api).
 
 ### Auto-batch visitors
 
@@ -684,6 +828,34 @@ exist, then `assignUnassignedVisitors` spreads every visitor with a null
 `group_id` across the groups round-robin by arrival order. Useful when visitors
 arrived without scanning a specific lead's QR.
 
+### Distribute groups (S73D)
+
+`sessions/[id]/distribute` (POST) is ADVISORY: `distributeGroups` writes
+suggestions as `bootstrap_stall_queue` rows with `accepted_at` NULL and no
+`volunteer_id`, and each lead accepts (HEADING THERE) or declines (NOT NOW) on
+their own dashboard. It is re-runnable and idempotent -- the candidates are
+groups with no queue row anywhere, so a second press only fills gaps and never
+reshuffles. Groups that fit nowhere simply get no row.
+
+### End all visits (S73C)
+
+Visits close only when a stall volunteer taps RELEASE, and at the end of a real
+event people just walk away. `sessions/[id]/sweep-visits` (POST) closes every
+still-open visit in the session and returns how many. It is deliberately its
+own action, not a side effect of deactivating the session.
+
+### The pre-registration pool (S49, S73K, S74B)
+
+Volunteers who register at `/bootstrap/register/pool` (always open, either
+role) sit in the pool with `session_id = NULL` until a session is created
+(auto-assign, above) or an admin assigns them. The pool table on the sessions
+view shows name, SRN, phone, **Prefers** (the preferred stall, or LEAD), the
+login code and when they registered, with ASSIGN (pick a session and stall),
+edit, RESET CODE and delete per row. Bulk actions: EXPORT CSV, EXPORT TO GOOGLE
+SHEETS (the "Pool Volunteers" tab of the shared sheet), and DELETE ALL, which
+confirms with the count and offers EXPORT FIRST. The wipe's SQL carries
+`WHERE session_id IS NULL`, so it can never reach an assigned volunteer.
+
 ---
 
 ## Data Model Quick Reference
@@ -691,9 +863,11 @@ arrived without scanning a specific lead's QR.
 | Table | Key columns | Introduced / extended |
 | --- | --- | --- |
 | `bootstrap_sessions` | `name`, `is_active`, `created_at`, `map_image_url`, `max_group_size` | `007`, `008` (map url), `015` (group size) |
-| `bootstrap_stalls` | `stall_number`, `stall_name`, `status` (free/occupied/queued), `max_occupancy` (1-3), `claimed_by TEXT[]`, `queued_by`, `queued_at`, `map_x`, `map_y`, `lead_names` | `007`, `008`, `009` (queued_at), `015` (lead_names) |
+| `bootstrap_stalls` | `stall_number`, `stall_name`, `status` (stored but derived on read), `max_occupancy` (1-4), `max_groups` (1-10), `time_limit_minutes`, `claimed_by TEXT[]`, `map_x`, `map_y`, `lead_names`; `queued_by` / `queued_at` unused since `027` | `007`, `008`, `009` (queued_at), `015` (lead_names), `027` (max_groups), `029` (time limit, occupancy 4) |
 | `bootstrap_volunteers` | `username`, `password_hash`, `display_name`, `current_session_token`, `role`, `suggested_stall_id`, `checkin_token`, `login_code`, `phone`, `srn`, `group_number`, `in_classroom`, `created_at`, `preferred_stall_name`, `switch_requested_stall_id`, `switch_requested_at` | `007`, `009`, `014` (role), `015` (checkin_token), `016` (self-register fields), `021` (nullable session_id + preferred_stall_name), `025` (switch request pair) |
 | `bootstrap_groups` | `name`, `team_lead_id`, `created_at` | `014` |
+| `bootstrap_stall_queue` | `stall_id`, `group_id`, `volunteer_id` (NULL = an admin placement), `queued_at`, `accepted_at`; UNIQUE(stall_id, group_id) | `027` |
+| `bootstrap_stall_visits` | `session_id`, `stall_id`, `group_id`, `volunteer_id`, `arrived_at`, `left_at` (NULL = here now); UNIQUE(stall_id, group_id) = the revisit ban | `028` |
 | `bootstrap_visitors` | `name`, `prn`, `phone`, `group_id`, `arrived_at` | `014` |
 | `bootstrap_feedback` | `stall_id`, `rating` (1-5 per-stall), `comment` (legacy), `overall_rating` (1-10), `memorable_stall`, `join_likelihood`, `suggestions`, `submitted_at` | `014`, `017` |
 
@@ -714,6 +888,10 @@ Notes:
   (`getPoolVolunteerBySrn`), not by the database.
 - Deleting a session still cascades to its assigned volunteers while pool
   members survive, which is why the `ON DELETE CASCADE` was left untouched.
+- Groups are stored as "Group A", "Group B" (the `UNIQUE(session_id, name)`
+  join key) but no UI renders the letter: `groupLabel`
+  (`src/lib/utils/group.ts`, S73K) shows "Group 1". Full column detail for
+  every table is in [Database Schema](/docs/database).
 
 ---
 
@@ -726,6 +904,7 @@ Notes:
 | `/bootstrap/register/group` | Public | Group volunteer self-registration. Needs an active session. |
 | `/bootstrap/register/pool` | Public | Pre-registration, always open, either role (S74B). |
 | `/bootstrap/checkin/[token]` | Public | Visitor check-in into a lead's group via QR. |
+| `/bootstrap/checklist/[id]` | Public (visitor row id) | The student's own stall checklist (S73D). |
 | `/bootstrap/feedback` | Public | Visitor feedback form. |
 | `/admin/bootstrap` | Admin (NextAuth) | Session list or the live control dashboard. |
 

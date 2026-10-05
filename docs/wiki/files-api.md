@@ -1,15 +1,8 @@
 # API Routes
 
-_Current as of Session 72D (2026-08-12). This per-handler reference was written
-against an earlier snapshot and does not yet cover every handler added since:
-`/api/admin/accounts/me`, `/api/admin/posts` (+ `[id]`), `/api/admin/team/reorder`,
-`/api/admin/events/[id]/registrations/[regId]`,
-`/api/admin/bootstrap/sessions/[id]/stalls`,
-`/api/admin/bootstrap/volunteers/[id]/{assign,reset-code,switch-request}`,
-`/api/bootstrap/switch-request`, `/api/events/[slug]/register`, and
-`/api/docs/auth`. **`docs/wiki/routes.md` is complete and verified against the
-filesystem (all 60 API routes), so treat it as authoritative for the
-inventory** and this file as the deeper per-handler notes.
+_Current as of Session 82C (2026-10-05). Every exported handler in every
+`route.ts` under `src/app/api` (73 files) has an entry here; `routes.md` is the
+one-line index of the same routes._
 
 Standing rule for any handler added here: a mutating admin route needs the
 `isViewer` write guard immediately after the `isAdmin` check. Omitting it is a
@@ -57,100 +50,86 @@ volunteer to the active session, so callers treat a non-null return as
 
 # Public API
 
-These five carry no auth. They are read-only GETs of already-public
-content (events, gallery, sponsors, team) or the recruitment intake form
-(`/api/join`). The security boundary is that they only ever expose data
-the public site already renders, and writes are limited to the single
-join form, which is rate-limited by a honeypot field, a server-side
-recruitment-open gate, and strict field validation before any row is
-created. All list queries carry a LIMIT in the service layer.
-
-## GET /api/events
-
-**Auth:** Public -- no session check. Safe because it returns only the
-public events list already shown on `/events`.
-**Purpose:** Fetch the public events list, optionally filtered by status.
-
-**Query/params:**
-- `status` (string, optional) -- `"upcoming"` routes to `getUpcomingEvents`, `"past"` routes to `getPastEvents`; any other/absent value falls through to `getEvents`.
-- `limit` (int, optional) -- defaults to 20 (`parseInt` of the param).
-
-**Response (2xx):** `200` JSON array of event rows.
-**Response (4xx/5xx):** `500` `{ error: "Failed to fetch events" }` on any thrown error.
-
-**Notes:** `export const dynamic = "force-dynamic"`. Calls
-`getEvents` / `getUpcomingEvents` / `getPastEvents` from
-src/lib/services/events.
-
-## GET /api/gallery
-
-**Auth:** Public -- returns only gallery content already shown on `/gallery`.
-**Purpose:** Fetch gallery items, or the list of gallery events, or items for one event.
-
-**Query/params:**
-- `eventsOnly` (string, optional) -- `"true"` returns `getGalleryEvents()` (distinct events that have gallery items).
-- `eventId` (string, optional) -- when present (and `eventsOnly` not "true"), returns `getGalleryByEvent(eventId)`.
-- `limit` (int, optional) -- defaults to 30; used only for the default `getGalleryItemsLimited` path.
-
-**Response (2xx):** `200` JSON array (shape depends on branch: gallery items or gallery-event summaries).
-**Response (4xx/5xx):** `500` `{ error: "Failed to fetch gallery items" }`.
-
-**Notes:** `dynamic = "force-dynamic"`. Services from src/lib/services/gallery.
+These three carry no session auth: the recruitment intake (`/api/join`),
+native event registration (`/api/events/[slug]/register`), and the docs
+password exchange (`/api/docs/auth`). Each entry says what bounds it. The
+four read-only public GETs this section used to list (`/api/events`,
+`/api/gallery`, `/api/sponsors`, `/api/team`) were deleted in S52B: they had
+no callers -- every public page reads through the service layer directly --
+and `/api/events` accepted an unclamped `?limit=`.
 
 ## POST /api/join
 
-**Auth:** Public -- this is the recruitment application intake. Abuse is
-bounded by (1) a hidden `website` honeypot field that silently returns
-success when filled, (2) a server-side `recruitment_open` settings gate
-that 403s when recruitment is closed, and (3) strict per-field validation
-before any DB write.
-**Purpose:** Submit a recruitment application.
+**Auth:** Public -- the recruitment application intake. Abuse is bounded by
+(1) a hidden `website` honeypot that silently returns success when filled,
+(2) the `recruitment_open` settings gate (403 when closed), (3) strict
+per-field validation before any write, and (4) the 10-character minimum on
+written answers (S81).
+**Purpose:** Submit a recruitment application (the S81 / S82B form).
 
 **Request body:**
-- `website` (any, optional) -- honeypot; if truthy, returns `{ success: true }` without doing anything.
-- `name` (string, required) -- trimmed, must be 2-100 chars.
-- `email` (string, required) -- must pass `isValidEmail`.
-- `domain_interest` (string, required) -- must be one of Coding, Automotives, Sponsorship, Robotics, Operations, Social Media.
-- `domain_interest_2`, `domain_interest_3` (string, optional) -- if present must be a valid domain.
-- `mobile_number` (string, optional) -- normalised via `normalisePhone` (strips +91/spaces); must resolve to 10 digits when supplied.
-- `srn_prn` (string, optional).
-- `semester` (string, optional) -- if present must be "1", "3", or "5".
-- `why_join`, `value_addition`, `domain_experience` (string, optional).
-- `design_portfolio_url` (string, optional) -- if present must pass `isValidUrl` (https).
+- `website` (any) -- honeypot; truthy returns `{ success: true }` and writes nothing.
+- `name` (string, required) -- trimmed, 2-100 chars. `email` (required) -- `isValidEmail`.
+- `mobile_number` (optional) -- `normalisePhone`, 10 digits when given.
+- `srn_prn` (optional) -- `normaliseSrnPrn`, either structure when given.
+- `semester` (optional) -- "1" | "3" | "5" when given. (The form requires these three.)
+- `course` (required) -- one of `COURSES`; `course_other` (required when course is
+  "Other", max 200) is what gets stored in that case.
+- `domain_interest` (required), `domain_interest_2`, `domain_interest_3` -- each one of
+  the five current keys (`DOMAINS`): Automotives, Robotics, Coding, Social Media,
+  Operations & Sponsorship. The pre-S82B "Operations" / "Sponsorship" are refused.
+- `answers` (object) -- validated by `parseJoinAnswers(answers, domains)`.
 
-**Response (2xx):** `200` `{ success: true, id }` on create; `200` `{ success: true }` on honeypot trip.
+**Response (2xx):** `200` `{ success: true, id }`; `200` `{ success: true }` on a honeypot trip.
 **Response (4xx/5xx):**
-- `403` `{ error: "Recruitment is currently closed" }` when `recruitment_open !== "true"`.
-- `400` for each failed validation (name length, invalid email, invalid domain, bad mobile, bad semester, bad portfolio URL) with a specific message.
-- `500` `{ error: "Failed to submit application" }`.
+- `403` `{ error: "Recruitment is currently closed" }`.
+- `400` per failed field (name, email, domain, mobile, SRN/PRN, semester, course), or
+  the first error `parseJoinAnswers` returns.
+- `500` `{ error: "Failed to submit application" }` -- including a missing column if
+  migration 030 / 031 were not applied.
 
-**Notes:** `VALID_DOMAINS` must stay in sync with JoinClient and the
-migration 004 CHECK constraint. Calls `getSetting`, `createApplication`.
-`portfolio_url` is always sent as null (only `design_portfolio_url` is used).
+**Notes:** `parseJoinAnswers` (src/lib/utils/joinQuestions.ts) walks
+`visibleQuestions(domains, answers)` -- the SAME walk the form renders from -- so
+only the general questions and the selected domains' visible questions are
+read; deselected domains' answers, questions hidden by a Design / Social Media
+or Automotives / Robotics checkbox, and unknown keys are dropped. Required text
+must be non-empty; any filled-in written answer must be at least 10 characters
+(trimmed) and at most 2000; multi-selects are filtered through their offered
+options; an "Other" tick needs its text. Links: an empty link is always valid;
+a filled one must pass its `LINK_RULES` check (Drive, https, Drive-or-repo, or
+GitHub/GitLab profile). Writes `course` and `answers` via `createApplication`;
+the pre-S81 question columns are left NULL. Domains arrive already sorted into
+/join order by the client.
 
-## GET /api/sponsors
+## POST /api/events/[slug]/register
 
-**Auth:** Public -- returns only active sponsors already shown on `/sponsors`.
-**Purpose:** Fetch active sponsors.
+**Auth:** Public (S47) -- native event registration, replacing the external
+`registration_form_url` link.
+**Purpose:** Register for an event.
 
-**Response (2xx):** `200` JSON array from `getActiveSponsors()`.
-**Response (4xx/5xx):** `500` `{ error: "Failed to fetch sponsors" }`.
+**Request body:** `name` (required), `email` (required, valid), `phone`
+(`normalisePhone`, 10 digits), `srn` (`normaliseSrnPrn`, S73F), `message` (optional).
+**Response (2xx):** `200` `{ success: true }`.
+**Response (4xx/5xx):** `404` unknown event (or a no-registration slug); `400` per
+failed field; `409` `{ error: "Registration is closed for this event" }`; `409`
+`{ error: "This email is already registered for this event" }` (case-insensitive
+match); `500` `{ error: "Failed to register" }`.
 
-**Notes:** `export const revalidate = 120` -- this route is ISR-cached for
-120s (the only public API route that is not `force-dynamic`).
+**Notes:** Calls `getEventBySlug`, `findEventRegistrationByEmail`,
+`createEventRegistration`.
 
-## GET /api/team
+## POST /api/docs/auth
 
-**Auth:** Public -- returns only public team members shown on `/crew`.
-**Purpose:** Fetch team members, optionally by tier.
+**Auth:** Public -- it is the way into `/docs` (S52B).
+**Purpose:** Exchange the shared docs password for the docs cookie.
+**Request body:** `password` (string).
+**Response (2xx):** `200` `{ ok: true }` with the cookie set.
+**Response (4xx/5xx):** `400` / `401` `{ error: "Incorrect password" }`.
 
-**Query/params:**
-- `tier` (string, optional) -- when one of `core` / `crew` / `legacy`, returns `getMembersByTier(tier)`; otherwise returns all via `getMembers()`.
-
-**Response (2xx):** `200` JSON array of member rows.
-**Response (4xx/5xx):** `500` `{ error: "Failed to fetch team members" }`.
-
-**Notes:** `dynamic = "force-dynamic"`. Services from src/lib/services/team.
+**Notes:** The cookie value IS the password -- no session table, no JWT;
+rotating `DOCS_PASSWORD` invalidates every cookie. Middleware does not gate this
+route (it starts with `/api`, not `/docs`). Threat model:
+docs/superpowers/plans/2026-07-26-docs-password-gate.md.
 
 ---
 
@@ -207,12 +186,12 @@ session (re-registration is refused).
 **Request body:**
 - `name` (string, required) -- trimmed, max 100.
 - `phone` (string, required) -- normalised via `normalisePhone`; must be 10 digits.
-- `srn` (string, required) -- trimmed, max 30, `[a-zA-Z0-9]` only (becomes the username).
+- `srn` (string, required) -- `normaliseSrnPrn` (S73F): whitespace stripped, uppercased, and it must match `SRN_PATTERN` (`PES1UG21CS999`) or `PRN_PATTERN` (`PES1201912345`). Lowercased, it becomes the username.
 - `stall_id` (string, required) -- must be a stall in the active session.
 
 **Response (2xx):** `200` JSON from `registerVolunteer` (the created login/code).
 **Response (4xx/5xx):**
-- `400` missing fields, invalid phone, field too long, non-alphanumeric SRN, or unknown stall.
+- `400` missing fields, invalid phone ("Phone must be 10 digits, no country code"), name over 100, malformed SRN/PRN ("SRN / PRN must look like PES1UG21CS999 or PES1201912345"), or unknown stall.
 - `404` `{ error: "Registration is not open yet" }` when no active session.
 - `409` `{ error: "This SRN is already registered..." }` when the SRN already exists in the session.
 - `500` `{ error: "Registration failed" }`.
@@ -265,11 +244,11 @@ the stall variant minus the stall selection.
 **Request body:**
 - `name` (string, required) -- trimmed, max 100.
 - `phone` (string, required) -- normalised; 10 digits.
-- `srn` (string, required) -- trimmed, max 30, alphanumeric only.
+- `srn` (string, required) -- `normaliseSrnPrn`, SRN or PRN (S73F), as for the stall route.
 
 **Response (2xx):** `200` JSON from `registerGroupVolunteer`.
 **Response (4xx/5xx):**
-- `400` missing fields, invalid phone, field too long, non-alphanumeric SRN.
+- `400` missing fields, invalid phone, name over 100, malformed SRN/PRN.
 - `404` no active session.
 - `409` SRN already registered.
 - `500` `{ error: "Registration failed" }`.
@@ -282,35 +261,54 @@ idempotent FCFS round-robin that numbers each lead as they arrive.
 **Auth:** Volunteer cookie -- `getVolunteerFromCookie()`, 401 if null.
 **Purpose:** Return the stall board plus this volunteer's dashboard context.
 
-**Response (2xx):** `200` `{ stalls, session: { map_image_url }, mySuggestion, volunteerRole, checkinToken, groupNumber, inClassroom }`.
-- `volunteerRole` defaults to `"stall"` (S32, picks the dashboard view).
-- `checkinToken` is the lead's stable QR token (S33); `groupNumber` FCFS (S35); `inClassroom` the S36 lead flag.
-**Response (4xx/5xx):** `401` `{ error: "Unauthorized" }`; `500` `{ error: "Failed to fetch stalls" }`.
-
-**Notes:** Runs `getBootstrapStalls(volunteer.session_id)` and
-`getActiveBootstrapSession()` in parallel.
+**Response (2xx):** `200` `{ stalls, session: { map_image_url }, mySuggestion,
+mySuggestionId, switchRequestStallId, switchRequestStallName, volunteerNames,
+myGroupId, myGroupSize, volunteerRole, checkinToken, groupNumber, inClassroom }`.
+- `stalls` -- `getBootstrapStalls`: derived status (S73B), group capacity, time limit
+  (S77), occupying groups and the queue.
+- `mySuggestionId` -- the volunteer's own stall id, so the client knows which stall is
+  theirs (S72B). `switchRequestStall*` -- a pending switch request (S72C).
+- `volunteerNames` -- username -> display name only (S72C); never login codes.
+- `myGroupId` (S73B) -- the lead's own group, so the client can tell "my group is in
+  this queue". Every queue mutation re-resolves it server-side.
+- `myGroupSize` (S73D) -- a headcount only; names come from /api/bootstrap/roster.
+- `volunteerRole` defaults to `"stall"`; `checkinToken` (S33), `groupNumber` (S35),
+  `inClassroom` (S36).
+**Response (4xx/5xx):** `401`; `500` `{ error: "Failed to fetch stalls" }`.
 
 ## PATCH /api/bootstrap/stalls/[id]
 
-**Auth:** Volunteer cookie.
-**Purpose:** Volunteer-facing stall state change (claim / release / queue).
+**Auth:** Volunteer cookie, plus role and ownership gates (S72B, S73B).
+**Purpose:** Volunteer stall actions.
 
 **Request body:**
-- `action` (string, required) -- one of `claim`, `release`, `mark_queued`, `unqueue`.
+- `action` (required) -- `claim` | `release` | `mark_queued` | `unqueue` | `accept_queued`.
+- `group_id` (optional) -- which group arrived (claim) or is leaving (release).
 **Query/params:** `id` (route param) -- stall id.
 
-**Response (2xx):** `200` the updated stall row.
+**Response (2xx):** `200` the updated stall.
 **Response (4xx/5xx):**
-- `401` unauthorized.
-- `400` `{ error: "Invalid action" }` when action is not in the allowed set.
-- `404` `{ error: "Stall not found" }` when the service returns null.
-- `500` `{ error: "Failed to update stall" }`.
+- `401`; `400` `{ error: "Invalid action" }`.
+- `403` "Group volunteers cannot claim or release a stall" / "You can only update the
+  stall you are assigned to" (claim / release are stall-volunteer only, own stall).
+- `403` "Only group leads can queue for a stall"; `400` "You have no group assigned yet".
+- `404` stall not found; `409` "Nobody is at that stall right now - head over instead"
+  (queueing at a free stall); `400` "Say which group is leaving" (release on a
+  multi-group stall without `group_id`); `500` "Failed to update stall".
 
-**Notes:** Calls `updateStallStatus(id, volunteer.username, action)`.
-Per the source comment, `mark_queued` is cooperative (any volunteer, no
-claim); `unqueue` is only UI-gated to the queuer and is not re-checked
-here (a stale tap is harmless -- `array_remove` of an absent name is a
-no-op).
+**Notes:**
+- Queue actions (S73B) are LEAD-ONLY and write `bootstrap_stall_queue`; the group
+  is resolved server-side from the cookie, never from the body, so one lead cannot
+  queue or unqueue another's group. `accept_queued` (S73D) confirms an admin
+  auto-placement; declining one is plain `unqueue`.
+- Claim / release (S73C) also move a group through `bootstrap_stall_visits`: the
+  visit is recorded FIRST, then the claim, so a rejected visit leaves nothing
+  half-done. Claim without `group_id` is the "every group has already visited"
+  escape -- the stall is marked occupied with no visit row. Release closes the
+  named group's visit, and the volunteer steps off the stall only when the LAST
+  group has gone. Releasing never clears the queue.
+- Calls `addToQueue`, `removeFromQueue`, `acceptQueuePlacement`, `recordStallVisit`,
+  `closeStallVisit`, `updateStallStatus`.
 
 ## PATCH /api/bootstrap/classroom
 
@@ -353,27 +351,25 @@ when no `stallId` is present.
 
 ## POST /api/bootstrap/checkin/[token]
 
-**Auth:** Token-gated public (S33) -- the per-lead token in the URL is the
-gate; it resolves to exactly one lead's group in the active session. No
-account involved.
+**Auth:** Token-gated public (S33) -- the per-lead token in the URL resolves to
+exactly one lead's group in the active session. No account involved.
 **Purpose:** Check a visitor into a group via the lead's QR link.
 
-**Request body:**
-- `name` (string, required) -- max 100.
-- `prn` (string, required) -- max 30.
-- `phone` (string, required) -- max 20.
-**Query/params:** `token` (route param) -- the lead's per-lead check-in token.
+**Request body:** `name` (required, max 100), `prn` (required; SRN or PRN via
+`normaliseSrnPrn`, S73F), `phone` (required; `normalisePhone`, 10 digits, S73F).
+**Query/params:** `token` (route param).
 
-**Response (2xx):** `200` `{ groupName, sessionName }`.
+**Response (2xx):** `200` `{ groupName, sessionName, visitorId }`. `visitorId` (S73D)
+is the visitor's own row id, which the UI links to /bootstrap/checklist/[id].
 **Response (4xx/5xx):**
-- `400` missing fields, field too long, or `{ error: "This link has no group assigned yet..." }` when `ctx.group_id` is null.
-- `404` `{ error: "Invalid check-in link or no active Bootstrap session" }` when the token resolves to nothing.
-- `409` `{ error: "This group is full!..." }` when `checkinVisitorToGroup` returns false (capacity reached).
-- `500` `{ error: "Check-in failed" }`.
+- `400` missing fields, field too long, malformed SRN/PRN or phone, or "This link has
+  no group assigned yet - ask an organiser".
+- `404` "Invalid check-in link or no active Bootstrap session".
+- `409` "This group is full! Ask a different group lead to scan you in."
+- `500` "Check-in failed".
 
-**Notes:** `getCheckinContext(token)` yields `{ session_id, group_id,
-max_group_size, group_name, session_name }`; capacity is enforced inside
-`checkinVisitorToGroup`.
+**Notes:** `getCheckinContext(token)`, then `checkinVisitorToGroup`, which enforces
+capacity. Group names reach the visitor through `groupLabel` ("Group 1", S73K).
 
 ## POST /api/bootstrap/suggestion/dismiss
 
@@ -386,33 +382,94 @@ max_group_size, group_name, session_name }`; capacity is enforced inside
 **Notes:** Calls `suggestStallToVolunteer(volunteer.id, null)` -- clearing
 the suggestion by setting it to null.
 
+## GET /api/bootstrap/stalls/[id]/groups
+
+**Auth:** Volunteer cookie; stall volunteers only, on their own stall.
+**Purpose:** The groups this stall may still receive -- every group in the session
+that has not visited it yet (S73C). Feeds the "which group just arrived?" picker.
+**Response (2xx):** `200` `{ groups }`.
+**Response (4xx/5xx):** `401`; `403` "Only stall volunteers log group arrivals" /
+"You can only update the stall you are assigned to"; `500` "Failed to load groups".
+
+**Notes:** Same gates as the claim it feeds, so the list a volunteer can see is
+the list they can act on. A convenience only -- the claim re-validates the chosen
+group server-side. Calls `getUnvisitedGroups`.
+
+## GET /api/bootstrap/roster
+
+**Auth:** Volunteer cookie; leads only (`403` "Leads only").
+**Purpose:** The lead's own group roster (S73D).
+**Response (2xx):** `200` `{ roster }` (empty when the lead has no group yet).
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to load roster".
+
+**Notes:** No parameters at all -- the group comes from the cookie volunteer, so
+there is no group id to tamper with. Name and SRN/PRN only; `getGroupRoster` never
+selects phone numbers.
+
+## GET, PATCH /api/bootstrap/checklist/manual
+
+**Auth:** Volunteer cookie; leads only, for their own group (`requireLeadGroup`):
+`401`; `403` "Only group leads can edit their group's checklist"; `400` "You have no
+group assigned yet - ask an admin".
+**Purpose:** The lead half of the manual checklist backup (S73G).
+
+**Request body (PATCH):** `stall_id` (required), `visited` (boolean).
+**Response (2xx):** `200` `{ stalls }` -- the group's checklist after the change.
+**Response (4xx/5xx):** `400` "stall_id is required"; `409` "Your group is currently
+marked present at this stall. Ask the stall volunteer to mark you as moved on
+first."; `500`.
+
+**Notes:** `visited: true` -> `markStallVisitedManually` (writes an already-closed
+visit row); `false` -> `clearStallVisitManually`. An OPEN visit cannot be cleared
+here -- that belongs to the stall volunteer's release.
+
+## POST /api/bootstrap/switch-request
+
+**Auth:** Volunteer cookie; stall volunteers only.
+**Purpose:** Ask to move to a different stall (S72C, migration 025).
+**Request body:** `stall_id` (required).
+**Response (2xx):** `200` `{ ok: true }`.
+**Response (4xx/5xx):** `401`; `400` "stall_id is required" / "That stall cannot be
+requested. Ask an admin to move you."; `403` "Only stall volunteers can request a
+stall switch"; `500`.
+
+**Notes:** Records the ASK only; nothing is reassigned until an admin approves via
+PATCH /api/admin/bootstrap/volunteers/[id]/switch-request. Stall volunteers are
+locked to their own stall (S72B), so this is the sanctioned way to move.
+
 ---
 
 # Admin -- Bootstrap ops
 
 All under `/api/admin/bootstrap/*`. Every handler runs `await auth()` and
-returns `401 { error: "Unauthorized" }` unless `session.user.isAdmin`.
-Middleware also guards the path; the in-route check is the second layer.
+returns `401 { error: "Unauthorized" }` unless `session.user.isAdmin`;
+every mutating handler then returns `403` for a viewer (S47). Middleware also
+guards the path; the in-route check is the second layer.
 
 ## POST /api/admin/bootstrap/sessions
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard.
 **Purpose:** Create a Bootstrap session with its stalls and empty visitor groups.
 
 **Request body:**
-- `name` (string, required) -- trimmed, non-empty.
-- `stalls` (array, required, >=1) -- each `{ stall_name (string, required), max_occupancy (1|2|3, required), lead_names? (string[], max 3, each <=100 chars) }`.
-- `group_count` (number, optional) -- default 4; integer 1-26 (groups are lettered A-Z).
-- `max_group_size` (number, optional) -- default 20; integer 1-100.
+- `name` (string, required).
+- `stalls` (array, required, >=1) -- each `{ stall_name, max_occupancy (1-4, S77),
+  max_groups (1-3 at setup), time_limit_minutes? (whole minutes >= 1, or blank / null
+  for no timer, S77), lead_names? (string[], max 4 since S78B, each <= 100 chars) }`.
+- `group_count` (optional) -- default 4; integer 1-26.
+- `max_group_size` (optional) -- default 20; integer 1-100.
 
-**Response (2xx):** `200` `{ session }` (S35: no volunteer accounts are created here anymore).
-**Response (4xx/5xx):**
-- `400` missing name/stalls, group_count out of 1-26, max_group_size out of 1-100, bad stall name/occupancy, >3 lead names, or lead name >100 chars.
-- `500` `{ error: "Failed to create session" }`.
+**Response (2xx):** `200` `{ session, autoAssigned }` -- `autoAssigned` is how many
+pre-registered pool volunteers `autoAssignPoolMembers` pulled in.
+**Response (4xx/5xx):** `401`; `403` viewer; `400` "Name and at least 1 stall
+required", group count / max group size out of range, "Every stall needs a name
+and occupancy 1-4", "Every stall needs groups 1-3", "Time limit must be a whole
+number of minutes, or blank", "Max 4 lead names per stall", "Lead names max 100
+chars"; `500` "Failed to create session".
 
-**Notes:** Calls `createBootstrapSession`, `createBootstrapStalls`
-(stall_number assigned by array index+1), `createBootstrapGroups`.
-`lead_names` are informational only now (no accounts created).
+**Notes:** Calls `createBootstrapSession`, `createBootstrapStalls` (stall_number =
+index + 1), `createBootstrapGroups` (stored "Group A", shown "Group 1"),
+`autoAssignPoolMembers`. `lead_names` are informational only.
 
 ## GET /api/admin/bootstrap/sessions/[id]
 
@@ -425,7 +482,7 @@ Middleware also guards the path; the in-route check is the second layer.
 
 ## DELETE /api/admin/bootstrap/sessions/[id]
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete an inactive session (stalls + volunteers cascade).
 **Query/params:** `id` (route param).
 
@@ -434,7 +491,7 @@ Middleware also guards the path; the in-route check is the second layer.
 
 ## PATCH /api/admin/bootstrap/sessions/[id]/active
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Mark a session active/inactive.
 
 **Request body:**
@@ -457,7 +514,7 @@ Middleware also guards the path; the in-route check is the second layer.
 
 ## POST /api/admin/bootstrap/sessions/[id]/groups
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Ensure N groups exist, then round-robin all unassigned visitors across them.
 
 **Request body:**
@@ -471,7 +528,7 @@ Middleware also guards the path; the in-route check is the second layer.
 
 ## PATCH /api/admin/bootstrap/sessions/[id]/map
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Set the session's campus-map image URL.
 
 **Request body:**
@@ -487,7 +544,7 @@ paste a valid https R2 URL.
 
 ## POST /api/admin/bootstrap/sessions/[id]/summarize
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Generate an AI admin summary of a session's feedback via Gemini.
 **Query/params:** `id` (route param).
 
@@ -501,7 +558,7 @@ paste a valid https R2 URL.
 
 **Notes:** Reads raw rows via `getBootstrapFeedbackRaw`, computes
 avgOverall/avgJoin locally, then POSTs a hand-built prompt to
-`gemini-1.5-flash:generateContent` (`GEMINI_API_KEY`, maxOutputTokens
+`gemini-3.5-flash:generateContent` (`GEMINI_API_KEY`, maxOutputTokens
 1024, temperature 0.3). The only route that calls an external AI API.
 
 ## GET /api/admin/bootstrap/sessions/[id]/visitors
@@ -515,7 +572,7 @@ avgOverall/avgJoin locally, then POSTs a hand-built prompt to
 
 ## PATCH /api/admin/bootstrap/groups/[id]/lead
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Assign or clear a group's lead.
 
 **Request body:**
@@ -527,25 +584,27 @@ avgOverall/avgJoin locally, then POSTs a hand-built prompt to
 
 ## PATCH /api/admin/bootstrap/stalls/[id]
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard.
 **Purpose:** Admin override of a stall's status and occupants (no conflict check).
 
 **Request body:**
-- `status` (string, required) -- one of `free`, `occupied`, `queued`.
-- `claimed_by` (string[] or string, optional) -- joined to a comma string; forced to `""` when status is `free`.
-- `queued_by` (string, optional) -- passed through; the service clears it when status is `free`.
+- `status` (required) -- `free` | `occupied` | `queued`.
+- `claimed_by` (string[] or string, optional) -- joined to a comma string; forced to
+  `""` when status is `free`.
 **Query/params:** `id` (route param).
 
-**Response (2xx):** `200` the updated stall row.
-**Response (4xx/5xx):** `401` unauthorized; `400` `{ error: "Invalid status" }`; `404` `{ error: "Stall not found" }`; `500` `{ error: "Failed to update stall" }`.
+**Response (2xx):** `200` the updated stall.
+**Response (4xx/5xx):** `401`; `403` viewer; `400` "Invalid status"; `404`; `500`.
 
-**Notes:** Calls `updateStallStatus(id, claimedBy, "override", status, queuedBy)`.
-This is the admin twin of the volunteer PATCH -- same service, `"override"`
-mode bypasses the claim/queue rules.
+**Notes:** Calls `updateStallStatus` in `"override"` mode. Since S73B the stall's
+displayed status is DERIVED on read from `claimed_by` and the queue table, so the
+override's real effect is on `claimed_by`; the old `queued_by` pass-through is
+gone, and an admin cannot "mark a stall queued" -- the queue is groups, in
+`bootstrap_stall_queue`.
 
 ## PATCH /api/admin/bootstrap/stalls/[id]/position
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Set (or clear) a stall's map pin position as percentages.
 
 **Request body:**
@@ -559,7 +618,7 @@ mode bypasses the claim/queue rules.
 
 ## PATCH /api/admin/bootstrap/volunteers/[id]/role
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Change a volunteer's role.
 
 **Request body:**
@@ -571,7 +630,7 @@ mode bypasses the claim/queue rules.
 
 ## PATCH /api/admin/bootstrap/volunteers/[id]/suggest
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Set or clear a suggested stall for a volunteer.
 
 **Request body:**
@@ -586,7 +645,7 @@ route uses with null.
 
 ## PATCH /api/admin/bootstrap/volunteers/[id]/unlock
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Release a volunteer's claimed login so they can log in again.
 **Query/params:** `id` (route param) -- volunteer id.
 
@@ -596,12 +655,166 @@ route uses with null.
 **Notes:** Calls `clearVolunteerSession(id)` -- the same clear that logout
 performs, done by an admin on the volunteer's behalf.
 
+## PATCH /api/admin/bootstrap/sessions/[id]
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Rename a session or change its visitor cap after creation (S49).
+**Request body:** `name` (optional, 1-100 chars), `max_group_size` (optional, 1-100).
+**Response (2xx):** `200` `{ session }`.
+**Response (4xx/5xx):** `401`; `403`; `400` per field or "Nothing to update" (an empty
+body is refused so a no-op cannot silently pass); `404` "Session not found"; `500`.
+
+## POST, DELETE /api/admin/bootstrap/sessions/[id]/stalls
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Add a stall to a live session, or delete one (S49).
+**Request body (POST):** `stallName` (1-60 chars), `maxOccupancy` (1-4), `maxGroups` (1-3).
+**Query (DELETE):** `stallId` (required).
+**Response (2xx):** POST `200` `{ stall }`; DELETE `200` `{ ok: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` per field / "stallId is required"; `404`
+"Stall not found"; `409` "Stall is occupied. Free it before deleting."; `500`.
+
+## POST /api/admin/bootstrap/sessions/[id]/distribute
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Advisory auto-distribution of groups across stalls (S73D).
+**Response (2xx):** `200` "placed N of M" counts from `distributeGroups`.
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to distribute groups".
+
+**Notes:** Writes suggestions as `bootstrap_stall_queue` rows with `accepted_at` NULL
+and `volunteer_id` NULL; each lead accepts (`accept_queued`) or declines (`unqueue`).
+Re-runnable and idempotent: the candidates are groups with no queue row anywhere, so
+a second press only fills gaps and never reshuffles. No refusal on overflow --
+groups that fit nowhere simply get no row.
+
+## POST /api/admin/bootstrap/sessions/[id]/sweep-visits
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Close every still-open visit in a session (S73C).
+**Response (2xx):** `200` `{ closed }` -- how many rows were closed.
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to close visits".
+
+**Notes:** Visits only close when a volunteer taps RELEASE; at the end of a real
+event people walk away. Deliberately its own action rather than a side effect of
+deactivating the session.
+
+## GET, PATCH /api/admin/bootstrap/sessions/[id]/groups/[groupId]/checklist
+
+**Auth:** isAdmin (a local `guard()` helper); PATCH adds the viewer guard.
+**Purpose:** The admin half of the manual checklist backup (S73G).
+**Request body (PATCH):** `stall_id` (required), `visited` (boolean).
+**Response (2xx):** `200` `{ stalls }`.
+**Response (4xx/5xx):** `401`; `403`; `400` "stall_id is required"; `409` "This group is
+currently marked present at that stall. Use the stall controls to release them
+first."; `500`.
+
+**Notes:** Session-nested on purpose, like every other admin bootstrap route. Same
+service functions as the lead route: `markStallVisitedManually`,
+`clearStallVisitManually`, `getGroupStallChecklist`.
+
+## PATCH /api/admin/bootstrap/stalls/[id]/max-groups
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Live per-stall group capacity (S73B).
+**Request body:** `max_groups` -- whole number 1-10.
+**Response (2xx):** `200` `{ ok: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` "max_groups must be a whole number between 1
+and 10"; `500`.
+
+**Notes:** The wide-range control; setup-time tiles offer 1-3. A bare single-column
+write (`setStallMaxGroups`) that stays out of the stall status logic, like
+./position. The DB CHECK (027) backs the validation.
+
+## PATCH, DELETE /api/admin/bootstrap/volunteers/[id]
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** PATCH corrects a volunteer's own registration details (S55); DELETE
+removes a pre-registration pool entry (S55B).
+**Request body (PATCH):** any of `display_name`, `phone` (`normalisePhone`), `srn`
+(`normaliseSrnPrn`).
+**Response (2xx):** `200` `{ ok: true }`.
+**Response (4xx/5xx):** PATCH: `400` "Nothing to update" / bad phone / bad SRN; `409`
+"Another pre-registered volunteer already uses that SRN". DELETE: `409` "Not found,
+or already assigned to a session. Delete the session instead." Both: `401`; `403`; `500`.
+
+**Notes:** PATCH validates every field it is sent, so a legacy off-format SRN blocks
+a name-only save from the dashboard (which sends all three) -- flagged in S73F.
+Passwords and login codes are not touched here. DELETE only ever reaches pool
+rows: `deletePoolVolunteer`'s `session_id IS NULL` guard sends an assigned
+volunteer to the 409.
+
+## PATCH /api/admin/bootstrap/volunteers/[id]/assign
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Pull a pool member (`session_id` NULL) into a session, pointed at a stall (S49).
+**Request body:** `sessionId` (required), `stallId` (optional; must belong to that session).
+**Response (2xx):** `200` `{ ok: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` "sessionId is required" / "Unknown stall for
+this session"; `409` "Volunteer not found or already assigned to a session"; `500`.
+
+**Notes:** One-way door -- the service's `IS NULL` guard means an assigned volunteer is
+never silently moved.
+
+## POST /api/admin/bootstrap/volunteers/[id]/reset-code
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Issue a volunteer a new plaintext login code (S55C).
+**Response (2xx):** `200` `{ login_code }`.
+**Response (4xx/5xx):** `401`; `403`; `404` "Volunteer not found"; `500`.
+
+**Notes:** POST rather than a PATCH flag: it generates a value rather than writing
+one the caller supplied.
+
+## PATCH /api/admin/bootstrap/volunteers/[id]/switch-request
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Approve or deny a stall volunteer's switch request (S72C).
+**Request body:** `action` -- `"approve"` | `"deny"`.
+**Response (2xx):** `200` `{ ok: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` bad action; `409` "No pending switch request
+for this volunteer"; `500`.
+
+**Notes:** Approve reassigns through the same service as the MOVE STALL dropdown
+(`resolveStallSwitch`); deny drops the request.
+
+## GET /api/admin/bootstrap/volunteers/pool/export
+
+**Auth:** isAdmin only -- no viewer guard; it reads.
+**Purpose:** CSV of the whole pre-registration pool (S73K).
+**Response (2xx):** `200` CSV (`poolVolunteersTable` + `toCsv` from
+src/lib/utils/exportTables.ts), login codes included -- they already show in the
+pool table.
+**Response (4xx/5xx):** `401`.
+
+**Notes:** Reuses `getUnassignedVolunteers()` unchanged (`LIMIT 200`), so the export is
+exactly the set the pool table shows and the delete button would wipe.
+
+## POST /api/admin/bootstrap/volunteers/pool/export/google
+
+**Auth:** isAdmin + viewer guard (it writes to a shared Sheet).
+**Purpose:** The same pool into the "Pool Volunteers" tab of the shared sheet.
+**Response (2xx):** `200` `{ ok: true, url, name }` -- a deep link to the tab.
+**Response (4xx/5xx):** `401`; `403`; `502` `{ error }` -- Google's own code / reason /
+message, or "not configured" when the env vars are missing.
+
+## POST /api/admin/bootstrap/volunteers/pool/delete-all
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Wipe the pre-registration pool between events (S73K). Irreversible.
+**Response (2xx):** `200` `{ ok: true, deleted }`.
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to clear the pool".
+
+**Notes:** `deleteAllPoolVolunteers()` carries `WHERE session_id IS NULL` in the SQL, so
+it can never reach an assigned volunteer. POST rather than DELETE: no single
+resource, and a bodyless DELETE is the shape a prefetch or link scanner can trip.
+The UI confirms and offers EXPORT FIRST.
+
 ---
 
 # Admin -- general content and config
 
 All under `/api/admin/*`. Every handler re-checks `session.user.isAdmin`
-in-route (401 otherwise), except the two token-gated routes noted below
+in-route (401 otherwise; mutating handlers then 403 a viewer), except the two token-gated routes noted below
 which have no session check because middleware exempts them.
 
 ## GET /api/admin/events
@@ -614,7 +827,7 @@ which have no session check because middleware exempts them.
 
 ## POST /api/admin/events
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Create an event.
 
 **Request body:** Event fields (spread into `createEvent`); `slug` optional -- when absent, derived via `slugify(body.title)`.
@@ -631,7 +844,7 @@ change, do not fix unprompted.
 
 ## PATCH /api/admin/events
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update an event.
 
 **Request body:**
@@ -643,7 +856,7 @@ change, do not fix unprompted.
 
 ## DELETE /api/admin/events
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Archive (soft-delete) or permanently delete an event.
 
 **Query/params:**
@@ -666,7 +879,7 @@ the few places raw SQL sits outside the service layer.
 
 ## POST /api/admin/gallery
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Create a gallery item.
 
 **Request body:** gallery-item fields passed to `createGalleryItem`.
@@ -674,7 +887,7 @@ the few places raw SQL sits outside the service layer.
 
 ## DELETE /api/admin/gallery
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete a gallery item.
 **Query/params:** `id` (query, required) -- 400 if missing.
 **Response (2xx):** `200` `{ success: true }`. **Response (4xx/5xx):** `401`; `400` `{ error: "ID required" }`; `500` `{ error: "Failed to delete gallery item" }`.
@@ -687,14 +900,14 @@ the few places raw SQL sits outside the service layer.
 
 ## POST /api/admin/sponsors
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Create a sponsor.
 **Request body:** sponsor fields passed to `createSponsor`.
 **Response (2xx):** `201` the created sponsor. **Response (4xx/5xx):** `401`; `500` `{ error: "Failed to create sponsor" }`.
 
 ## PATCH /api/admin/sponsors
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update a sponsor, or toggle its active flag.
 
 **Request body:**
@@ -707,7 +920,7 @@ the few places raw SQL sits outside the service layer.
 
 ## DELETE /api/admin/sponsors
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete a sponsor.
 **Query/params:** `id` (query, required).
 **Response (2xx):** `200` `{ success: true }`. **Response (4xx/5xx):** `401`; `400` `{ error: "ID required" }`; `500` `{ error: "Failed to delete sponsor" }`.
@@ -723,14 +936,14 @@ in the route (raw SQL outside the service layer).
 
 ## POST /api/admin/team
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Create a team member.
 **Request body:** member fields passed to `createMember`.
 **Response (2xx):** `201` the created member. **Response (4xx/5xx):** `401`; `500` `{ error: "Failed to create member" }`.
 
 ## PATCH /api/admin/team
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update a member, or toggle its active flag.
 
 **Request body:**
@@ -743,14 +956,14 @@ in the route (raw SQL outside the service layer).
 
 ## DELETE /api/admin/team
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete a member.
 **Query/params:** `id` (query, required).
 **Response (2xx):** `200` `{ success: true }`. **Response (4xx/5xx):** `401`; `400` `{ error: "ID required" }`; `500` `{ error: "Failed to delete member" }`.
 
 ## POST /api/admin/upload
 
-**Auth:** isAdmin -- checked inside the try block.
+**Auth:** isAdmin + viewer guard (`403` for viewers) -- checked inside the try block.
 **Purpose:** Upload a file to Cloudflare R2.
 
 **Request body:** `multipart/form-data`:
@@ -775,7 +988,7 @@ no-op line to keep an import present without changing behavior.
 
 ## PATCH /api/admin/settings
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update settings, or (overloaded) update one application's status.
 
 **Request body:**
@@ -787,7 +1000,7 @@ no-op line to keep an import present without changing behavior.
 
 ## POST /api/admin/import/team
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Bulk-import team members from pasted CSV text.
 
 **Request body:** raw CSV text (`req.text()`), not JSON. Header row must be exactly `name,role,tier,domain,quote,linkedin_url,github_url,display_order`. Max 500 data rows.
@@ -839,21 +1052,21 @@ still needs godfather approval (see accounts/[id]/approve).
 
 ## POST /api/admin/milestones
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Create a milestone.
 **Request body:** `date_label`, `title`, `description` (string, required, trimmed non-empty), `sort_order` (number, must be finite).
 **Response (2xx):** `200` `{ milestone }`. **Response (4xx/5xx):** `401`; `400` `{ error: "All fields are required" }`; `500` `{ error: "Failed to create milestone" }`.
 
 ## DELETE /api/admin/milestones
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete a milestone.
 **Query/params:** `id` (query, required).
 **Response (2xx):** `200` `{ ok: true }`. **Response (4xx/5xx):** `401`; `400` `{ error: "Missing id" }`; `500` `{ error: "Failed to delete milestone" }`.
 
 ## PATCH /api/admin/milestones/[id]
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update a single milestone.
 **Request body:** `date_label`, `title`, `description` (required, trimmed), `sort_order` (finite number).
 **Query/params:** `id` (route param).
@@ -864,8 +1077,10 @@ still needs godfather approval (see accounts/[id]/approve).
 
 **Auth:** Token-gated public -- NO session check. Middleware exempts this
 path; the one-time reset token in the body is the gate. Boundary:
-`usePasswordResetToken` validates and consumes the token atomically, so a
-missing/expired/used token can never set a password.
+`consumePasswordResetToken` re-reads the token (unused, unexpired) before
+writing, so a missing/expired/used token can never set a password. It then
+updates the account and marks the token used as two separate statements, not
+one transaction.
 **Purpose:** Set a new password from a reset link.
 
 **Request body:**
@@ -878,8 +1093,62 @@ missing/expired/used token can never set a password.
 - `400` missing fields, mismatch, password <8, or `{ error: "Reset link is invalid, expired, or already used" }` when the service throws `"Invalid or expired token"`.
 - `500` `{ error: "Password reset failed" }`.
 
-**Notes:** Password hashing happens inside `usePasswordResetToken` (the
-service), not the route.
+**Notes:** Password hashing and the `token_version` bump happen inside
+`consumePasswordResetToken` (the service), not the route.
+
+## GET, POST, PATCH, DELETE /api/admin/announcements
+
+**Auth:** isAdmin on every method; viewer guard on POST / PATCH / DELETE.
+Mirrors /api/admin/sponsors.
+**Purpose:** Homepage announcement CRUD (S73E).
+**Request body:** POST -- `title` (required) plus `body`, `image_url_desktop`,
+`image_url_mobile`, `cta_label`, `cta_href`, `is_active`, `display_order`. PATCH -- `id`
+(required); a body of just `{ id, is_active }` goes through `toggleAnnouncementActive`,
+anything else through `updateAnnouncement`. DELETE -- `?id=`.
+**Response (2xx):** GET -> the rows; POST -> the created row; PATCH / DELETE `{ success: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` "Title is required" / "ID required"; `500`.
+
+**Notes:** Nothing stops two rows being active; the homepage's `LIMIT 1` read shows
+the first by `display_order`.
+
+## GET, POST /api/admin/posts
+
+**Auth:** isAdmin; viewer guard on POST.
+**Purpose:** List every post (drafts included, `getAllPostsAdmin`) / create one.
+**Request body (POST):** `title`, `author_name`, `body` (required); `slug` (derived from
+the title when absent), `category`, `author_role`, `excerpt`, `source_url`,
+`source_label`, `thumbnail_url`, `published`, `published_at`.
+**Response (4xx/5xx):** `401`; `403`; `400` "Title, author name and content are required"
+/ "Could not derive a slug"; `500` with the service's message.
+
+## PATCH, DELETE /api/admin/posts/[id]
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Update or delete one post.
+**Request body (PATCH):** any post field above.
+**Response (2xx):** PATCH -> the updated post; DELETE `{ success: true }`.
+**Response (4xx/5xx):** `401`; `403`; `400` "Invalid slug"; `404` "Post not found"; `500`.
+
+**Notes:** Clearable columns use posts.ts's read-then-write shape, not
+`COALESCE`, which could never write a NULL back.
+
+## PATCH /api/admin/team/reorder
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Persist a drag reorder within one tier.
+**Request body:** `tier`, `ids` (that tier's member ids in the new order).
+**Response (2xx):** `200` `{ success: true }`.
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to reorder members".
+
+**Notes:** `TeamMembersTable` renumbers the tier optimistically and reverts on failure.
+
+## PATCH /api/admin/events/[id]/registrations/[regId]
+
+**Auth:** isAdmin + viewer guard.
+**Purpose:** Set one event registration's status (S47).
+**Request body:** `status`.
+**Response (2xx):** `200` `{ success: true }`.
+**Response (4xx/5xx):** `401`; `403`; `500` "Failed to update registration status".
 
 ---
 
@@ -897,14 +1166,14 @@ All under `/api/admin/applications/*`; every handler re-checks isAdmin
 
 ## DELETE /api/admin/applications
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Delete an application.
 **Query/params:** `id` (query, required).
 **Response (2xx):** `200` `{ success: true }`. **Response (4xx/5xx):** `401`; `400` `{ error: "ID required" }`; `500` `{ error: "Failed to delete application" }`.
 
 ## PATCH /api/admin/applications/[id]/status
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Update one application's status.
 **Request body:** `status` (string, required) -- must be in `APPLICATION_STATUSES`.
 **Query/params:** `id` (route param).
@@ -912,7 +1181,7 @@ All under `/api/admin/applications/*`; every handler re-checks isAdmin
 
 ## PATCH /api/admin/applications/[id]/group
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Assign or clear an application's interview group.
 **Request body:** `group` (string | null) -- null clears; otherwise must be in `INTERVIEW_GROUPS`.
 **Query/params:** `id` (route param).
@@ -920,7 +1189,7 @@ All under `/api/admin/applications/*`; every handler re-checks isAdmin
 
 ## POST /api/admin/applications/bulk-status
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Set status on many applications at once.
 **Request body:** `ids` (string[], required, non-empty after filtering to strings), `status` (string, required, in `APPLICATION_STATUSES`).
 **Response (2xx):** `200` `{ success: true, updated: <count> }`.
@@ -928,18 +1197,42 @@ All under `/api/admin/applications/*`; every handler re-checks isAdmin
 
 ## GET /api/admin/applications/export
 
-**Auth:** isAdmin.
-**Purpose:** Export applications as a downloadable CSV (LIMIT 500).
-**Query/params:** `status` (query, optional) -- filters the export.
-**Response (2xx):** `200` CSV body; `Content-Type: text/csv; charset=utf-8`; `Content-Disposition: attachment; filename="vegavath-applications-<ts>.csv"`.
-**Response (4xx/5xx):** `401` unauthorized. No explicit try/catch -- a service throw would surface as an unhandled 500.
+**Auth:** isAdmin -- viewers allowed; it only reads.
+**Purpose:** Applications as a downloadable CSV (`LIMIT 500`).
+**Query/params:** `status` (optional) -- filters the export. The page passes the active
+tab, so export from ALL for everything.
+**Response (2xx):** `200` CSV; `Content-Type: text/csv; charset=utf-8`;
+`Content-Disposition: attachment; filename="vegavath-applications-<ts>.csv"`.
+**Response (4xx/5xx):** `401`. No try/catch -- a service throw surfaces as a 500.
 
-**Notes:** RFC-4180 escaping via `esc()` (every field quoted, embedded
-quotes doubled). Dates formatted `en-IN`. 15 columns.
+**Notes:** Columns come from `applicationsTable` in src/lib/utils/exportTables.ts,
+shared with the Google Sheets export so the two cannot disagree: every table
+column (S81: id, the FY25 `portfolio_url`, the full UTC timestamp beside the date),
+course, Domain 1-3 as display labels in /join order with an old Operations +
+Sponsorship pair collapsed (S82B), the pre-S81 question columns, then one column
+per question headed "<set> (<branch>): <question>" with multi-selects joined by
+", ". A Vitest test pins that every Application field is exported. Quoting is RFC
+4180 (`toCsv`); it does NOT neutralise a cell starting with `=` / `+` / `-` / `@`, so
+spreadsheet formula injection is possible when the CSV is opened (flagged S81; the
+Sheets export is safe, it writes RAW).
+
+## POST /api/admin/applications/export/google
+
+**Auth:** isAdmin + viewer guard (it writes to a shared Sheet; viewers keep the CSV).
+**Purpose:** The same dataset into the "Applications" tab of the shared sheet (S73K,
+rewritten S74A).
+**Query/params:** `status` (optional), as above.
+**Response (2xx):** `200` `{ ok: true, url, name }` -- `url` deep-links to the tab.
+**Response (4xx/5xx):** `401`; `403`; `502` `{ error }` -- Google's own code / reason /
+message, or "not configured".
+
+**Notes:** `exportTableToGoogleSheets` (src/lib/services/googleExport.ts) clears the tab
+and rewrites it; it never creates a file. The route's own comment still says it
+"creates a file in the team's Drive" -- that describes S73K and is stale since S74A.
 
 ## POST /api/admin/applications/auto-assign-groups
 
-**Auth:** isAdmin.
+**Auth:** isAdmin + viewer guard (`403` for viewers).
 **Purpose:** Round-robin every interview applicant without a panel into A..N.
 **Request body:** `panel_count` (number, required) -- must be 1, 2, 3, or 4.
 **Response (2xx):** `200` `{ assigned }`. **Response (4xx/5xx):** `401`; `400` `{ error: "panel_count must be 1-4" }`; `500` `{ error: "Auto-assign failed" }`.
@@ -973,14 +1266,45 @@ below fold both "not admin" and "not godfather" into a single `401`.
 
 ## POST /api/admin/accounts/invite
 
-**Auth:** godfather-only -- `if (!isAdmin || !isGodfather) return 401`.
-**Purpose:** Create a one-time invite link for a new admin.
-**Request body:** `inviteeName` (string, required) -- must contain at least one alphanumeric char (so the slug is non-empty).
-**Response (2xx):** `200` `{ url: "<origin>/admin/invite/<slug>/<token>" }`.
-**Response (4xx/5xx):** `401` unauthorized; `400` `{ error: "Invitee name is required" }`; `500` `{ error: "Failed to create invite" }`.
+**Auth:** godfather-only -- `isAdmin` and `isGodfather`, else 401; then a viewer guard (`403`), which is unreachable in practice since a godfather is never a viewer.
+**Purpose:** Create an invite link.
+**Request body:** `type: "open"` creates a reusable open viewer link (S48); otherwise a
+named one-time invite with `inviteeName` (required, at least one alphanumeric) and
+`role` (`"viewer"` makes a viewer invite; anything else an admin invite).
+**Response (2xx):** `200` `{ url }` -- `<origin>/admin/register?token=...` (open) or
+`<origin>/admin/invite/<slug>/<token>` (named).
+**Response (4xx/5xx):** `401`; `400` "Invitee name is required"; `500` "Failed to create
+invite: <reason>".
 
-**Notes:** `createInviteToken` returns `{ token, slug }`; the route builds
-the full URL from `req.nextUrl.origin`.
+**Notes:** Since S76C the 500 includes the underlying error text: the route is
+godfather-only, so that is no wider disclosure, and hiding it cost a full
+diagnosis round-trip on a live failure.
+
+## GET, DELETE /api/admin/accounts/invite
+
+**Auth:** godfather-only; DELETE also carries the viewer guard.
+**Purpose:** GET `?type=open` lists the active open viewer links (`getOpenViewerTokens`);
+DELETE `?tokenId=` revokes one (`revokeOpenToken`).
+**Response (2xx):** GET the links with their `url`s; DELETE `{ ok: true }`.
+**Response (4xx/5xx):** `401` / `403`; `400` "Unknown type" / "Missing tokenId"; `500` with
+the reason (S76C).
+
+**Notes:** The panel only shows these controls when `NEXT_PUBLIC_SHOW_VIEWER_INVITES`
+is "true" (production only).
+
+## PATCH /api/admin/accounts/me
+
+**Auth:** isAdmin -- **deliberately no viewer guard** (S67). It can only write the
+caller's own `admin_accounts` row, scoped by `session.user.accountId` (never the body);
+a viewer must still be able to rotate their own password.
+**Purpose:** Self-service profile update.
+**Request body:** `currentPassword` + `newPassword` (min 8) to change the password; and/or
+`displayName`, `mobileNumber` (`normalisePhone`, 10 digits, S73F).
+**Response (2xx):** `200` `{ success: true, signedOut: true }` after a password change
+(other sessions are invalidated); otherwise `{ success: true, displayName, mobileNumber }`.
+**Response (4xx/5xx):** `401` / "Current password is incorrect"; `400` env-godfather account
+("configured through environment variables"), invalid body, missing passwords,
+short password, empty display name, bad mobile, "Nothing to update"; `404`; `500`.
 
 ## POST /api/admin/accounts/[id]/approve
 

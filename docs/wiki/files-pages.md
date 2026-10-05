@@ -1,13 +1,8 @@
 # Pages
 
-_Current as of Session 72D (2026-08-12). This per-file reference was written
-against an earlier snapshot and does not yet describe every page added since:
-`/posts`, `/posts/[slug]`, the five `/f1` pages, `/projects` and its two
-project pages, `/events/[slug]/register`, `/admin/posts*`, `/admin/profile`,
-`/admin/qr`, `/admin/register`, and `/docs/login`. **`docs/wiki/routes.md` is
-complete and verified against the filesystem (all pages and all 60 API routes),
-so treat it as authoritative for the inventory** and this file as the deeper
-per-file notes for the pages it does cover._
+_Current as of Session 82C (2026-10-05). Every `page.tsx` in `src/app` has an
+entry (55 pages); `docs/wiki/routes.md` is the one-line inventory of the same
+pages plus all 73 API routes._
 
 Per-file reference for every Next.js App Router page, layout, and
 special file in the Team Vegavath repo. Documents route, rendering
@@ -139,16 +134,18 @@ File: src/app/(public)/page.tsx
 - **Route.** `/` (home).
 - **Rendering mode.** ISR (60s) -- `export const revalidate = 60`.
 - **Data.** `Promise.all` of `getUpcomingEvents(3)`,
-  `getPastEvents(3)` (both `@/lib/services/events`), and
-  `getActiveSponsors()` (`@/lib/services/sponsors`); each `.catch`es to
-  `[]`.
+  `getPastEvents(3)` (both `@/lib/services/events`),
+  `getActiveSponsors()` (`@/lib/services/sponsors`), and
+  `getActiveAnnouncement()` (`@/lib/services/announcements`, S73E); the
+  lists `.catch` to `[]`, the announcement to `null`.
 - **Auth.** Public.
 - **Metadata.** `title: "Team Vegavath | Karts, Code & Innovation at
   PESU ECC"`.
-- **Renders.** Hero (JOIN / VIEW EVENTS CTAs), `StatsTicker`,
+- **Renders.** Hero (JOIN / VIEW EVENTS CTAs), `AnnouncementBanner`
+  (renders nothing when no row is active), `StatsTicker`,
   `KartModelWrapper` (3D kart), `DomainGrid`, `EventsPreview` (fed
-  slimmed upcoming/past event objects), `SponsorMarquee` (only when
-  sponsors exist), and a Join CTA section.
+  slimmed upcoming/past event objects), `ProjectsTeaser`,
+  `SponsorMarquee` (only when sponsors exist), and a Join CTA section.
 - **Notable.** Event objects are projected down to just
   `{slug, title, category, event_date, cover_image_url}` before being
   handed to `EventsPreview`.
@@ -222,6 +219,17 @@ File: src/app/(public)/events/[slug]/page.tsx
   ("the absence IS the signal"); it shows a "closed" message only when
   a form URL exists but registration is off.
 
+## /events/[slug]/register
+File: src/app/(public)/events/[slug]/register/page.tsx
+
+- **Route.** `/events/<slug>/register` (S47, native event registration).
+- **Rendering mode.** dynamic -- `export const dynamic = "force-dynamic"`.
+- **Data.** `getEventBySlug(slug)`; slugs flagged by `isNoRegistrationEvent`
+  and unknown slugs -> `notFound()`.
+- **Auth.** Public. The form posts to `/api/events/[slug]/register`.
+- **Renders.** `EventRegisterForm` inside `Container` when
+  `event.registration_open`; a closed state otherwise.
+
 ## /gallery
 File: src/app/(public)/gallery/page.tsx
 
@@ -237,6 +245,35 @@ File: src/app/(public)/gallery/page.tsx
   by title, and prepends an "All" option -- so only events with media
   become filter tabs.
 
+## /f1
+File: src/app/(public)/f1/page.tsx
+
+- **Route.** `/f1`, optional `?constructor=` filter.
+- **Rendering mode.** ISR 60 -- the kill-switch response time, not a freshness
+  number; reading `searchParams` also makes it dynamic.
+- **Data.** `getF1Enabled()` (`services/settings`); when on, driver and
+  constructor standings and the current schedule from `services/f1`
+  (Jolpica, null on failure).
+- **Auth.** Public.
+- **Renders.** `F1Paused` when the switch is off; otherwise `F1Section` /
+  `F1Table` blocks, with `F1Empty` for a failed fetch.
+
+## /f1/drivers, /f1/drivers/[driverId], /f1/circuits, /f1/seasons
+Files: src/app/(public)/f1/drivers/page.tsx,
+src/app/(public)/f1/drivers/[driverId]/page.tsx,
+src/app/(public)/f1/circuits/page.tsx, src/app/(public)/f1/seasons/page.tsx
+
+- **Rendering mode.** ISR 60 on all four, under the same `f1_enabled` kill
+  switch.
+- **Data.** `/f1/drivers` -- standings plus `getF1AllDrivers(offset)`
+  (`?offset=` paging). `/f1/drivers/[driverId]` -- `getF1DriverInfo`, then the
+  driver's seasons and constructors; unknown id -> `notFound()`.
+  `generateStaticParams` was removed in S54 (it was the cause of an empty
+  build-time render). `/f1/circuits` -- `getF1AllCircuits()`. `/f1/seasons` --
+  `getF1SeasonHistory()` + `getF1SeasonChampions()`, deliberately N+1 and capped
+  at the 30 most recent seasons.
+- **Auth.** Public.
+
 ## /join
 File: src/app/(public)/join/page.tsx
 
@@ -247,7 +284,9 @@ File: src/app/(public)/join/page.tsx
   false on throw).
 - **Auth.** Public. The form posts to `/api/join`.
 - **Renders.** `JoinClient` with the `recruitmentOpen` flag; the client
-  component gates the form vs a "recruitment closed" state.
+  component gates the 4-step form vs a "recruitment closed" state.
+- **Metadata.** The description lists the domains from `JOIN_DOMAINS`
+  (`src/lib/utils/joinQuestions.ts`), so it cannot drift from the form (S82B).
 
 ## /legal
 File: src/app/(public)/legal/page.tsx
@@ -262,6 +301,63 @@ File: src/app/(public)/legal/page.tsx
   License (derived from MIT)". (CLAUDE.md flags a known open item that
   legal copy elsewhere still says MIT -- this page already presents the
   custom license.)
+
+## /posts
+File: src/app/(public)/posts/page.tsx
+
+- **Route.** `/posts`, optional `?category=` filter.
+- **Rendering mode.** ISR 300 (reading `searchParams` makes it dynamic).
+- **Data.** `getPublishedPosts()` (`services/posts`).
+- **Auth.** Public.
+- **Renders.** Category filter and post cards inside `Container`.
+
+## /posts/[slug]
+File: src/app/(public)/posts/[slug]/page.tsx
+
+- **Route.** `/posts/<slug>`.
+- **Rendering mode.** ISR 600.
+- **Data.** `getPostBySlug(slug)`; unknown -> `notFound()`. `generateMetadata`
+  from the post.
+- **Auth.** Public.
+- **Renders.** The markdown body through `DocsContent` (the docs renderer)
+  and `InstagramEmbed` for embedded posts.
+
+## /projects
+File: src/app/(public)/projects/page.tsx
+
+- **Route.** `/projects` (S60/D4).
+- **Rendering mode.** ISR 3600. No data -- static content.
+- **Auth.** Public.
+- **Renders.** The project index (`Container`, `Reveal`): Go-Kart, Combat
+  Bot, Maze Solver.
+
+## /projects/kart
+File: src/app/(public)/projects/kart/page.tsx
+
+- **Rendering mode.** ISR 3600.
+- **Auth.** Public.
+- **Renders.** The kart build page with `KartModelWrapper` (the 3D kart, on
+  every viewport by design).
+
+## /projects/combat-bot
+File: src/app/(public)/projects/combat-bot/page.tsx
+
+- **Rendering mode.** static (no data, no revalidate).
+- **Auth.** Public.
+- **Renders.** An "under construction" stub. Deliberately kept out of
+  `sitemap.ts` until it has real content (thin-content page).
+
+## /projects/maze-solver
+File: src/app/(public)/projects/maze-solver/page.tsx
+
+- **Route.** `/projects/maze-solver` (S78).
+- **Rendering mode.** ISR 3600. No data.
+- **Auth.** Public.
+- **Renders.** `MazeSolver` (src/components/projects/): a fixed 8x8 maze
+  (`src/lib/maze/data.ts`) where a visitor picks the start and goal cells and
+  the robot's starting heading, then watches a BFS run and gets the shortest
+  path, its absolute directions and the robot command sequence (copyable).
+  The solving logic is pure TypeScript in `src/lib/maze/` with Vitest tests.
 
 ## /sponsors
 File: src/app/(public)/sponsors/page.tsx
@@ -334,8 +430,9 @@ File: src/app/(admin)/admin/dashboard/page.tsx
   constant backstops settings.
 - **Renders.** Recruitment open/closed badge, four stat cards (events /
   members / gallery / active sponsors), a recent-logins table, and a
-  latest-10-applications table. All inline markup, no dedicated child
-  components.
+  latest-10-applications table whose Domain cell is the first domain as a
+  display label in /join order (`orderedDomainLabels`, S82B). All inline
+  markup, no dedicated child components.
 
 ## /admin/accounts
 File: src/app/(admin)/admin/accounts/page.tsx
@@ -355,6 +452,16 @@ File: src/app/(admin)/admin/accounts/page.tsx
   `accounts.length <= 1` a disabled "DELETE" label is shown instead of
   the delete control.
 
+## /admin/announcements
+File: src/app/(admin)/admin/announcements/page.tsx
+
+- **Route.** `/admin/announcements` (S73E).
+- **Rendering mode.** dynamic (reads `searchParams`).
+- **Auth.** Admin session; viewers read only.
+- **Data.** `getAnnouncements()`.
+- **Renders.** `?new=true` -> `AnnouncementForm` create page; otherwise
+  `AnnouncementsTable`, whose EDIT opens the shared slide-in panel.
+
 ## /admin/applications
 File: src/app/(admin)/admin/applications/page.tsx
 
@@ -365,8 +472,11 @@ File: src/app/(admin)/admin/applications/page.tsx
   filtered by the active tab.
 - **Renders.** A tab bar (status pipeline `ALL/PENDING/SHORTLISTED/
   INTERVIEW/SELECTED/REJECTED` plus one tab per `INTERVIEW_GROUPS`
-  entry), an "EXPORT CSV" link to `/api/admin/applications/export`, and
-  `ApplicationsTable`.
+  entry), an "EXPORT CSV" link to `/api/admin/applications/export` and a
+  `GoogleSheetsExportButton` (hidden for viewers, S73K) -- both pass the
+  active `?status=`, so export from ALL for everything -- and
+  `ApplicationsTable`, whose expandable row shows course and every answer
+  grouped by set and branch (pre-S81 rows show their old fields).
 - **Notable.** Group tabs filter by `interview_group` (ignoring
   status); status and group are mutually exclusive in the query.
   `showPanelAssign` is passed to the table only on the INTERVIEW status
@@ -393,12 +503,16 @@ File: src/app/(admin)/admin/events/page.tsx
 - **Rendering mode.** dynamic (also reads `searchParams`).
 - **Auth.** Admin session.
 - **Data.** `getEvents({ limit: 100 })`.
-- **Renders.** With `?new=true`, an `EventForm` in create mode.
-  Otherwise a table of events with per-row EDIT link and an
+- **Renders.** With `?new=true`, an `EventForm` in create mode (its own
+  page). Otherwise `EventsTable` (S82): per row EDIT (opens `EventForm` in
+  the slide-in panel), REGISTRATIONS (the full edit page) and an
   `InlineDelete` labelled "ARCHIVE".
-- **Notable.** The row delete is a soft-delete/archive (the API's
-  non-permanent path); permanent deletion lives on the edit page's
-  danger zone. Title cells link to the public `/events/<slug>` page.
+- **Notable.** The server page formats both date strings (display date and
+  the form's YYYY-MM-DD) and hands them to the client table, so a DATE is
+  never formatted in the viewer's timezone (hydration mismatch). The row
+  delete is a soft-delete/archive (the API's non-permanent path); permanent
+  deletion lives on the edit page's danger zone. Title cells link to the
+  public `/events/<slug>` page.
 
 ## /admin/events/[id]/edit
 File: src/app/(admin)/admin/events/[id]/edit/page.tsx
@@ -433,6 +547,45 @@ File: src/app/(admin)/admin/milestones/page.tsx
 - **Renders.** `MilestonesTable` seeded with `initialData`. Page title
   is "Road So Far".
 
+## /admin/posts
+File: src/app/(admin)/admin/posts/page.tsx
+
+- **Route.** `/admin/posts`.
+- **Rendering mode.** dynamic.
+- **Auth.** Admin session; viewers get no NEW / EDIT / DELETE controls.
+- **Data.** `getAllPostsAdmin()` (drafts included).
+- **Renders.** The posts table with EDIT links and `InlineDelete`.
+
+## /admin/posts/new, /admin/posts/[id]/edit
+Files: src/app/(admin)/admin/posts/new/page.tsx, src/app/(admin)/admin/posts/[id]/edit/page.tsx
+
+- **Rendering mode.** dynamic.
+- **Auth.** Admin session; viewers are redirected away.
+- **Data.** Edit: `getPostByIdAdmin(id)`; unknown -> `notFound()`.
+- **Renders.** `PostForm` (markdown body, draft / publish, category,
+  thumbnail). Posts keep full-page editing on purpose -- a long-form editor
+  is too cramped for the slide-in panel (S82).
+
+## /admin/profile
+File: src/app/(admin)/admin/profile/page.tsx
+
+- **Route.** `/admin/profile`.
+- **Rendering mode.** dynamic.
+- **Auth.** Admin session. The env godfather has no DB row, so the page tests
+  the session id `"godfather"` (not `isGodfather`) to decide what to show.
+- **Data.** `getAdminAccountById()`.
+- **Renders.** `AdminProfileForm` (display name, mobile number, password).
+
+## /admin/qr
+File: src/app/(admin)/admin/qr/page.tsx
+
+- **Route.** `/admin/qr` (S72C).
+- **Rendering mode.** dynamic.
+- **Auth.** Admin session (viewers included -- it writes nothing).
+- **Renders.** `QRGenerator`: pick a public route from the shared
+  `src/types/routes.ts` list (which includes `/bootstrap/feedback`, S76D)
+  or type a URL, then download the code as SVG or PNG (S76F).
+
 ## /admin/settings
 File: src/app/(admin)/admin/settings/page.tsx
 
@@ -466,9 +619,9 @@ File: src/app/(admin)/admin/sponsors/page.tsx
 - **Rendering mode.** dynamic (also reads `searchParams`).
 - **Auth.** Admin session.
 - **Data.** `getSponsors()` (list mode only).
-- **Renders.** With `?new=true`, a `SponsorForm` in create mode.
-  Otherwise a sponsors table with per-row EDIT link and `InlineDelete`;
-  uses an in-file `truncateText` helper for logo URLs.
+- **Renders.** With `?new=true`, a `SponsorForm` in create mode (its own
+  page). Otherwise `SponsorsTable`: per-row EDIT opens `SponsorForm` in the
+  slide-in panel, and `InlineDelete`.
 
 ## /admin/sponsors/[id]/edit
 File: src/app/(admin)/admin/sponsors/[id]/edit/page.tsx
@@ -476,8 +629,9 @@ File: src/app/(admin)/admin/sponsors/[id]/edit/page.tsx
 - **Route.** `/admin/sponsors/<id>/edit`.
 - **Rendering mode.** dynamic.
 - **Auth.** Admin session.
-- **Data.** Direct `sql`SELECT * FROM sponsors WHERE id = ${id}`` via
-  `@/lib/db` (inline SQL). Missing -> `notFound()`.
+- **Data.** `getSponsorById(id)` (`services/sponsors`). Missing ->
+  `notFound()`. The page stays for bookmarks and deep links; the list edits
+  in the slide-in panel.
 - **Renders.** `SponsorForm` in edit mode + danger zone with
   `DeleteSponsorButton`.
 
@@ -489,11 +643,15 @@ File: src/app/(admin)/admin/team/page.tsx
 - **Auth.** Admin session.
 - **Data.** `getMembers()`.
 - **Renders.** Three modes via query params: `?import=true` ->
-  `BulkImportTeam`; `?new=true` -> `MemberForm` create; default ->
-  `BulkTeamPhotoUpload` plus a members table. Each row has
-  `QuickPhotoUpload`, an EDIT link, and `InlineDelete` (permanent).
+  `BulkImportTeam`; `?new=true` -> `MemberForm` create (its own page);
+  default -> `BulkTeamPhotoUpload` plus `TeamMembersTable` (drag reorder
+  within a tier, active toggle). Each row has `QuickPhotoUpload`, EDIT
+  (opens `MemberForm` in the slide-in panel, S82), and `InlineDelete`
+  (permanent).
 - **Notable.** Row thumbnails use a raw `<img>` (with the
-  `no-img-element` lint disabled inline) rather than `next/image`.
+  `no-img-element` lint disabled inline) rather than `next/image`. The table
+  resyncs its local rows when `router.refresh()` delivers new props (S82),
+  which is also what makes a quick photo upload show its new thumbnail.
 
 ## /admin/team/[id]/edit
 File: src/app/(admin)/admin/team/[id]/edit/page.tsx
@@ -553,6 +711,20 @@ File: src/app/(docs)/docs/[slug]/page.tsx
 
 ---
 
+## /docs/login
+File: src/app/docs/login/page.tsx
+
+- **Route.** `/docs/login` (S52B).
+- **Rendering mode.** client component.
+- **Auth.** Public -- it is the way in.
+- **Renders.** A password field that POSTs to `/api/docs/auth`, which sets
+  the docs cookie.
+- **Notable.** Deliberately OUTSIDE the `(docs)` route group: a nested
+  layout nests inside its parent, so a page under `(docs)/docs/` could never
+  escape the docs sidebar. Do not move it.
+
+---
+
 # Standalone admin token pages
 
 These live under `/admin/*` but *outside* the `(admin)` route group, so
@@ -585,6 +757,19 @@ File: src/app/admin/invite/[name]/[token]/page.tsx
   missing/expired/used; otherwise `AdminRegisterForm` (prefilled with
   `invitee_name`, posts to `/api/admin/register`).
 - **Metadata.** `robots: { index: false, follow: false }`.
+
+---
+
+## /admin/register
+File: src/app/admin/register/page.tsx
+
+- **Route.** `/admin/register?token=...` -- the S48 open viewer invite.
+- **Rendering mode.** dynamic.
+- **Auth.** Token-gated public (middleware exempts it; no AdminShell).
+- **Data.** `getOpenInviteToken(token)`; a NAMED invite token pasted here is
+  redirected to its canonical `/admin/invite/<name>/<token>` page via
+  `getNamedInviteSlug`.
+- **Renders.** `AdminRegisterForm`, which registers the visitor as a viewer.
 
 ---
 
@@ -625,6 +810,18 @@ File: src/app/bootstrap/checkin/[token]/page.tsx
   max_group_size`. A bad token or inactive session yields a "not
   started" state (all context null).
 
+## /bootstrap/checklist/[id]
+File: src/app/bootstrap/checklist/[id]/page.tsx
+
+- **Route.** `/bootstrap/checklist/<visitorId>` (S73D).
+- **Rendering mode.** dynamic, no polling -- a reload is the refresh.
+- **Auth.** Public; the id is the visitor's own row id from their check-in
+  response. Unknown or malformed ids get the same dead end as a bad check-in
+  token.
+- **Data.** `getVisitorChecklistContext(id)` -- the visitor's group and which
+  stalls it has visited (`bootstrap_stall_visits`).
+- **Renders.** `BootstrapChecklist`.
+
 ## /bootstrap/feedback
 File: src/app/bootstrap/feedback/page.tsx
 
@@ -646,6 +843,17 @@ File: src/app/bootstrap/register/group/page.tsx
 - **Renders.** `BootstrapRegister` with `variant="group"` and
   `hasSession`.
 
+## /bootstrap/register/pool
+File: src/app/bootstrap/register/pool/page.tsx
+
+- **Route.** `/bootstrap/register/pool` (S74B).
+- **Rendering mode.** static by consequence: it reads nothing.
+- **Auth.** Public.
+- **Renders.** `BootstrapRegister variant="pool"` with a role choice (stall
+  volunteer or group lead). Deliberately does NOT look up the active session:
+  it has no session-dependent UI, and it must stay usable while a session is
+  running (registering for the NEXT event).
+
 ## /bootstrap/register/stall
 File: src/app/bootstrap/register/stall/page.tsx
 
@@ -655,4 +863,6 @@ File: src/app/bootstrap/register/stall/page.tsx
 - **Data.** `getActiveBootstrapSession()`; if a session exists,
   `getBootstrapStalls(session.id)`.
 - **Renders.** `BootstrapRegister` with `variant="stall"`, `hasSession`,
-  and a slimmed stall list (`{id, stall_name}`).
+  and a slimmed stall list (`{id, stall_name}`). Since S74B there is no form
+  without an active session: it points at `/bootstrap/register/pool`
+  instead (before S74B it silently fell through to pre-registration).

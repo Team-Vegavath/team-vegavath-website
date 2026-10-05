@@ -1,6 +1,6 @@
 # Admin System
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 The admin panel is the protected back-office for the Team Vegavath site.
 It lives under `/admin`, is guarded by NextAuth v5 (beta) plus middleware,
@@ -12,7 +12,7 @@ page, and the login audit log.
 All claims below are taken from the code as it stands: `src/lib/auth.ts`,
 `src/lib/services/admin.ts`, `src/middleware.ts`, the `(admin)` route group,
 the token-gated public pages, the account API routes, and migrations 006,
-010, 012, 019 and 020.
+010, 012, 019, 020 and 026.
 
 ## The three roles, and the counter-intuitive part
 
@@ -52,15 +52,15 @@ When a user submits the login form, `authorize()` runs in this order:
 1. **DB accounts first.** It looks up `admin_accounts` by lowercased
    `username`. If a row exists, the submitted password is checked against
    `password_hash` with `bcrypt.compare`. On success it returns a user
-   object with `isAdmin: true`, `isGodfather: (role === "godfather")`, and
-   the account's `token_version` (read in a separate query so login still
+   object with `isAdmin: true`, `isGodfather: (role === "godfather")`,
+   `isViewer: (role === "viewer")`, and the account's `token_version` (read in a separate query so login still
    works if migration 012 has not added the column yet -- it defaults to 0).
 2. **Env "godfather" fallback.** If the `admin_accounts` table does not
    exist yet (the DB lookup throws), or the username matched no row, it
    falls through to the environment super-admin. It compares the lowercased
    username to `ADMIN_USERNAME` and the password to `ADMIN_PASSWORD_HASH`
    (a bcrypt hash). On success it returns a user with `id: "godfather"`,
-   `isAdmin: true`, `isGodfather: true`, and display name
+   `isAdmin: true`, `isGodfather: true`, `isViewer: false`, and display name
    `ADMIN_DISPLAY_NAME` (default "Vegavath Admin").
 
 `bcrypt.compare` is wrapped in `.catch(() => false)` in both branches so a
@@ -70,18 +70,22 @@ credentials rather than crashing the route.
 ### Sessions (JWT strategy)
 
 Sessions use the `jwt` strategy with `maxAge` of 24 hours. The `jwt`
-callback stamps `isAdmin`, `isGodfather`, `accountId` (the user id), and
-`tokenVersion` onto the token at sign-in. On every later refresh, for DB
+callback stamps `isAdmin`, `isGodfather`, `isViewer`, `accountId` (the user
+id), and `tokenVersion` onto the token at sign-in. On every later refresh, for DB
 accounts only (`accountId !== "godfather"`), the callback re-reads
 `token_version` from `admin_accounts` and returns `null` (forcing
-re-login) if it no longer matches the token's stored version. This is the
+re-login) if it no longer matches the token's stored version, or if the
+account row is gone (a deleted account is logged out on its next refresh). This is the
 mechanism that kills every live session for an account when its password is
 reset. If the column/table is missing or the DB errors, it allows the token
 through rather than locking everyone out. The env godfather is exempt from
 this check, so its JWTs are never invalidated by a version bump.
 
-The `session` callback copies `isAdmin` and `isGodfather` onto
-`session.user`. `pages.signIn` is `/admin`, so unauthenticated access
+The `session` callback copies `isAdmin`, `isGodfather`, `isViewer` and
+`accountId` onto `session.user`. `accountId` (S67) is the `admin_accounts.id`,
+or the literal `"godfather"` for the env account -- that string, not
+`isGodfather`, is the exact test for "environment-configured account", since a
+DB account can carry `role = 'godfather'` too. `pages.signIn` is `/admin`, so unauthenticated access
 redirects to the login screen.
 
 ### Two-layer guard
@@ -96,7 +100,8 @@ architecture contract in CLAUDE.md):
 - **In-route re-check.** Every admin page calls `await auth()` and
   `redirect("/admin")` when `!session?.user?.isAdmin`. Every admin API route
   calls `await auth()` and returns `401` when `!session?.user?.isAdmin`.
-  Routes that mutate accounts additionally require `isGodfather`.
+  Every mutating route then returns `403` when `isViewer`. Routes that mutate
+  accounts additionally require `isGodfather`.
 
 ### Middleware exemptions
 
@@ -104,6 +109,7 @@ The middleware lets a few paths through without a session because a
 one-time token in the URL is the gate, not the cookie:
 
 - `/admin/invite/...` (S27 registration pages)
+- `/admin/register` (S48 open viewer link page)
 - `/api/admin/register` and `/api/admin/credentials/reset`
 - any path matching `/admin/[username]/credentials/...` (S29 reset pages)
 
@@ -113,22 +119,29 @@ per Edge isolate for 60 s, with `NEXT_PUBLIC_MAINTENANCE_MODE=true` as an
 emergency override) and rewrites non-admin, non-API traffic to
 `/maintenance`. `/admin` and `/api` stay reachable so the toggle can be
 switched off from the panel. On a DB error it fails open (site stays up).
+The middleware also runs the S52B `/docs` password gate; see
+[Middleware and Config](/docs/files-middleware).
 
 ## Account types
 
-There are exactly two roles. The distinction is enforced by the
-`isGodfather` flag on the session and by `role` in `admin_accounts` (a CHECK
-constraint allows only `'admin'` and `'godfather'`, default `'admin'` --
-migration 010).
+There are three roles, enforced by the `isGodfather` and `isViewer` session
+flags and by `role` in `admin_accounts` (migration 010 allowed `'admin'` and
+`'godfather'`, default `'admin'`; migration 019 added `'viewer'`).
 
-| Capability | godfather | regular admin |
-| --- | --- | --- |
-| Log in and use every content page (events, team, gallery, etc.) | Yes | Yes |
-| See the Accounts list | Yes | Yes |
-| Generate invite links | Yes | No |
-| See and approve/reject pending registration requests | Yes | No |
-| Generate password-reset links for accounts | Yes | No |
-| Delete admin accounts | Yes | No |
+| Capability | godfather | admin | viewer |
+| --- | --- | --- | --- |
+| Enter the panel and read every page (events, team, applications, etc.) | Yes | Yes | Yes |
+| Create, edit, delete, upload, export to Google Sheets | Yes | Yes | No |
+| See the Accounts list | Yes | Yes | Yes |
+| Generate invite links (named, or the open viewer link) | Yes | No | No |
+| See and approve/reject pending registration requests | Yes | No | No |
+| Generate password-reset links for accounts | Yes | No | No |
+| Delete admin accounts | Yes | No | No |
+
+Viewers see the same pages with the write controls hidden: every table and
+form takes an `isViewer` prop, and the `?new=true` / `?import=true` create
+screens fall back to the list for them. The CSV exports stay open to viewers
+(they are reads).
 
 There are two ways to be a godfather:
 
@@ -140,31 +153,43 @@ There are two ways to be a godfather:
 - **A DB account with `role = 'godfather'`.** Stored in `admin_accounts`
   like any other, but with elevated privileges.
 
-Regular admins are DB accounts with `role = 'admin'`. In the Accounts UI the
-role renders with a colored dot: gold for `godfather`, accent for `admin`.
+Admins and viewers are DB accounts with `role = 'admin'` / `'viewer'`. In
+the Accounts table the role renders as uppercase text with a small square dot:
+gold for `godfather`, accent for `admin`, muted for `viewer`.
 
 The account-mutating API routes all enforce
 `session.user.isAdmin && session.user.isGodfather`; the Accounts page also
-hides the invite button, pending-requests table, reset button, and delete
+hides the invite controls, pending-requests table, reset button, and delete
 control from non-godfather sessions.
 
 ## Invite flow
 
 New DB accounts are created only through an invite that a godfather issues
-and then approves. The state machine lives on the `admin_invite_tokens`
+and then approves. An invite carries the role the account will get
+(`pending_role`, migration 019: `admin` or `viewer`). The state machine lives on the `admin_invite_tokens`
 table (migration 010, extended by 012), whose `status` moves through
 `generated` -> `pending_approval` -> `approved` | `rejected`.
 
 ### 1. Godfather generates an invite
 
-On `/admin/accounts` the godfather clicks "Generate invite", which POSTs to
-`POST /api/admin/accounts/invite` with an `inviteeName`. The route requires
-godfather, validates the name slugifies to something non-empty, then calls
-`createInviteToken(inviteeName)`. That inserts a row with a 32-byte hex
-`token`, the `invitee_name`, and an `invitee_slug` (lowercased,
-non-alphanumerics collapsed to `-`), `status = 'generated'`, and
-`expires_at = now() + 48 hours`. The route returns a full URL of the form
-`/admin/invite/{slug}/{token}` for the godfather to share.
+On `/admin/accounts` the godfather enters a name, picks a role ("Admin" or
+"Viewer - read only") and clicks "Generate invite", which POSTs to
+`POST /api/admin/accounts/invite` with `{ inviteeName, role }`. The route
+requires godfather, validates the name slugifies to something non-empty,
+treats any role other than `"viewer"` as `"admin"` (an unknown value is never
+trusted into a privilege level), then calls
+`createInviteToken(inviteeName, role)`. That inserts a row with a 32-byte hex
+`token`, the `invitee_name`, an `invitee_slug` (lowercased,
+non-alphanumerics collapsed to `-`), the `pending_role`,
+`status = 'generated'`, and `expires_at = now() + 48 hours`. The route
+returns a full URL of the form `/admin/invite/{slug}/{token}` plus the role,
+and the copy box notes "ADMIN INVITE" or "VIEWER INVITE" and the 48-hour
+expiry.
+
+Since S76C a failure returns the underlying error text
+(`Failed to create invite: <message>`) and the UI shows it via `failureText`.
+The route is godfather-only, so this is not a wider disclosure; swallowing it
+had cost a full diagnosis round-trip on a live prod failure.
 
 ### 2. Invitee opens the registration page
 
@@ -197,13 +222,46 @@ accent dot when any exist (`hasPendingAccounts` in `AdminShell`).
 - **Approve** -> `POST /api/admin/accounts/[id]/approve` (godfather only).
   It loads the invite, verifies it is `pending_approval` with the pending
   fields present, calls `createAdminAccount(...)` (which inserts into
-  `admin_accounts` with the already-hashed password and default
-  `role = 'admin'`), then sets the invite `status = 'approved'`. The account
+  `admin_accounts` with the already-hashed password and
+  `role = pending_role === 'viewer' ? 'viewer' : 'admin'`), then sets the
+  invite `status = 'approved'`. The account
   can now log in. If the username already exists the insert fails and the
   route returns 500 with an explanatory message.
 - **Reject** -> `POST /api/admin/accounts/[id]/reject` (godfather only).
   It verifies the invite is `pending_approval` and sets `status =
   'rejected'`; no account is created.
+
+### The open viewer link (S48)
+
+Named invites do not scale to a 30-person domain, so a godfather can also
+mint ONE reusable, unnamed link that registers anyone as a viewer. Per-person
+approval still happens in Pending Requests.
+
+- **Create.** `POST /api/admin/accounts/invite` with `{ type: "open" }` calls
+  `createOpenViewerToken()`: a row with `is_open = true` (migration 020),
+  `pending_role = 'viewer'`, `status = 'generated'`, and a **30-day** expiry.
+  The URL is the flat `/admin/register?token={token}` (there is no invitee name
+  to slugify).
+- **List and revoke.** `GET /api/admin/accounts/invite?type=open` returns the
+  active open links (the accounts page server-renders the same list; this lets
+  the client refresh it). `DELETE /api/admin/accounts/invite?tokenId=...`
+  revokes one by setting `status = 'rejected'`.
+- **Register.** `/admin/register` is public and chrome-less. A valid open token
+  renders `AdminRegisterForm` in open mode; a still-valid NAMED token pasted
+  into that URL redirects to its canonical `/admin/invite/{slug}/{token}` page;
+  anything else shows "Invalid invite link". The form POSTs
+  `/api/admin/register` with `open: true`, and `submitOpenRegistration` writes a
+  **fresh named row** (`is_open = false`, `status = 'pending_approval'`, its own
+  48-hour expiry) carrying the registration -- the open token itself is left
+  untouched so it stays reusable. From there approval is identical to a named
+  invite.
+- **Production only (S67).** The `OpenViewerLink` control renders only when
+  `NEXT_PUBLIC_SHOW_VIEWER_INVITES === "true"`, which is set in the prod Vercel
+  project and nowhere else: an open link minted against the draft or a local
+  database would be a live credential path into that environment. It renders
+  nothing at all otherwise (a disabled control would advertise the feature).
+  This is an additional condition on top of the godfather gate, not a
+  replacement for it.
 
 ## Password reset flow
 
@@ -234,7 +292,7 @@ reset link". On success it renders `ResetPasswordForm`.
 
 The form POSTs to `POST /api/admin/credentials/reset` (public, token is the
 gate). It validates match and length >= 8 and calls
-`usePasswordResetToken(token, newPassword)`. That re-validates the token,
+`consumePasswordResetToken(token, newPassword)`. That re-validates the token,
 bcrypt-hashes the new password, updates `admin_accounts` setting
 `password_hash` and **`token_version = token_version + 1`**, then marks the
 reset token `used_at = now()`. Bumping `token_version` is what invalidates
@@ -245,8 +303,25 @@ above), forcing a re-login everywhere.
 
 All pages live in the `(admin)` route group, are `force-dynamic`, re-check
 `isAdmin` at the top, and (except the login screen) render inside
-`AdminShell`. The sidebar nav order is: Dashboard, Events, Team,
-Applications, Bootstrap, Gallery, Road So Far, Sponsors, Settings, Accounts.
+`AdminShell`. The sidebar is grouped into four labelled sections (S65):
+
+- **Overview:** Dashboard
+- **Content:** Events, Posts, Team, Gallery, Road So Far, Sponsors,
+  Announcements
+- **Recruitment:** Applications
+- **System:** Bootstrap, Settings, QR Codes, Profile, Accounts
+
+**Editing (S82).** On the Events, Team, Sponsors and Announcements lists, EDIT
+opens the form in a slide-in panel over the table (`AdminEditPanel`, one shared
+component) instead of navigating away; the panel closes and the table refreshes
+on save. "Add" / "New" still uses its own page (`?new=true`). Events, Team and Sponsors also keep
+their full-page edit routes; announcements are panel-only.
+
+**Uploads (S76E).** Every admin upload goes through one helper,
+`uploadToR2(file, path)` in `src/lib/utils.ts`, which POSTs to
+`/api/admin/upload`. It refuses a file over 4 MB before uploading (Vercel's
+request body limit is about 4.5 MB, and a phone HDR photo is routinely 4-6 MB),
+with a message that names the file and its size.
 
 ### `/admin` -- Login
 
@@ -265,27 +340,41 @@ limit** (5 failed attempts per IP per 15 minutes, queried against
 Overview page. Shows a recruitment OPEN/CLOSED badge (from `site_settings`),
 four stat cards (Events, Team Members, Gallery Items, Active Sponsors), a
 **Recent Logins** table (latest 10 from `admin_login_log`), and a **Recent
-Applications** table (latest 10 from the join form). All data is fetched in
+Applications** table (latest 10 from the join form, domains shown in the
+fixed /join order). All data is fetched in
 parallel with per-query `.catch` fallbacks so one failing service does not
 blank the page.
 
 ### `/admin/events` and `/admin/events/[id]/edit` -- Events
 
-The list page (`?new=true` shows the create form via `EventForm mode="create"`)
-lists up to 100 events with dates and a delete control (`InlineDelete`). The
-edit page loads a single event by id (via a direct `SELECT` in the page --
-note: the wider contract wants SQL in services, this page reads inline),
-renders `EventForm` for editing, plus `ToggleEventStatusButton` and
-`DeleteEventButton`. Known open item (CLAUDE.md): the `hackathons` category
-is offered by the form but rejected by the DB CHECK constraint, causing a
-500 on create.
+The list page loads up to 100 events into `EventsTable` (S82): EDIT opens
+`EventForm` in the slide-in panel, REGISTRATIONS goes to the full edit page,
+and ARCHIVE is a soft delete (`InlineDelete` against
+`DELETE /api/admin/events?id=...`). `?new=true` shows the create form
+(`EventForm mode="create"`). Dates are formatted on the server and passed in,
+because formatting a SQL DATE in the client would use the viewer's timezone
+while SSR uses the server's.
+
+The edit page loads the event with `getEventById` and its registrations with
+`getEventRegistrations` (both in `services/events.ts`), and renders
+`EventForm`, `ToggleEventStatusButton`, `EventRegistrationsTable` (S47, the
+native /register sign-ups) and a Danger Zone with `DeleteEventButton`
+(permanent delete). Viewers can read the registrations; the form, toggle and
+Danger Zone are hidden for them.
+
+The `hackathons` category is accepted by the DB since migration 018 (applied)
+but has never been exercised through the form; creating one is the remaining
+check.
 
 ### `/admin/team` and `/admin/team/[id]/edit` -- Team
 
 Manages team members. The list supports `?new=true` (add member via
-`MemberForm`) and `?import=true` (bulk import via `BulkImportTeam`). It also
-wires up `BulkTeamPhotoUpload` and `QuickPhotoUpload` for member photos, and
-`InlineDelete` per row. The edit page edits a single member.
+`MemberForm`) and `?import=true` (bulk import via `BulkImportTeam`), and
+shows `BulkTeamPhotoUpload` above `TeamMembersTable`. The table carries
+drag-to-reorder within a tier, an inline active toggle, a per-row
+`QuickPhotoUpload`, `InlineDelete`, and EDIT in the slide-in panel (S82). The
+edit page (`getTeamMemberById`) edits a single member and holds
+`DeleteMemberButton`.
 
 ### `/admin/applications` -- Applications
 
@@ -293,16 +382,33 @@ The recruitment pipeline viewer. Filter tabs are the status pipeline (ALL,
 PENDING, SHORTLISTED, INTERVIEW, SELECTED, REJECTED) plus one tab per
 interview group (from `INTERVIEW_GROUPS`), which filter by `interview_group`
 rather than status. It loads up to 200 applications for the active filter
-and renders `ApplicationsTable`. Selects by `?status=` or `?group=`.
+(`?status=` or `?group=`) and renders `ApplicationsTable`.
+
+- **Rows.** Domains are listed in the fixed /join order (`orderedDomainLabels`,
+  S82B); a stored pre-S82B "Operations" or "Sponsorship" displays as
+  "Operations & Sponsorship". Expanding a row shows the contact details, the
+  course (S81), and either the new-form answers -- grouped by question set in
+  /join order, with the merged domains' answers under their branch headings --
+  or, for a pre-S81 row (`answers IS NULL`), the old free-text fields.
+- **Controls.** Per-row status and interview-group selects, bulk status on a
+  selection, and (on the plain INTERVIEW tab) an auto-assign strip that
+  round-robins unassigned interviewees across 1-4 panels. All hidden for
+  viewers.
+- **Export.** EXPORT CSV (`GET /api/admin/applications/export`, honours the
+  status filter, open to viewers) and, for non-viewers, "Export to Google
+  Sheets" (`POST /api/admin/applications/export/google`, S73K) via
+  `GoogleSheetsExportButton`. The two are independent: the CSV never depends on
+  the Google integration being configured or reachable.
 
 ### `/admin/bootstrap` -- Bootstrap
 
 Event-day operations for the "Bootstrap" event. If a `BootstrapSession` is
 active it renders `BootstrapAdminDashboard` seeded with that session's stalls
-and volunteers; otherwise it renders `BootstrapSessions` to create/select a
-session. (Bootstrap has its own extensive subsystem of API routes and public
-visitor pages -- QR check-in, feedback, volunteer self-registration -- which
-are outside this admin guide's scope.)
+and volunteers; otherwise it renders `BootstrapSessions` (all sessions, the
+unassigned pre-registration pool, and `isViewer`) to create or select one. The
+whole subsystem -- QR check-in, groups, the stall queue and visits, the visitor
+checklist, volunteer self-registration, feedback -- is documented in
+[Bootstrap](/docs/bootstrap).
 
 ### `/admin/gallery` -- Gallery
 
@@ -320,9 +426,22 @@ renders `MilestonesTable` for inline editing/ordering.
 ### `/admin/sponsors` and `/admin/sponsors/[id]/edit` -- Sponsors
 
 Manages sponsors. The list page supports `?new=true` (add via `SponsorForm
-mode="create"`) and shows all sponsors with `InlineDelete`. The edit page
-edits a single sponsor. `is_active` controls whether a sponsor counts toward
-the dashboard's "Active Sponsors" stat and appears publicly.
+mode="create"`) and renders `SponsorsTable`, where EDIT opens the form in the
+slide-in panel (the first table to get it, S62) and `InlineDelete` removes a
+row. The edit page (`getSponsorById`) edits a single sponsor. `is_active`
+controls whether a sponsor counts toward the dashboard's "Active Sponsors" stat
+and appears publicly.
+
+### `/admin/announcements` -- Announcements
+
+The homepage announcement slot (S73E, table `announcements`, migration 026).
+`?new=true` shows `AnnouncementForm mode="create"`; the list (up to 50 rows)
+is `AnnouncementsTable`, with EDIT in the slide-in panel and `InlineDelete`.
+Each announcement has a title, optional body, an optional CTA (shown only when
+both label and link are set), and separate desktop and mobile images, each
+removable. Only one shows: the homepage takes the first active row by
+`display_order` (`LIMIT 1`), so two active rows are allowed but only the first
+appears.
 
 ### `/admin/posts`, `/admin/posts/new`, `/admin/posts/[id]/edit` -- Posts
 
@@ -338,16 +457,23 @@ reference implementation for both.
 
 ### `/admin/profile` -- Profile
 
-The signed-in admin's own account record (display name, mobile number, password
-change), backed by `GET`/`PATCH /api/admin/accounts/me`.
+The signed-in admin's own account record: display name, mobile number
+(10 digits, filtered as typed), and a password change that requires the current
+password. The page reads the record server-side; saves go to
+`PATCH /api/admin/accounts/me`, which scopes its UPDATE to the caller's own
+`accountId`. The env godfather has no `admin_accounts` row, so it gets a
+read-only "Environment-configured account" card instead of the form.
 
 ### `/admin/qr` -- QR generator
 
-Generates QR codes for the site's public route pages. The dropdown is driven by
-the shared `src/types/routes.ts` list. That file exists precisely so a client
-component can share the route list **without** importing a service -- a value
-import from `src/lib/services/*` drags `lib/db.ts` and the Neon driver into the
-browser bundle, where db.ts's module-level `DATABASE_URL` check throws.
+"QR Codes" in the nav. Generates QR codes for the site's public route pages.
+The dropdown is driven by `QR_ROUTES` in the shared `src/types/routes.ts`
+list: the sitemap's routes plus `/bootstrap/feedback` (S76D), which is public
+and shareable but not crawlable. Each code downloads as SVG or as a 1024px PNG
+(S76F). That file exists precisely so a client component can share the route
+list **without** importing a service -- a value import from
+`src/lib/services/*` drags `lib/db.ts` and the Neon driver into the browser
+bundle, where db.ts's module-level `DATABASE_URL` check throws.
 
 ### `/admin/settings` -- Settings
 
@@ -359,16 +485,17 @@ Edits the `site_settings` key/value store via `SettingsForm`. The
 public site to `/maintenance`; `f1_enabled` is the kill switch for every `/f1`
 page, and a missing row reads as OFF by design.
 
-A read-only "Recent Applications" table also still lives on this page. It is
-superseded by `/admin/applications`; removing it needs a decision, so it is
-flagged rather than deleted.
+The read-only "Recent Applications" table that used to sit below the form was
+removed in S58; `/admin/applications` is the canonical view. A viewer has
+nothing writable here, so it sees a notice instead of the form.
 
 ### `/admin/accounts` -- Accounts
 
 Admin account management (covered in detail above). Everyone with `isAdmin`
-can view the accounts table. Godfathers additionally see the pending-requests
-table, the "Generate invite" button, a per-row "Reset password" button, and
-a delete control. Deletion goes through `DELETE /api/admin/accounts?id=...`,
+can view the accounts table (display name, username, mobile, role, created).
+Godfathers additionally see the pending-requests table (with each request's
+role), the "Generate invite" control, the open viewer link (production only),
+a per-row "Reset password" button, and a delete control. Deletion goes through `DELETE /api/admin/accounts?id=...`,
 which requires godfather and refuses to delete the **last** admin account
 (`countAdminAccounts() <= 1` -> 400); the UI also disables delete when only
 one account remains.

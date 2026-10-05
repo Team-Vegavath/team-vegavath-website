@@ -1,14 +1,14 @@
 # Team Vegavath
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05). Migrations 001-031 are all applied._
 
 Official website for Team Vegavath, the motorsport and innovation student club at PES University Electronic City Campus (PESU ECC), Bangalore. Live at [vegavath.live](https://vegavath.live). The site combines public-facing pages, a protected admin panel, a "Bootstrap" event-day volunteer operations system, and this in-app documentation site.
 
 ## What it does
 
-- **Public site** -- home, about, crew, events, gallery, sponsors, a blog at `/posts`, an F1 stats section, per-project build pages at `/projects`, and a join/apply flow for prospective members.
-- **Admin panel** -- authenticated dashboard to manage events, crew, sponsors, gallery, posts, applications, milestones, accounts and site settings. Admin API routes re-check the session and admin status inside each route, even though middleware also guards `/admin`.
-- **Bootstrap system** -- an event-day ops tool for volunteers: session logins, stall management, attendee registration, check-in QR overlays, and feedback collection.
+- **Public site** -- home (with an admin-managed announcement slot), about, crew, events with native registration, gallery, sponsors, a blog at `/posts`, an F1 stats section, per-project build pages at `/projects` (including an interactive maze-solver demo), and a four-step `/join` application across five domains.
+- **Admin panel** -- authenticated dashboard to manage events, team, sponsors, announcements, gallery, posts, applications (with CSV and Google Sheets export), milestones, QR codes, accounts and site settings. Three roles: godfather, admin, and a read-only viewer. Admin API routes re-check the session and admin status inside each route, even though middleware also guards `/admin`, and every mutating route refuses viewers.
+- **Bootstrap system** -- an event-day ops tool: volunteer self-registration and a pre-registration pool, per-day volunteer logins, stall occupancy by group with a queue and per-stall capacity, a visit log that feeds each student's checklist, per-stall countdowns, QR check-in, and feedback with an AI summary.
 - **Docs site** -- `/docs` renders these files in-app, behind a shared-password cookie gate.
 
 ## Tech stack
@@ -19,15 +19,17 @@ Official website for Team Vegavath, the motorsport and innovation student club a
 - **Data:** Neon Postgres via `@neondatabase/serverless`; all SQL lives in `src/lib/services/*.ts`.
 - **Storage:** Cloudflare R2 (S3-compatible) for images and media.
 - **Auth:** NextAuth v5 (beta) with bcryptjs.
+- **Exports:** `googleapis` (Google Sheets, service account).
+- **Tests:** Vitest (`npm test`) for the pure utility modules.
 - **Deploy:** Vercel.
 
 Project version: 0.1.0.
 
 ## Layout
 
-- `src/app/` -- routes: `(public)`, `(admin)`, `admin`, `api`, `bootstrap`, `docs`, `maintenance`.
-- `src/lib/` -- `auth.ts`, `db.ts`, `r2.ts`, `utils.ts`, plus `services/` and `utils/`.
-- `src/components/` -- grouped by feature (about, admin, bootstrap, crew, docs, events, f1, gallery, home, join, layout, legal, posts, sponsors, ui).
+- `src/app/` -- routes: `(public)`, `(admin)`, `(docs)`, `admin` (token-gated account pages), `api`, `bootstrap`, `docs` (the docs login), `maintenance`, plus `robots.ts` and `sitemap.ts`.
+- `src/lib/` -- `auth.ts`, `db.ts`, `r2.ts`, `utils.ts` (including `uploadToR2`), `docs-config.ts`, plus `services/` (all SQL, plus the two outbound services `f1.ts` and `googleExport.ts`), `utils/` (pure helpers with Vitest tests: join questions, phone, SRN/PRN, link rules, export tables, group labels) and `maze/` (the maze solver's pure logic).
+- `src/components/` -- grouped by feature (about, admin, bootstrap, crew, docs, events, f1, gallery, home, join, layout, legal, posts, projects, sponsors, ui).
 - `src/types/` -- shared types and constants. Client components import constants from here, never from `services/`: a value import drags the Neon driver into the browser bundle.
 
 ## Documentation

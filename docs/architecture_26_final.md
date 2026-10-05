@@ -2,7 +2,7 @@
 
 **Supersedes:** `vegavath-architecture-v3.pdf` (March 2026) where noted below.
 **Companion doc:** `context_for_revamp.md` - the frontend redesign spec. This file and that one are meant to be read together.
-**Prepared:** July 2026, for the frontend revamp build. **Updated 2026-07-15 after revamp Session 29.**
+**Prepared:** July 2026, for the frontend revamp build. **Updated 2026-07-15 after revamp Session 29; current-state facts corrected 2026-10-05 in Session 82C.**
 **You are:** an AI coding agent (Claude Code / Fable 5 or similar) that has **never seen this codebase before**. Read Section 0 before anything else.
 
 > **STATUS UPDATE (2026-07-15): the revamp this document was prepared for is
@@ -14,6 +14,16 @@
 > file remains useful for the backend fundamentals (services contract, R2
 > layout, rendering strategy) and the truth-hierarchy protocol. Section 13
 > below summarizes what was added since this doc was written.
+
+> **STATUS UPDATE (2026-10-05, Session 82C): this file is a July 2026
+> snapshot.** The current, code-verified reference is the wiki in
+> `docs/wiki/` (rendered in-app at `/docs`): architecture, routes, database,
+> deployment, the admin and Bootstrap systems, and file-by-file references
+> for every page, API route and component. The S82C pass corrected the
+> statements below that read as CURRENT facts -- migration status, the
+> applications columns, env vars, outbound calls, rendering, folder and
+> service lists -- and Section 14 summarizes what changed between S30 and
+> S82B. Everything else here is history.
 
 ---
 
@@ -148,6 +158,8 @@ migrations/              # SQL schema migrations
 scripts/                 # Seed scripts (seed-events.ts, seed-gallery.ts, seed-team.ts, seed-sponsors.ts)
 ```
 
+**S82C:** the tree above is the July 2026 shape; the current one is in `AGENTS.md` and `docs/wiki/architecture.md`. Since then `app/` gained `(docs)/docs`, `docs/login`, `admin/` (token-gated account pages), `bootstrap/` and `maintenance/`; `(public)` gained posts, f1 and projects; `components/` gained bootstrap, f1, posts, projects, legal and docs; `lib/` gained `utils/` (pure, Vitest-tested helpers), `maze/` and `docs-config.ts`; `types/` gained announcement, post, routes and next-auth.d.ts; and middleware now also runs maintenance mode and the `/docs` gate.
+
 **Delta from the original v3.0 doc:** the original PDF (Section 3) proposed `public/models/` for the `.glb` kart model, committed to git. The actual implementation correctly moved this to R2 `models/` instead - consistent with the "zero media in git" principle, and the right call. Don't "fix" this back to matching the PDF; the PDF was wrong here, reality is right.
 
 ---
@@ -171,6 +183,11 @@ admin accounts, invite tokens, password reset tokens), `services/about.ts`
 its exported types deliberately never include password_hash or session
 tokens). `services/applications.ts` also grew `setInterviewGroup`,
 `bulkSetStatus`, `deleteApplication` and status/group filters.
+
+**Added after the revamp (S82C list):** `services/posts.ts` (S50),
+`services/announcements.ts` (S73E), and two services that hold no SQL
+because they wrap external APIs: `services/f1.ts` (Jolpica, S50) and
+`services/googleExport.ts` (Google Sheets, S73K/S74A).
 
 ---
 
@@ -207,6 +224,8 @@ vegavath-media/
 - **`/events` page has a known bug (confirmed by Abhi directly, not previously documented anywhere): event images are not loading from R2 for some reason**, separate from the already-known "no admin upload flow yet → `cover_image_url` is null" issue. When implementing the admin events image-upload flow (in scope for this revamp), also check whether existing `cover_image_url`/gallery URLs that *are* populated are actually resolving - this may be a `next.config.ts` `remotePatterns` issue, a broken R2 public URL, or a stale/incorrect path. Diagnose before assuming it's purely "no image uploaded yet."
 - **`team_members` videos are YouTube embeds**, not R2-hosted video files - the club's YouTube account hosts video content, R2 only holds photos for team members. Don't build video-upload-to-R2 UI for team members; the pattern is: photo → R2, video → YouTube URL stored as a link/embed.
 
+**S82C:** uploads now go through `uploadToR2` in `src/lib/utils.ts` and also write under `events/{slug}/` (logos, covers), `posts/{slug}/` (thumbnails), `announcements/` and `gallery/{eventSlug}/`. So an `events/` prefix does exist now; the bullet above describes July.
+
 ### 5.3 The `payments/` folder - explicit scope note
 
 `payments/` contains screenshots from the PESU Academy student portal, used as step-by-step visual guides showing students how to pay event registration fees. **This is reference material for one specific purpose only: helping students complete event fee payment.** It is:
@@ -238,6 +257,11 @@ If you (the AI agent) encounter this folder while exploring the codebase or R2 b
 | `R2_PUBLIC_HOSTNAME`        | `next.config.ts`  | For`next/image` `remotePatterns`               |
 | `ADMIN_DISPLAY_NAME`        | `src/lib/auth.ts` | Optional display name for the env godfather account (S27) |
 | `NEXT_PUBLIC_MAINTENANCE_MODE` | `src/middleware.ts` | Emergency override only (S30): normal path is the admin settings toggle (`site_settings.maintenance_mode`), read by middleware with a 60 s cache |
+| `DOCS_PASSWORD` | `src/middleware.ts`, `/api/docs/auth` | Shared secret gating `/docs` (S52B). Fails OPEN when unset |
+| `GEMINI_API_KEY` | Bootstrap summarize route | Gemini feedback summary; the route returns 503 when unset |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | `src/lib/services/googleExport.ts` | Base64 service-account key for the Sheets export (S73K) |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | `src/lib/services/googleExport.ts` | The target sheet, shared with the service account |
+| `NEXT_PUBLIC_SHOW_VIEWER_INVITES` | `AccountsActions.tsx` | `"true"` only in the prod Vercel project: shows the open viewer link control (S67) |
 
 ### 6.2 Known-stale documentation - do not follow these, do not "fix" the code to match them
 
@@ -274,7 +298,9 @@ The original v3.0 PDF (Section 4) is the most detailed schema reference availabl
 
 ### 7.5 `applications` (Join Us)
 
-Rebuilt across migrations 003/004/005/011 (all applied): `id` (UUID PK) · `name` · `email` · `domain_interest` (+`_2`, `_3` - up to 3 picks) · `portfolio_url` · `mobile_number` · `srn_prn` · `semester` · `why_join` · `value_addition` · `domain_experience` · `design_portfolio_url` · `status` (`pending → shortlisted → interview → selected/rejected`, legacy `reviewed`/`accepted` still valid) · `interview_group` (A-D or NULL) · `submitted_at`
+Rebuilt across migrations 003/004/005/011/030/031 (all applied): `id` (UUID PK) · `name` · `email` · `domain_interest` (+`_2`, `_3` - up to 3 picks) · `portfolio_url` · `mobile_number` · `srn_prn` · `semester` · `why_join` · `value_addition` · `domain_experience` · `design_portfolio_url` · `status` (`pending → shortlisted → interview → selected/rejected`, legacy `reviewed`/`accepted` still valid) · `interview_group` (A-D or NULL) · `submitted_at` · `course` (030) · `answers` JSONB (030)
+
+**S82C:** since the S81 rebuild the form writes `course` and `answers` (every new-form answer, keyed by question id; NULL on every pre-S81 row) and no longer writes `portfolio_url`, `why_join`, `value_addition`, `domain_experience` or `design_portfolio_url` (kept for old rows). The domain CHECKs (031) allow the five current keys `Automotives`, `Robotics`, `Coding`, `Social Media` (shown as "Design & Social Media"), `Operations & Sponsorship`, plus the legacy `Operations`, `Sponsorship` and the FY25 values. Full detail: `docs/wiki/database.md`.
 
 ### 7.6 `site_settings`
 
@@ -293,14 +319,20 @@ Key-value store. `key` (PK) · `value` · `updated_at`. Known keys: `recruitment
 - `milestones` (010) - the About page "Road So Far" timeline: date_label, title, description, sort_order.
 - `admin_password_reset_tokens` (012) - one-time password reset links: 2h expiry, used_at, cascade delete with the account.
 
+**S82C, tables and columns added after 012** (013-031, all applied; the notable ones): `github_url` and the legacy tier (013); `bootstrap_groups`, `bootstrap_visitors`, `bootstrap_feedback` (014, extended 017); stall lead names, group size and the self-registration fields (015-016); `event_registrations` and the `viewer` role (019); open viewer invites (020); the pre-registration pool (021); `posts` (022-024); the stall switch request (025); `announcements` (026); `bootstrap_stall_queue` and `max_groups` (027, which retired `queued_by` / `queued_at`); `bootstrap_stall_visits` (028); `time_limit_minutes` (029); applications `course` / `answers` (030) and the merged domain (031). Per-table detail: `docs/wiki/database.md`.
+
 ---
 
-## 8. Rendering Strategy (unchanged, confirmed still accurate)
+## 8. Rendering Strategy (updated S82C)
 
 | Route                                                     | Strategy        | Revalidate | Why                                                               |
 | --------------------------------------------------------- | --------------- | ---------- | ----------------------------------------------------------------- |
-| `/`, `/about`, `/gallery`, `/crew`, `/sponsors` | ISR             | 60–120s   | Read-heavy, CDN-cacheable, admin changes propagate within minutes |
+| `/`, `/about`, `/gallery`, `/crew`, `/sponsors`, `/legal` | ISR             | 60–120s   | Read-heavy, CDN-cacheable, admin changes propagate within minutes |
 | `/events`                                               | ISR             | 60s        | Same                                                              |
+| `/posts`, `/posts/[slug]`                               | ISR             | 300s / 600s | Blog; the list reads searchParams so it reports dynamic         |
+| `/projects` and project pages                           | ISR             | 3600s      | Near-static build pages                                           |
+| `/f1/*`                                                 | ISR             | 60s        | Kill-switch response time, NOT freshness; upstream calls have their own long per-fetch windows |
+| `/bootstrap`, `/bootstrap/checklist/[id]`, check-in, feedback | SSR     | none       | Live event-day state                                              |
 | `/events/[slug]`                                        | SSR             | none       | Registration status must be live                                  |
 | `/join`                                                 | SSR             | none       | `recruitment_open` flag must be live                            |
 | `/admin`, `/admin/*`                                  | SSR + protected | none       | Always fresh, not cache-eligible                                  |
@@ -439,7 +471,8 @@ revamp-log entry for the named session has the full detail.
 
 **Join / applications pipeline**
 - 4-step application form with up to 3 domain picks (FY26 domain set),
-  apply-once cookie, honeypot (S17-S19).
+  apply-once cookie, honeypot (S17-S19). (Rebuilt in S81 and S82B; see
+  Section 14.)
 - Admin pipeline: status flow, interview groups A-D, bulk status, RFC 4180
   CSV export (S19, S28).
 
@@ -449,18 +482,55 @@ revamp-log entry for the named session has the full detail.
   guards, hardcoded SVG campus map, freed-stall notifications, queue wait
   timers) and `/admin/bootstrap` (sessions, credential generation with
   CSPRNG passwords, overrides, per-volunteer stall suggestions).
+  (Credential generation was replaced by self-registration in S35, and the
+  stall model was rebuilt around groups in S73B-S77; see Section 14.)
 - Deliberately its own visual system (`BS` palette); the ONLY part of the
   site where rounded corners are allowed.
 
 **Content & misc**
 - Milestones ("Road So Far"): DB-backed About timeline with a
   drag-to-reorder admin editor (S27, S29).
-- Favicon generated at build time by `src/app/icon.tsx` (S21); 404 page has
+- Favicon generated at build time by `src/app/icon.tsx` (S21; replaced by an
+  R2 tab icon in S57, the file is gone); 404 page has
   a playable canvas F1 game (S16-S22); team CSV bulk import (S15); gallery
   multi-file upload (S16).
-- **Migrations 001-012 are ALL applied to Neon as of 2026-07-15.** New
-  schema changes still go through numbered files applied manually by the
-  owner before dependent code deploys.
+- **Migrations 001-031 are ALL applied to Neon, owner-confirmed as of
+  2026-10-05 (S82C).** (This line read "001-012" in July.) New schema
+  changes still go through numbered files applied manually by the owner
+  before dependent code deploys.
+
+---
+
+## 14. Since the revamp (S30-S82B), summarized 2026-10-05
+
+One screen of what changed; the wiki has the detail and `docs/revamp-log.md`
+(local only) has the per-session record.
+
+- **Roles (S47-S48, S67):** a read-only `viewer` tier (`isAdmin` stays true,
+  `isViewer` is the write gate on every mutating route), named invites with
+  a role choice, one reusable open viewer link (production only), and a
+  self-service profile.
+- **Content:** native event registration (S47), the blog at `/posts` (S50,
+  thumbnails S54C), the F1 section on Jolpica behind a kill switch (S50), the
+  `/projects` pages (kart, maze-solver S78, combat-bot), the homepage
+  announcement slot (S73E), and the QR tool (S72C, SVG/PNG S76F).
+- **Docs:** `/docs` renders `docs/wiki/*.md` in-app behind a shared password
+  (S52B), failing open when `DOCS_PASSWORD` is unset (loud warning since S68).
+- **Bootstrap:** self-registration (S35) and a pre-registration pool (S49,
+  role choice S74B); stall volunteers locked to their stall with an
+  admin-approved switch request (S72B/C); the group-based stall model --
+  derived status, a queue table, group capacity, a visit log with a revisit
+  ban, advisory distribution, a student checklist, a manual checklist backup
+  (S73B-S73G); time limits with a lead-side countdown and occupancy 4 (S77).
+- **Exports:** applications and the volunteer pool to CSV and to Google
+  Sheets (S73K/S74A), the third outbound egress point beside Jolpica and
+  Gemini.
+- **Admin UX:** one upload path with a 4 MB cap (S76E), and the shared
+  slide-in edit panel for sponsors, announcements, team and events (S62, S82).
+- **Join (S81, S82B):** a four-step form driven by one question module,
+  course and JSONB answers, five domains in a fixed order with Operations &
+  Sponsorship merged into one domain with two branches.
+- **Tests (S75):** Vitest over the pure modules (`npm test`).
 
 ---
 

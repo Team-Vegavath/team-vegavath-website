@@ -1,12 +1,12 @@
 # Middleware and Config
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 Reference for the Edge middleware, the Next.js build config, and the shared TypeScript type definitions that describe the site's data model.
 
 ## src/middleware.ts
 
-The middleware wraps NextAuth's `auth()` helper and runs on the Edge. It does two jobs on every matched request: enforce maintenance mode, and gate the admin surface behind a session.
+The middleware wraps NextAuth's `auth()` helper and runs on the Edge. It does three jobs on every matched request, in this order: enforce maintenance mode, gate `/docs` behind a shared password (S52B), and gate the admin surface behind a session.
 
 ### What it guards
 
@@ -34,16 +34,30 @@ Everything that is not an admin route or admin API route passes through with no 
 - `/bootstrap/checkin/[token]` (S33, per-lead QR check-in)
 - `/bootstrap/feedback`
 - `/bootstrap/register/stall` and `/bootstrap/register/group` (S35 volunteer self-registration)
+- `/bootstrap/register/pool` (S49 pre-registration pool; S74B role choice)
+- `/bootstrap/checklist/[id]` (S73D visitor checklist, keyed by the visitor's own row id)
 - their `/api/bootstrap/*` endpoints
+
+(The code comment only names the first three; the rest pass for the same reason -- nothing outside `/admin` and `/api/admin` is session-gated.)
 
 There is also an explicit token-gated allowlist that returns `NextResponse.next()` before the auth gate. These are public auth pages where a one-time URL token is the gate, not a session:
 
 - `/admin/invite/*` (S27 invites)
-- `/api/admin/register`
+- `/admin/register` and `/api/admin/register` (S48 open viewer link)
 - `/api/admin/credentials/reset` (S29 password resets)
 - any path matching `/^\/admin\/[^/]+\/credentials\//` (per-account credential flows)
 
 Without this allowlist those `/admin/*` and `/api/admin/*` paths would be caught by the auth gate and redirected, which would break invite and reset links for logged-out users.
+
+### /docs password gate (S52B)
+
+The internal docs at `/docs/*` publish the auth flow, env var names, the DB schema and every API route with its guards, so they sit behind a shared secret (threat model: `docs/superpowers/plans/2026-07-26-docs-password-gate.md`). The check runs after the token allowlist and before the admin gate:
+
+- `/docs/login` always passes.
+- Any other `/docs` path without a `docs_session` cookie equal to `DOCS_PASSWORD` is redirected to `/docs/login`.
+- `/api/docs/auth` (which sets the cookie) is not caught here -- it starts with `/api`, not `/docs`.
+
+It **fails OPEN** when `DOCS_PASSWORD` is unset, deliberately, so local dev needs no setup and a var that goes transiently missing mid-deploy cannot lock the docs out. Since S68 that state is loud: every request logs `[docs] DOCS_PASSWORD is not set -- the /docs password gate is OPEN ...` to the function logs. Only the absence is logged, never the value. `robots.ts` disallowing `/docs` is the independent second layer.
 
 ### Maintenance-mode check behavior
 
@@ -54,7 +68,7 @@ if (
   !pathname.startsWith("/admin") &&
   !pathname.startsWith("/api") &&
   pathname !== "/maintenance" &&
-  (await getMaintenanceMode())
+  (await isMaintenanceEnabled())
 ) {
   const url = req.nextUrl.clone();
   url.pathname = "/maintenance";
@@ -67,19 +81,19 @@ Key details:
 - `/admin`, `/api`, and `/maintenance` itself are exempt from the maintenance rewrite, so the admin panel and API stay reachable to turn maintenance off. The path checks are ordered first so those routes never pay for the DB lookup.
 - The rewrite serves the maintenance page while preserving the original URL in the browser.
 
-`getMaintenanceMode()` resolves the flag with three tiers:
+`isMaintenanceEnabled()` (local to the middleware) resolves the flag with three tiers:
 
 1. `NEXT_PUBLIC_MAINTENANCE_MODE === "true"` -- an emergency override (used when the DB is down) that short-circuits to `true`.
 2. An in-memory cache per Edge isolate, valid for 60 seconds (`60_000` ms). A toggle flip from the admin panel takes effect within a minute without a DB query on every request.
-3. A direct query against `site_settings` for `key = 'maintenance_mode'`, treating the string `"true"` as enabled, then caching the result.
+3. `getMaintenanceMode()` from `src/lib/services/settings.ts` (reads `site_settings` key `maintenance_mode`), treating the string `"true"` as enabled, then caching the result.
 
 On any DB error the function returns `false` -- it fails open to keep the site up.
 
-Important: the middleware uses a local `neon(process.env.DATABASE_URL!)` HTTP-driver instance, NOT `lib/db.ts`. The comment states this is intentional -- middleware runs on the Edge and must stay pinned to the HTTP driver even if `db.ts` changes (the pending dev-TCP fix).
+The lookup goes through the settings service and therefore `lib/db.ts`, which is the Neon HTTP driver (Edge-safe). An earlier local `neon(...)` instance in the middleware is gone, so the SQL-in-services contract holds here too. If the pending dev-TCP `db.ts` fix ever lands, the middleware must stay on an Edge-compatible driver.
 
 ### Cookie / session validation
 
-Session validation is delegated to NextAuth's `auth()` wrapper. The middleware reads `req.auth` (populated by `auth()`) and treats its presence/absence as the session check; it does not parse cookies directly. The augmented session shape (`isAdmin`, `isGodfather`) is defined in `next-auth.d.ts` (documented below).
+Session validation is delegated to NextAuth's `auth()` wrapper. The middleware reads `req.auth` (populated by `auth()`) and treats its presence/absence as the session check; it does not parse cookies directly. The augmented session shape (`isAdmin`, `isGodfather`, `isViewer`, `accountId`) is defined in `next-auth.d.ts` (documented below).
 
 ### The exact config.matcher
 
@@ -126,7 +140,7 @@ Represents a single event record.
 | `id` | `string` | Primary key. |
 | `slug` | `string` | URL-safe identifier for the event page. |
 | `title` | `string` | Event title. |
-| `category` | `"workshops" \| "hackathons" \| "competitions" \| "talks" \| "other"` | Event category. (Note: `hackathons` is a known open item -- the DB CHECK currently rejects it.) |
+| `category` | `"workshops" \| "hackathons" \| "competitions" \| "talks" \| "other"` | Event category. `hackathons` is allowed by the DB CHECK since migration 018 (applied); never yet exercised through the admin UI. |
 | `status` | `"upcoming" \| "past" \| "archived"` | Lifecycle state. |
 | `description` | `string \| null` | Optional description. |
 | `event_date` | `string` | Date of the event. |
@@ -220,6 +234,7 @@ The typed, aggregated view of all settings after parsing.
 | --- | --- | --- |
 | `recruitment_open` | `boolean` | Whether recruitment is accepting applications. |
 | `maintenance_mode` | `boolean` | Maintenance toggle (read by the middleware). |
+| `f1_enabled` | `boolean` | Kill switch for the /f1 pages (S50). Off means no Jolpica calls; a missing row reads as OFF. |
 | `maintenance_message` | `string` | Message shown on the maintenance page. |
 | `contact_email` | `string` | Public contact email. |
 | `contact_phone` | `string` | Public contact phone. |
@@ -230,15 +245,17 @@ The typed, aggregated view of all settings after parsing.
 
 ### `ApplicationDomain` (type)
 
-FY26 recruitment domains. The comment warns these must stay in sync with `JoinClient` DOMAINS, `/api/join` VALID_DOMAINS, and the CHECKs in `migrations/004`.
+The five current /join domain keys (S82B). The ordered source of truth -- order, labels, test tracks, question sets -- is `JOIN_DOMAINS` in `src/lib/utils/joinQuestions.ts`; these keys must also be allowed by the CHECKs in `migrations/031`.
 
-`"Coding" | "Automotives" | "Sponsorship" | "Robotics" | "Operations" | "Social Media"`
+`"Automotives" | "Robotics" | "Coding" | "Social Media" | "Operations & Sponsorship"`
+
+"Social Media" is the stored key for the domain shown as "Design & Social Media" (S81 relabelled it without touching stored data).
 
 ### `LegacyApplicationDomain` (type)
 
-FY25 values still present on rows submitted before migration 004, plus the long FY26 name used before Session 19 shortened it to "Sponsorship".
+Values still allowed on stored rows but no longer offered by /join: `"Operations"` and `"Sponsorship"` (separate domains until S82B merged them; they display as "Operations & Sponsorship"), the FY25 names from before migration 004, and the long FY26 name Session 19 shortened.
 
-`"Automotive" | "Design" | "Media" | "Marketing" | "Programming" | "Sponsorship & Finance"`
+`"Operations" | "Sponsorship" | "Automotive" | "Design" | "Media" | "Marketing" | "Programming" | "Sponsorship & Finance"`
 
 ### `APPLICATION_STATUSES` (const) and `ApplicationStatus` (type)
 
@@ -262,13 +279,19 @@ A recruitment application record.
 | `mobile_number` | `string \| null` (optional) | FY26 field (migration 004); null on pre-FY26 rows. |
 | `srn_prn` | `string \| null` (optional) | FY26 student ID field. |
 | `semester` | `"1" \| "3" \| "5" \| null` (optional) | FY26 semester field. |
-| `why_join` | `string \| null` (optional) | FY26 free-text field. |
-| `value_addition` | `string \| null` (optional) | FY26 free-text field. |
-| `domain_experience` | `string \| null` (optional) | FY26 free-text field. |
-| `design_portfolio_url` | `string \| null` (optional) | FY26 design portfolio link. |
+| `why_join` | `string \| null` (optional) | FY26 free-text field. Not written since S81 (kept for old rows). |
+| `value_addition` | `string \| null` (optional) | FY26 free-text field. Not written since S81. |
+| `domain_experience` | `string \| null` (optional) | FY26 free-text field. Not written since S81. |
+| `design_portfolio_url` | `string \| null` (optional) | FY26 design portfolio link. Not written since S81. |
 | `status` | `ApplicationStatus` | Pipeline status. |
 | `interview_group` | `InterviewGroup \| null` (optional) | Migration 011; null until an admin assigns a group. |
 | `submitted_at` | `string` | Submission timestamp. |
+| `course` | `string \| null` (optional) | Migration 030 (S81). A course option, or the applicant's own text for "Other". |
+| `answers` | `JoinAnswers \| null` (optional) | Migration 030 (S81). Every page 3/4 answer; NULL on every pre-S81 row, which is how an old-form row is identified. |
+
+### `JoinAnswers` (type)
+
+`Record<string, string | string[]>` -- the S81 answers object, keyed by the stable question ids in `src/lib/utils/joinQuestions.ts`. Multi-selects are string arrays.
 
 ### `INTERVIEW_GROUPS` (const) and `InterviewGroup` (type)
 
@@ -295,6 +318,10 @@ The public submission shape. Same core fields as `Application`, but `domain_inte
 | `value_addition` | `string \| null` (optional) |
 | `domain_experience` | `string \| null` (optional) |
 | `design_portfolio_url` | `string \| null` (optional) |
+| `course` | `string \| null` (optional) |
+| `answers` | `JoinAnswers \| null` (optional) |
+
+`/api/join` now sends `course` and `answers` and leaves the four pre-S81 text fields unset.
 
 ## src/types/sponsor.ts
 
@@ -334,6 +361,7 @@ Augments `User`:
 | --- | --- | --- |
 | `isAdmin` | `boolean` (optional) | Whether the account has admin rights. |
 | `isGodfather` | `boolean` (optional) | Whether the account is a "godfather" (super-admin) account. |
+| `isViewer` | `boolean` (optional) | Read-only admin tier (S47): sees everything, writes nothing. |
 | `tokenVersion` | `number` (optional) | Token version, used to invalidate sessions when bumped. |
 
 Augments `Session` with a fully specified `user` object (this replaces, rather than extends, the default session user):
@@ -345,6 +373,8 @@ Augments `Session` with a fully specified `user` object (this replaces, rather t
 | `user.image` | `string \| null` (optional) | Avatar. |
 | `user.isAdmin` | `boolean` | Admin flag (required, non-optional here). |
 | `user.isGodfather` | `boolean` | Godfather flag (required, non-optional here). |
+| `user.isViewer` | `boolean` | The write gate. `isAdmin` is TRUE for viewers too (it means "may enter the panel"), so every mutating admin route checks `isViewer` right after `isAdmin`. |
+| `user.accountId` | `string` | `admin_accounts.id`, or the literal `"godfather"` for the env account (S67). |
 
 ### `declare module "next-auth/jwt"`
 
@@ -354,5 +384,65 @@ Augments `JWT`:
 | --- | --- | --- |
 | `isAdmin` | `boolean` (optional) | Admin flag carried in the token. |
 | `isGodfather` | `boolean` (optional) | Godfather flag carried in the token. |
+| `isViewer` | `boolean` (optional) | Viewer flag carried in the token. |
 | `accountId` | `string` (optional) | The account's ID. |
 | `tokenVersion` | `number` (optional) | Token version for invalidation checks. |
+
+## src/types/announcement.ts
+
+The homepage announcement (S73E, table `announcements`, migration 026).
+
+### `Announcement` (interface)
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | `string` | Primary key. |
+| `title` | `string` | Required. |
+| `body` | `string \| null` | Optional text. |
+| `image_url_desktop` / `image_url_mobile` | `string \| null` | Separate crops per aspect ratio (R2 URLs). |
+| `cta_label` / `cta_href` | `string \| null` | The button shows only when both are set. |
+| `is_active` | `boolean` | Only active rows can show; the homepage takes the first by `display_order`. |
+| `display_order` | `number` | Sort key. |
+| `created_at` / `updated_at` | `string` | Timestamps. |
+
+### `CreateAnnouncementInput` / `UpdateAnnouncementInput` (types)
+
+`CreateAnnouncementInput` is `Announcement` minus `id` and the timestamps.
+`UpdateAnnouncementInput` is `Partial<CreateAnnouncementInput>`, where `undefined`
+means "leave alone" and an explicit `null` CLEARS a field -- the reason
+`updateAnnouncement` reads then writes instead of using `COALESCE` (which can never
+write a NULL back).
+
+## src/types/post.ts
+
+Blog post constants (S50), here rather than in `services/posts.ts` because
+`PostForm` is a client component and needs them at runtime -- a value import from a
+service would pull the Neon driver into the client bundle.
+
+- `POST_CATEGORIES` -- `["motorsport", "automotives", "robotics"]` (narrowed to three
+  in S54B; migration 023 rewrote old rows to `motorsport`). Must match the CHECK in
+  migration 022 / 023.
+- `PostCategory` -- the union of those.
+- `DEFAULT_POST_CATEGORY` -- `"motorsport"`, the single fallback the API route and
+  `PostForm` share, so neither can drift onto a value the CHECK rejects.
+- `POST_CATEGORY_LABELS` -- display labels.
+- `isPostCategory(value)` -- type guard.
+
+## src/types/routes.ts
+
+The public route list (S72C), here so a client component (`/admin/qr`) can share
+it with `sitemap.ts` -- importing anything from sitemap.ts, which value-imports
+services, would drag the Neon driver into the browser bundle.
+
+- `SITE_URL` -- `"https://vegavath.live"`.
+- `STATIC_ROUTES: { path, priority }[]` -- the crawlable public pages the sitemap
+  lists: `/`, `/about`, `/events`, `/projects`, `/projects/kart`,
+  `/projects/maze-solver` (S78), `/crew`, `/join`, `/gallery`, `/posts`, `/sponsors`, the
+  four `/f1` pages, `/legal`. Deliberately excluded: `/projects/combat-bot` (a stub),
+  DB-backed detail pages (sitemap.ts adds those at build), and internal routes.
+- `QR_ROUTES: { path }[]` -- what the QR tool offers: `STATIC_ROUTES` plus
+  `/bootstrap/feedback` (S76D), which is public and shareable but not crawlable.
+  A separate array rather than a flag, so sitemap.ts needed no change. Because the
+  QR tool renders a dropdown over this array, "public routes only, no fragments"
+  is enforced by construction.
+

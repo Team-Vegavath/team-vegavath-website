@@ -1,11 +1,10 @@
 # Bootstrap Components
 
-_Current as of Session 72D (2026-08-12). The S72B/S72C correctness pass changed
-`StallVolunteerView` substantially: the full stall picker was removed (a net
-deletion) and replaced by a switch-request picker, so a stall volunteer is
-locked to their assigned stall. `pickerOpen` and `otherStalls` are the
-switch-request state; there is no `myStallId` and no `useEffect` left in that
-component. See `docs/wiki/bootstrap.md` for the flow._
+_Current as of Session 82C (2026-10-05). Rewritten for the S73B-S77 changes:
+the per-stall queue table, the visit log and its mandatory group naming, the
+group roster and checklist, advisory auto-placement, the manual checklist
+backup, "Group 1" labels, and the per-stall time limit. See
+`docs/wiki/bootstrap.md` for the flow._
 
 A file-by-file reference for every React component under
 `src/components/bootstrap/`, drawn directly from the source. For how these
@@ -13,8 +12,8 @@ pieces fit into the wider event-day system (sessions, auth, the service layer,
 API routes, migrations), see `docs/wiki/bootstrap.md`; this document is the
 component-level companion to it.
 
-Every component in this directory is a Client Component (`"use client"`) and
-every one styles itself inline from the exported `BS` palette in
+Every component in this directory except `BootstrapChecklist` (a server
+component) is a Client Component (`"use client"`), and every one styles itself inline from the exported `BS` palette in
 `StallCard.tsx` rather than the site's globals.css tokens (see the note in
 `StallCard.tsx` below for why).
 
@@ -29,205 +28,179 @@ every one styles itself inline from the exported `BS` palette in
 - [BootstrapRegister.tsx](#bootstrapregistertsx) -- self-registration (stall + group variants)
 - [BootstrapCheckin.tsx](#bootstrapcheckintsx) -- visitor check-in form
 - [BootstrapFeedback.tsx](#bootstrapfeedbacktsx) -- visitor feedback form
+- [BootstrapChecklist.tsx](#bootstrapchecklisttsx) -- a student's stall checklist page (S73D)
+- [ManualChecklistPanel.tsx](#manualchecklistpaneltsx) -- the manual checklist backup control (S73G)
+- [StallTimeLimitCountdown.tsx](#stalltimelimitcountdowntsx) -- the lead's per-stall countdown (S77)
 
 ---
 
 ## BootstrapDashboard.tsx
 
 `src/components/bootstrap/BootstrapDashboard.tsx` -- the client component behind
-`/bootstrap` for a logged-in volunteer; it polls stall state, then either
-renders itself (the full "lead" dashboard) or delegates to `StallVolunteerView`
-for "stall" volunteers.
-
-### Props
-
-| Prop | Type | What it does |
-| --- | --- | --- |
-| `displayName` | `string` | Volunteer's name, shown in the header. |
-| `username` | `string` | The lowercased SRN; used to test ownership (`claimed_by`/`queued_by`) and passed into `StallCard`. |
-| `initialRole` | `"stall" \| "lead"` (default `"stall"`) | Server-rendered role so the correct view shows before the first poll; the poll then keeps it live. |
-
-### State
-
-| State | Type | Tracks |
-| --- | --- | --- |
-| `stalls` | `BootstrapStall[]` | The current stall list from the poll. |
-| `mySuggestion` | `string \| null` | Admin's stall suggestion text (the "ADMIN SUGGESTS" banner). |
-| `volunteerRole` | `"stall" \| "lead"` | Live role; seeded from `initialRole`, refreshed every poll so an admin role flip lands within 4s. |
-| `checkinToken` | `string \| null` | The lead's stable QR check-in token (rides the poll payload). |
-| `groupNumber` | `number \| null` | The lead's FCFS group number, or null until assigned. |
-| `inClassroom` | `boolean` | Classroom-mode flag; rides the poll payload so it survives re-login. |
-| `origin` | `string` | `window.location.origin`, set after mount (window does not exist during SSR); used to build the check-in URL. |
-| `showMap` | `boolean` | Whether the full-screen map overlay is open. |
-| `lastUpdated` | `number \| null` | Timestamp of the last successful poll (drives "Xs ago"). |
-| `now` | `number` | Ticks every 1s so the "LIVE / Xs ago" label counts up. |
-| `failCount` | `useRef<number>` | Consecutive poll-failure counter (not state -- no re-render needed). |
-| `connectionIssue` | `boolean` | True once `failCount` hits 3; shows the red retry banner. |
-| `prevStallsRef` | `useRef<BootstrapStall[]>` | Previous poll snapshot, used to diff for freed-stall detection. Kept in a ref because release clears `queued_by` in the DB, so the "was I waiting on it?" test must read the OLD row. |
-| `freedNotifications` | `{ id; name; forme }[]` | Toasts for stalls that just went free; `forme` marks the one the user was queued on. |
-| `redirectSuggestions` | `{ id; name; dist }[]` | Nearby-and-free proximity suggestions, ranked by map distance. |
-
-### Key functions
-
-- `poll()` (useCallback, keyed on `username`) -- `GET /api/bootstrap/stalls`.
-  On 401 (token cleared by admin unlock or session deactivation) it hard-redirects
-  to `/bootstrap`. On success it sets all the poll-fed state, resets the fail
-  counter, then runs freed-stall detection:
-  - Step 5a: any stall whose status went from non-free to `free` becomes a
-    freed notification; each is auto-dismissed after 8000 ms. `forme` is true
-    when the previous snapshot's `queued_by` equalled `username`.
-  - Step 5b: "genuinely freed" stalls are those that freed with `queued_by ==
-    null` in the previous snapshot (nobody was waiting). If the user is queued
-    somewhere else and classroom mode is off, those are ranked by Euclidean
-    distance from the user's queued stall and shown as redirect suggestions
-    (auto-dismissed after 12000 ms). Distances scale the percentage deltas by
-    the map's pixel size (1024 x 419) so the metric is isotropic and does not
-    overweight the y axis. Classroom mode is read fresh from the poll payload
-    (`data.inClassroom`), not the possibly-stale state closure.
-
-  On any throw, `failCount` increments and the connection banner appears at 3.
-- `sendAction(stallId, action)` -- `PATCH /api/bootstrap/stalls/{stallId}` with
-  `{ action }`. On 401 redirects to login; on success it swaps the one updated
-  stall into local state optimistically (the next poll self-corrects on error).
-- `signOut()` -- `POST /api/bootstrap/logout`, then redirect to `/bootstrap`.
-- Inline (not named): the CLASSROOM MODE button handler toggles `inClassroom`
-  optimistically and `PATCH`es `/api/bootstrap/classroom` with `{ in_classroom }`.
-  The ADMIN SUGGESTS dismiss button `POST`s `/api/bootstrap/suggestion/dismiss`
-  and clears `mySuggestion`.
-
-### The poll loop
-
-`POLL_MS = 4000`. A `useEffect` (keyed on `poll`) runs `poll()` once immediately,
-then starts a `setInterval(poll, 4000)`. A `visibilitychange` listener stops the
-interval while `document.hidden` and restarts (with an immediate poll) when the
-tab is visible again -- described in the source as a battery/Neon courtesy only,
-nothing depends on it for correctness. A second, separate `useEffect` runs a 1s
-`setInterval` that only updates `now` so the freshness label ticks.
-
-### Role branching
-
-The whole render forks on `volunteerRole`. If it is `"stall"`, the component
-returns `<StallVolunteerView>` (passing the stalls, a `liveLabel` string, and
-`onAction`/`onSignOut` wrappers) and renders nothing else -- stall volunteers get
-no map, no queue, no notifications. Otherwise it renders the full lead dashboard
-below.
-
-### Render logic (lead dashboard)
-
-- Header (sticky, 64px): display name, a pulsing LIVE dot (green, or `BS.danger`
-  when `connectionIssue`) with "LIVE / Xs ago" or "CONNECTING..." while
-  `lastUpdated` is null, the CLASSROOM MODE toggle (filled accent style when
-  active, labelled "IN CLASSROOM"), the MAP button, and Sign out.
-- A sticky red "CONNECTION ISSUES - RETRYING..." banner under the header when
-  `connectionIssue` is true.
-- "Your group" card: shows `Group {n}` or "Not assigned yet" (muted).
-- "Your group check-in link" card (only when `checkinToken` is set): explanatory
-  copy plus `<CheckinQROverlay checkinUrl={origin}/bootstrap/checkin/{token}>`.
-- The freed-stall toasts (emphasised orange with a "IS FREE - YOUR GROUP CAN HEAD
-  OVER" message when `forme`, muted "just opened up" otherwise), each with an ×
-  to dismiss.
-- The redirect suggestions (the first/nearest styled distinctly with a "->
-  {name} is free and nearby" line and a "No group allocated yet" subtitle).
-- The ADMIN SUGGESTS banner (blue), dismissible server-side.
-- A "CLASSROOM MODE ACTIVE - QUEUE ACTIONS PAUSED" banner when `inClassroom`.
-- The `StallGrid` of `StallCard`s. In classroom mode the cards are passed
-  `username={undefined}` and `onAction={undefined}`, so they render read-only
-  (no CLAIM/QUEUE buttons) while a lead runs a session.
-- A full-screen `<BootstrapMapSVG>` overlay when `showMap` is true.
-
-### Why it exists
-
-This is the lead volunteer's command center on Bootstrap day. It solves the
-"which stalls are free right now, and where should my group go next" problem
-under a flaky captive-portal network: short-polling instead of WebSockets
-(Vercel serverless holds no persistent sockets), optimistic action updates that
-self-heal on the next poll, and freed-stall/proximity notifications derived
-purely client-side from diffing poll snapshots. The role split keeps stall
-volunteers out of all of that complexity.
-
----
-
-## StallVolunteerView.tsx
-
-`src/components/bootstrap/StallVolunteerView.tsx` -- the deliberately simplified
-UI for `role="stall"` volunteers who stand at one stall all day: pick it once,
-then toggle OCCUPIED/FREE.
+`/bootstrap` for a logged-in volunteer. It polls stall state, then either renders
+the full group-LEAD dashboard itself or delegates to `StallVolunteerView` for
+"stall" volunteers.
 
 ### Props
 
 | Prop | Type | What it does |
 | --- | --- | --- |
 | `displayName` | `string` | Header name. |
-| `username` | `string` | Used to test whether the user is in a stall's `claimed_by`. |
-| `stalls` | `BootstrapStall[]` | The stall list (from the parent's poll). |
-| `connectionIssue` | `boolean` | Shows the red retry banner. |
-| `liveLabel` | `string` | Pre-formatted "LIVE / Xs ago" (or "CONNECTING...") string from the parent. |
-| `onAction` | `(stallId, action) => void` | Delegates claim/release to the parent's `sendAction`. |
-| `onSignOut` | `() => void` | Delegates sign-out to the parent. |
+| `username` | `string` | The lowercased SRN; used to test ownership of `claimed_by` and passed down. |
+| `initialRole` | `"stall" \| "lead"` (default `"stall"`) | Server-rendered role so the right view shows before the first poll. |
 
-### State
+### State (poll-fed unless noted)
 
-| State | Type | Tracks |
-| --- | --- | --- |
-| `myStallId` | `string \| null` | Which stall is "mine". Held locally because releasing (marking FREE) drops the user from `claimed_by`, so the DB alone cannot remember the chosen stall while it sits free. |
+| State | Tracks |
+| --- | --- |
+| `stalls` | The stall list: derived status, `occupants` (groups at the stall, S73C), `queue` (S73B), `max_groups`, `time_limit_minutes` (S77). |
+| `mySuggestion`, `mySuggestionId` | The admin's stall suggestion; the id is a stall volunteer's own stall (S72B). |
+| `switchRequestStallId`, `switchRequestStallName` | A stall volunteer's pending switch request (S72C). |
+| `volunteerNames` | username -> display name, for the release confirmation (S72C). |
+| `actionError` | Why an action was refused (role or ownership gate, S72B). Not poll-fed. |
+| `volunteerRole`, `checkinToken`, `groupNumber`, `inClassroom` | Live role (an admin flip lands within 4s), the lead's QR token (S33), FCFS group number (S35), classroom mode (S36). |
+| `myGroupId`, `myGroupSize` | The lead's own group (S73B, resolved server-side) and its headcount (S73D). |
+| `roster`, `rosterOpen`, `rosterLoading` | The group roster, fetched on demand (S73D). |
+| `manualOpen`, `manualStalls`, `manualLoading`, `manualBusy`, `manualError` | The manual checklist backup (S73G). |
+| `origin`, `showMap`, `lastUpdated`, `now` | Check-in URL base (set after mount), map overlay, freshness label ("LIVE / Xs ago", 1s ticker). |
+| `connectionIssue` | True after 3 consecutive poll failures (`failCount` is a ref). |
+| `freedNotifications`, `redirectSuggestions` | Freed-stall toasts and nearby-free suggestions. |
 
-Two derived values (not state): `claimedStall` (the stall currently listing this
-user in `claimed_by`) and `myStall` (the stall matching `myStallId`). A
-`useEffect` re-syncs `myStallId` from `claimedStall` after a reload while the
-stall was still occupied by this user. `iAmOnIt` is whether `myStall`'s
-`claimed_by` includes `username`.
+### Key functions and endpoints
 
-### Key functions
+- `poll()` -- `GET /api/bootstrap/stalls`; a 401 (admin unlock or session ended)
+  hard-redirects to `/bootstrap`. Then freed-stall detection:
+  - A stall that went from non-free to `free` becomes a toast (auto-dismiss 8s).
+    `forme` is read from the CURRENT row's queue (S73B): releasing no longer
+    clears the queue, so the "your group can head over" banner fires only while
+    the group's queue entry genuinely still exists -- a lead who left the queue
+    gets nothing.
+  - Stalls that freed with nobody queued become redirect suggestions, ranked by
+    map distance from the stall the lead is queued at (isotropic: percentage
+    deltas scaled by the 1024 x 419 map), unless classroom mode is on (read fresh
+    from the payload). Auto-dismiss 12s.
+- `sendAction(stallId, action, groupId?)` -- `PATCH /api/bootstrap/stalls/[id]`
+  with `{ action, group_id }`; swaps the returned stall in optimistically, and
+  shows the server's refusal in `actionError`.
+- `requestSwitch(stallId)` -- `POST /api/bootstrap/switch-request` (stall volunteers).
+- Roster -- `GET /api/bootstrap/roster` when opened; names and SRN/PRN only.
+- Manual checklist -- `GET` / `PATCH /api/bootstrap/checklist/manual`.
+- Classroom toggle -- `PATCH /api/bootstrap/classroom`; suggestion dismiss --
+  `POST /api/bootstrap/suggestion/dismiss`; `signOut()` -- `POST /api/bootstrap/logout`.
 
-- `claim(stall)` -- sets `myStallId` locally and calls `onAction(id, "claim")`.
-- `switchStall()` -- if the user is currently on their stall, releases it
-  (`onAction(id, "release")`), then clears `myStallId` to return to the picker.
-- The main toggle button calls `onAction(myStall.id, iAmOnIt ? "release" :
-  "claim")`. No API endpoints are hit directly -- everything routes through the
-  parent's `sendAction` (which PATCHes `/api/bootstrap/stalls/[id]`).
+### The poll loop
 
-### Render logic
+`POLL_MS = 4000`; a `visibilitychange` listener pauses it while hidden and
+polls-then-restarts on return (a battery / Neon courtesy, not a correctness
+requirement). A separate 1s interval only updates `now`.
 
-- Header: display name, a pulsing LIVE dot (red on connection issue), the
-  `liveLabel`, and Sign out. Red retry banner when `connectionIssue`.
-- If `myStall` is set: a large card with the stall name, a FREE/OCCUPIED status
-  line, and one big toggle button ("Mark free" in danger style when the user is
-  on it, "Mark occupied" in accent when not), plus a "Switch stall" text link.
-- If no stall is chosen: "Tap your stall to claim it." over a `StallGrid` of
-  tappable buttons. Each button is joinable when the stall is `free`, or
-  `occupied` with room left (`claimed_by.length < max_occupancy`); non-joinable
-  stalls render at 0.45 opacity and are disabled. Each shows the name and a
-  FREE / "OCCUPIED · {names}" line.
+### Role branching
+
+`volunteerRole === "stall"` returns `<StallVolunteerView>` with the stalls, the
+assigned stall id, the switch-request state, `actionError`, the live label, and
+`onAction` / `onRequestSwitch` / `onSignOut` wrappers. Everything below is the
+lead dashboard.
+
+### Render logic (lead dashboard)
+
+- Sticky header: name, LIVE dot and freshness label, CLASSROOM MODE toggle
+  (S36: pauses redirect suggestions and queue actions), MAP, Sign out. A red
+  "CONNECTION ISSUES" banner and the `actionError` banner sit under it.
+- **Your group** card: "Group {n}" (S35), the headcount (S73D) with a tap-to-open
+  roster overlay, and a CHECKLIST button opening `ManualChecklistPanel` (S73G --
+  a backup for when a stall volunteer missed logging the visit).
+- **Countdown** (S77): `StallTimeLimitCountdown` for the lead's current open visit
+  at a stall with a time limit, keyed on `arrived_at` so a new stall remounts it.
+  A hidden `<audio>` (the chime) is primed on the lead's first tap, because
+  browsers block programmatic `play()` until the user has interacted.
+- **Advisory placements** (S73D): for each stall where the admin's distribute
+  pass placed this group (`is_advisory` -- the queue row has no `volunteer_id`), a
+  card with HEADING THERE (`accept_queued`) and NOT NOW (`unqueue`; leaving it
+  unaccepted would bring the card straight back).
+- **Your group check-in link** (S33): `CheckinQROverlay` with
+  `{origin}/bootstrap/checkin/{token}`.
+- Freed-stall toasts, redirect suggestions, the blue ADMIN SUGGESTS banner.
+- The `StallGrid` of `StallCard`s, passed `role` and `myGroupId`; in classroom mode
+  they get no `username` / `onAction`, so they render read-only.
+- Full-screen map and roster overlays (tap anywhere to close).
 
 ### Why it exists
 
-Stall volunteers have exactly one job -- keep their own stall's status current
--- so anything beyond a single toggle is noise. The local `myStallId` is the one
-subtle bit: without it, a stall marked FREE would vanish from "mine" because the
-release removed the user from `claimed_by`.
+The lead's command centre on Bootstrap day, built for a flaky captive-portal
+network: short polling instead of WebSockets (Vercel serverless holds no sockets),
+optimistic actions that self-heal on the next poll, and notifications derived
+client-side. The role split keeps stall volunteers out of all of it.
+
+---
+
+## StallVolunteerView.tsx
+
+`src/components/bootstrap/StallVolunteerView.tsx` -- the UI for `role="stall"`
+volunteers. Since S72B a stall volunteer is LOCKED to their assigned stall
+(`assignedStallId`, the admin's suggestion); since S73C occupying it means naming
+which group arrived.
+
+### Props
+
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `displayName`, `username` | `string` | Header name; `username` tests `claimed_by`. |
+| `stalls` | `BootstrapStall[]` | From the parent's poll. |
+| `assignedStallId` | `string \| null` | The volunteer's own stall. Null shows "waiting for an assignment". |
+| `switchRequestStallName`, `hasSwitchRequest` | | A pending switch request (S72C); shown as "WAITING FOR AN ADMIN TO APPROVE". |
+| `actionError`, `connectionIssue`, `liveLabel` | | Refusal text, the retry banner, "LIVE / Xs ago". |
+| `onAction` | `(stallId, action, groupId?) => void` | Claim / release through the parent's `sendAction`. |
+| `onRequestSwitch` | `(stallId) => void` | Raises a switch request. |
+| `onSignOut` | `() => void` | |
+
+### State
+
+| State | Tracks |
+| --- | --- |
+| `pickerOpen` | The switch-request picker (the one remaining multi-stall list). |
+| `groupMode` | `"arrive"` / `"leave"` / null -- the mandatory group picker (S73C). |
+| `candidates`, `loadingGroups` | Groups that may still arrive, fetched from `GET /api/bootstrap/stalls/[id]/groups`. |
+
+### Render logic
+
+- Header, retry banner, `actionError`.
+- The assigned stall's card: status, **HERE NOW** -- the groups at the stall from
+  open visits (S73C), as "Group 1" labels (S73K) -- and the volunteers on it.
+- **Group arrived** (shown only while the stall has group capacity left,
+  `max_groups`) opens the "Which group just arrived?" picker -- groups that have not
+  visited this stall. Picking one claims the stall AND logs the visit. If every
+  group has already been, an escape claims the stall with no visit.
+- **Release** -- with ONE group here, the single tap it has always been. With
+  several, **Group left** opens "Which group is leaving?" (the groups here now; no
+  fetch), so one group leaving never silently closes another's visit. The
+  volunteer only steps off the stall when the last group leaves.
+- **Request switch** opens the picker of other stalls; a pending request shows
+  the waiting state instead.
+
+### Why it exists
+
+Stall volunteers have one job: keep their own stall's state, and now its visit
+log, accurate. Locking them to one stall (S72B) stopped a single login occupying
+every stall; naming the group on arrival (S73C) is what the checklists and roster
+are built from.
 
 ---
 
 ## StallCard.tsx
 
-`src/components/bootstrap/StallCard.tsx` -- renders one stall card in either
-volunteer mode (rule-based action buttons) or admin mode (a tap-to-expand
-override form); it also exports the shared Bootstrap palette and grid helpers
-that nearly every other component imports.
+`src/components/bootstrap/StallCard.tsx` -- one stall card, in volunteer mode
+(rule-based action buttons) or admin mode (tap-to-expand override form). It also
+exports the Bootstrap palette and grid helpers the rest of the directory imports.
 
 ### Exports
 
-This file is the module the rest of the directory imports from. It exports:
-
-- `BS` -- the standalone Bootstrap color palette (documented below).
-- `bootstrapBtnStyle` -- a shared `React.CSSProperties` for the admin override
-  form's "Apply override" button.
-- `StallGrid` -- a component wrapping children in a responsive CSS grid (1 column
-  on phones, 2 columns at >= 600px) via a scoped `<style>` tag, because Tailwind
-  responsive prefixes are unreliable in this setup.
-- `VolunteerStallAction` -- the type `"claim" | "release" | "mark_queued" |
-  "unqueue"`.
-- `StallCard` (default export).
+- `BS` -- the standalone Bootstrap palette (below).
+- `bootstrapBtnStyle` -- the admin override form's button style.
+- `StallGrid` -- a responsive grid (1 column, 2 at >= 600px) via a scoped `<style>`.
+- `VolunteerStallAction` -- `"claim" | "release" | "mark_queued" | "unqueue" |
+  "accept_queued"` (the last added in S73D).
+- `waitMinutes(queued_at)` -- floor-minutes since a timestamp (0 for null).
+- `StallCard` (default).
 
 ### The exported `BS` palette
 
@@ -258,60 +231,38 @@ Note the two near-oranges are distinct: `occupied` is `#f97316`, the brand
 
 | Prop | Type | What it does |
 | --- | --- | --- |
-| `stall` | `BootstrapStall` | The stall to render. |
-| `username` | `string?` | Volunteer mode: whose ownership to test. Presence of both this and `onAction` switches on the volunteer buttons. |
-| `onAction` | `(action) => void`? | Volunteer mode: called with the chosen `VolunteerStallAction`. |
-| `expanded` | `boolean?` | Admin mode: whether the override form is showing. |
-| `onToggle` | `() => void`? | Admin mode: presence of this function is what marks the card as admin mode; toggles the form. |
-| `actions` | `React.ReactNode?` | Admin mode: the override form content, shown when expanded. |
+| `stall` | `BootstrapStall` | The stall. |
+| `username` | `string?` | Volunteer mode: whose ownership to test. With `onAction` it switches on the buttons. |
+| `role` | `"stall" \| "lead"`? | Picks the rule set. |
+| `myGroupId` | `string \| null`? | The viewing lead's own group (S73B), to tell "my group is queued here". |
+| `onAction` | `(action) => void`? | Volunteer mode callback. |
+| `expanded`, `onToggle`, `actions` | | Admin mode: `onToggle` marks admin mode; `actions` is the override form. |
 
-### Internal helpers / functions
+### The button rules (`volunteerButtons`, S73B)
 
-- `STATUS_META` -- maps each status to its `{ color, label }` (FREE/OCCUPIED/QUEUED).
-- `waitMinutes(queued_at)` -- floor-minutes since `queued_at`; returns 0 if null.
-  Stays fresh purely from the parent's 4s re-render, no ticker.
-- `BTN_KINDS` -- five button style presets: `accent` (filled, the primary CLAIM),
-  `accent-outline` (faint accent tint, used for JOIN), `danger` (RELEASE),
-  `queued` (MARK QUEUED), `neutral` (BACK TO OCCUPIED).
-- `volunteerButtons(stall, username)` -- the Session 25 rule engine returning the
-  button list. All action states:
-  - `free` -> **Claim** (accent).
-  - `occupied` and the user is in `claimed_by` -> **Release** (danger) + **Mark
-    queued** (queued).
-  - `occupied`, not the user's, and `claimed_by.length < max_occupancy` -> **Join**
-    (accent-outline, the shared-stall entry point) + **Mark queued**.
-  - `occupied`, not the user's, and full -> **Mark queued** only.
-  - `queued`, user is in `claimed_by` -> **Release**; and if the user is also the
-    `queued_by` owner, additionally **Back to occupied** (neutral).
-  - `queued`, user is the `queued_by` owner but not in `claimed_by` -> **Back to
-    occupied** only.
-  - `queued`, neither -> no buttons (read-only). Anyone may MARK QUEUED an
-    occupied stall, but only the `queued_by` owner may clear it.
+- **Stall volunteers** (claim / release only -- the server 403s them for leads):
+  nobody here -> **Claim**; on it -> **Release**; others on it with room
+  (`claimed_by.length < max_occupancy`) -> **Join**. No queue buttons, by
+  construction. (In practice a stall volunteer sees `StallVolunteerView`, not this.)
+- **Leads**: their group is queued here -> **Leave queue** (`unqueue`); otherwise,
+  if someone is at the stall -> **Mark queued**. A lead whose group is queued at a
+  stall that just went FREE still gets Leave queue, because release no longer
+  clears the queue (S73B) -- that surviving row is what drives the "head over"
+  banner.
 
 ### Render logic
 
-`adminMode` is `typeof onToggle === "function"`. The card always shows: the stall
-name; a status pill (colored by `meta.color`); a "Leads: {lead_names}" line when
-present (informational, from session creation); a claimed-names line ("No one
-here" when empty, prefixed "Presenting: " when queued); and, when queued with a
-`queued_by`, a "Queued: {name} ({n} min)" line where the minute count turns
-`BS.queued` (yellow) past 20 minutes as an urgency cue.
-
-- Volunteer mode (`username` and `onAction` both present): the header is static
-  and the `volunteerButtons` render as a stacked column below -- no tap-to-expand
-  between a volunteer and the action.
-- Admin mode (`onToggle` present): the header is a keyboard-accessible button
-  (role/tabIndex/Enter/Space) that toggles `expanded`; when expanded, the
-  `actions` override form renders below a divider. The card border turns accent
-  while expanded.
+The stall name, a status pill, "Leads: ..." (informational), the volunteers on it,
+**Here now:** the groups at the stall (S73C), and **Waiting:** every queued group in
+order with its wait in minutes (S73B -- the whole queue, not one name). Group names
+go through `groupLabel` ("Group 1", S73K). Volunteer mode shows the buttons
+stacked below; admin mode makes the header a keyboard-accessible toggle for the
+override form.
 
 ### Why it exists
 
-One card serves both the volunteer dashboard and the admin control panel, and
-the queue rules (who can claim, join, queue, and unqueue) are centralized here in
-`volunteerButtons` so both the button set and the underlying permission model
-stay in one place. Exporting `BS` from here (rather than a separate constants
-file) keeps the palette next to its heaviest consumer.
+One card serves the lead dashboard and the admin console, and the permission
+model for who may claim, join, queue and leave lives in one place.
 
 ---
 
@@ -469,6 +420,10 @@ Volunteer auth is intentionally separate from admin NextAuth -- this is the
 front door for the lightweight per-day cookie session. The full reload after a
 successful login is deliberate so the server-side cookie check runs cleanly.
 
+**S74B.** Under the session-gated stall and group registration links there is now
+an always-working **Pre-register** link to `/bootstrap/register/pool` -- the
+fallback for anyone who lands here between events.
+
 ---
 
 ## BootstrapRegister.tsx
@@ -524,6 +479,17 @@ volunteer types into one component keeps the shared field validation, styling,
 and the "Registered!" credential screen in a single place; only the stall picker
 and the request body differ.
 
+**Since S72D.**
+- **Three variants** (S74B): `stall` and `group` register INTO the active
+  session and need one; `pool` (always open) asks which role is intended
+  (`poolRole`: stall volunteer or group lead; a lead has no preferred stall) and
+  posts to `/api/bootstrap/register/pool`. The stall variant without a session
+  points at the pool instead of silently pooling the submission.
+- SRN / PRN are validated against the real `SRN_PATTERN` / `PRN_PATTERN` (S73F),
+  with generic examples (`PES1UG21CS999`, S73H).
+- The phone field is capped at 10 and filtered to digits on every keystroke
+  (`onDigitsChange`, S73I, S76B), with `inputMode="numeric"`.
+
 ---
 
 ## BootstrapCheckin.tsx
@@ -577,6 +543,13 @@ Visitors never log in; they scan a lead's QR and land here. The server passes a
 capacity snapshot for a fast "full" screen, but the actual INSERT is guarded
 atomically server-side so two phones racing for the last slot cannot both
 succeed -- the loser gets the 409 that surfaces as an error here.
+
+**Since S72D.**
+- PRN / SRN and phone use the shared validators (S73F); the phone field is capped
+  at 10 and digit-filtered as typed (S73I, S76B).
+- After a successful check-in the response's `visitorId` gives the student a
+  link to their own checklist, `/bootstrap/checklist/{visitorId}`, with a COPY
+  button (S73D). The group is named "Group 1", never by letter (S73K).
 
 ---
 
@@ -640,3 +613,54 @@ score, per-stall ratings, and a recruitment-intent signal) in a tap-first form
 that a fresher can finish in seconds on a phone. Keeping everything but Q1
 optional maximizes completion. The stored rows feed the admin feedback summary
 and the Gemini AI summary described in `docs/wiki/bootstrap.md`.
+
+---
+
+## BootstrapChecklist.tsx
+
+`src/components/bootstrap/BootstrapChecklist.tsx` -- the student checklist page
+behind `/bootstrap/checklist/[id]` (S73D). A **server component**: it renders
+resolved data and has no state, timers or polling -- the page is force-dynamic,
+so a reload is the refresh.
+
+**Props.** `ctx: VisitorChecklistContext | null` from `getVisitorChecklistContext`:
+the visitor, their group and every stall with whether the group has visited it.
+
+**Render.** `null` -> the same dead end as a bad check-in link (it never confirms
+whether a visitor exists). Otherwise the group (as "Group 1"), "N OF M STALLS
+DONE", and every stall marked DONE, HERE NOW (an open visit) or NOT YET.
+
+## ManualChecklistPanel.tsx
+
+`src/components/bootstrap/ManualChecklistPanel.tsx` -- the manual checklist
+toggle list (S73G), shared by the lead dashboard and the admin dashboard. Purely
+presentational: each consumer does its own fetching, because the endpoints differ
+(the lead's group comes from the cookie, the admin passes an explicit group id),
+but the control is written once.
+
+**Props.** `title`, `subtitle`, `stalls: GroupStallChecklistRow[]`, `loading`,
+`busyStallId`, `error`, `onToggle(stallId, visited)`, `onClose`. Type-only import of
+the row shape, so no service value reaches the client bundle.
+
+**Why it exists.** A backup path beside the automatic visit log: when a stall
+volunteer forgets to tap, a lead or admin can tick the stall. A tick writes an
+already-closed visit row; a stall the group is currently AT cannot be cleared
+here (409) -- that belongs to the stall volunteer's release.
+
+## StallTimeLimitCountdown.tsx
+
+`src/components/bootstrap/StallTimeLimitCountdown.tsx` -- the group lead's
+per-stall countdown (S77). Rendered only for a lead with an open visit at a stall
+that has `time_limit_minutes`; stall volunteers never see it.
+
+**Props.** `stallName`, `arrivedAt`, `timeLimitMinutes`, `playChime`.
+
+**Behaviour.** Remaining time is recomputed from `Date.now()` against the stored
+`arrived_at` on every tick and on every return to the foreground -- never from a
+tick count, which breaks when iOS Safari pauses a background tab. The interval
+only asks for a re-render. Turns amber under 4 minutes and red under 2 minutes
+and once over time. Chimes once at 4 minutes and once at 2 minutes remaining; a
+threshold crossed while the tab was hidden is marked fired and never plays late.
+The parent keys it on `arrived_at`, so moving to a new stall remounts it and resets
+the fired flags. The chime is a short beep inlined as a data URI (no binary in git).
+

@@ -1,6 +1,6 @@
 # Admin Components
 
-_Current as of Session 72D (2026-08-12)._
+_Current as of Session 82C (2026-10-05)._
 
 Per-file reference for every React component under `src/components/admin/`.
 These are the client-side building blocks the `(admin)` pages compose: forms,
@@ -8,6 +8,23 @@ tables, upload widgets, toggles, and the sidebar chrome. For the auth model,
 account types, invite/reset flows, and the pages themselves, see
 `docs/wiki/admin.md` -- this document stays at the component level and every
 claim is taken from the source as it stands.
+
+**Uploads (S76E).** Every admin form that uploads a file -- `EventForm`,
+`MemberForm`, `SponsorForm`, `PostForm`, `AnnouncementForm`,
+`GalleryUploadForm`, `QuickPhotoUpload`, `BulkTeamPhotoUpload` -- goes through
+ONE helper, `uploadToR2(file, path)` in `src/lib/utils.ts`, which replaced five
+copy-pasted versions. It still `POST`s to `/api/admin/upload`, but fails fast on
+a file over 4 MB (Vercel rejects request bodies over roughly 4.5 MB with a
+plain-text 413 before the route runs, which the old copies misreported as a
+JSON parse error), checks the status before parsing, and names the file and
+its size in the error. It surfaces the limit; it does not raise it --
+presigned direct-to-R2 uploads are the deferred real fix. Keys stay
+timestamped (R2 serves immutable cache headers).
+
+**Editing (S82).** EDIT on the sponsors, announcements, team and events lists
+opens the shared slide-in `AdminEditPanel`; each form takes an optional
+`onSuccess` (close the panel + `router.refresh()`) and, without it, navigates
+as before. Creating ("Add" / "New") keeps its own full page.
 
 Two conventions recur throughout and are stated once here:
 
@@ -50,6 +67,9 @@ Two conventions recur throughout and are stated once here:
   -- AdminPageHeader, AdminStatCard, AdminProfileForm, CommandPalette,
   CopyButton, EventRegistrationsTable, PostForm, QRGenerator, SponsorsTable,
   TeamMembersTable, StatefulButton
+- [Components added since S72D (S73-S82)](#components-added-since-s72d-s73-s82)
+  -- AdminEditPanel, AnnouncementForm, AnnouncementsTable, EventsTable,
+  GoogleSheetsExportButton, SegmentedCount
 
 ## AccountsActions.tsx
 
@@ -116,6 +136,12 @@ one shared copy-link UI so the godfather can hand out one-time links and clear
 the pending queue without leaving the Accounts page. The alert-on-error pattern
 keeps the surface small; the real authorization is enforced server-side (the
 routes require `isGodfather`).
+
+**S76C.** Every action reports `failureText(res, fallback)` -- the server's own
+`error` plus the HTTP status -- instead of a hardcoded alert, so a real 500 is no
+longer indistinguishable from a dropped request. The open viewer-link block
+renders only when `NEXT_PUBLIC_SHOW_VIEWER_INVITES === "true"` (production only,
+inlined at build time).
 
 ## AdminRegisterForm.tsx
 
@@ -194,244 +220,225 @@ noting the Navbar does not export it. `signOutSlot` is the notable design
 decision -- it threads a server action through a client component without the
 client importing server-only code.
 
+**S73E.** The nav includes **Announcements** (`/admin/announcements`).
+
 ## ApplicationsTable.tsx
 
 `src/components/admin/ApplicationsTable.tsx` -- the recruitment pipeline table on
 `/admin/applications`: expandable rows, per-row status and interview-group
 controls, bulk selection, and an interview-panel auto-assign strip.
 
-**Props.** `applications: Application[]` (the filtered list from the page) and
-`showPanelAssign?: boolean` (default `false`). The page sets `showPanelAssign`
-only on the plain INTERVIEW tab so the auto-assign strip appears exactly where
-it makes sense.
+**Props.** `applications: Application[]` (the filtered list from the page),
+`showPanelAssign?: boolean` (default `false`; the page sets it only on the plain
+INTERVIEW tab), and `isViewer?: boolean` (hides every write control, S47).
 
-**State.** `expandedId` (which row's detail panel is open); `panelCount`
-(1--4 or null, the auto-assign panel count); `assigning` (auto-assign in
-flight); `statuses` (a `Record<id, ApplicationStatus>` of optimistic status
-overrides); `groups` (a `Record<id, InterviewGroup | null>` of optimistic group
-overrides); `updatingId` (row with a status PATCH in flight); `selected` (a
-`Set<string>` of checked row ids); `bulkStatus` (the chosen bulk status);
-`bulkBusy` (bulk apply in flight).
+**State.** `expandedId`; `panelCount` (1--4 or null); `assigning`; `statuses`
+(`Record<id, ApplicationStatus>` optimistic overrides); `groups`
+(`Record<id, InterviewGroup | null>`); `updatingId`; `selected` (`Set<string>`);
+`bulkStatus`; `bulkBusy`.
 
 **Key functions and endpoints.**
 
-- `statusOf(app)` / `groupOf(app)` -- resolve the effective status/group from
-  the optimistic override or the row. `groupOf` uses an explicit `undefined`
-  check because a stored `null` means "cleared" and must beat `??`.
-- `toggleSelected(id)` -- add/remove a row id from `selected`.
-- `changeGroup(id, group)` -- optimistically sets the group, then
-  `PATCH /api/admin/applications/${id}/group` with `{ group }`; reverts and
-  alerts on failure.
+- `statusOf(app)` / `groupOf(app)` -- the effective status/group from the override
+  or the row. `groupOf` checks `undefined` explicitly: a stored `null` means
+  "cleared" and must beat `??`.
+- `changeGroup(id, group)` -- optimistic, then
+  `PATCH /api/admin/applications/${id}/group`; reverts and alerts on failure.
+- `changeStatus(id, status)` -- `PATCH /api/admin/applications/${id}/status`.
 - `handleBulkStatus()` -- `POST /api/admin/applications/bulk-status` with
-  `{ ids: [...selected], status }`; on success clears the selection and
-  `router.refresh()`.
+  `{ ids, status }`, then clears the selection and `router.refresh()`.
 - `handleAutoAssign()` -- `POST /api/admin/applications/auto-assign-groups` with
-  `{ panel_count }`; round-robins unassigned interviewees oldest-first, then
-  refreshes.
-- `changeStatus(id, status)` -- `PATCH /api/admin/applications/${id}/status`
-  with `{ status }`; records the optimistic override on success.
-- `hasUnassignedInterviewees` -- derived flag; gates the panel strip so it only
-  shows when there is actually someone at `interview` with no group.
+  `{ panel_count }`; round-robins unassigned interviewees oldest-first.
+- `domainList(app)` -- `orderedDomainLabels` (S82B): the stored domain columns as
+  display labels, in the fixed /join order, with a pre-S82B Operations +
+  Sponsorship pair collapsed into one "Operations & Sponsorship".
 
 **Render logic.**
 
-- **Auto-assign panel strip** (only when `showPanelAssign` and unassigned
-  interviewees exist): segmented A / A--B / A--C / A--D tiles select the panel
-  count, an AUTO-ASSIGN button fires `handleAutoAssign`, with a one-line
-  explanation.
-- **Table.** A header select-all checkbox; each row has a per-row checkbox,
-  name, email, domain list (built by `domainList` joining up to three domain
-  fields with a middle dot), semester, formatted date, a status cell with a
-  colored `admin-dot` (`STATUS_COLORS` maps each pipeline stage; `reviewed` and
-  `accepted` are legacy), group tiles, and an actions cell.
-- **Group tiles** render only for `interview` or `shortlisted` rows -- one
-  square button per `INTERVIEW_GROUPS` entry, toggling the group on/off. The
-  checkbox and actions/group cells call `stopPropagation` so clicking them does
-  not toggle the row's expand.
-- **Expanded row** spans all columns and shows applicant contact line, domains,
-  why-join, value-add, experience, and an optional portfolio link.
-- **Empty state:** a single "NO APPLICATIONS" row.
-- **Bulk action bar** is sticky to the bottom and appears only when
-  `selected.size > 0`: it shows the count, a status select, an APPLY button, and
-  an x to clear the selection.
+- **Auto-assign strip** (only with `showPanelAssign`, unassigned interviewees, and
+  not a viewer): A / A--B / A--C / A--D tiles, AUTO-ASSIGN, one line of explanation.
+- **Table.** Select-all and per-row checkboxes, name, email, domains, semester,
+  date, a `.status-badge status-<value>` cell (S66 -- the colours live in
+  globals.css, keyed off the raw DB value), group tiles (only for
+  `interview` / `shortlisted` rows), and actions. Checkbox and action cells stop
+  propagation so they do not toggle the row.
+- **Expanded row.** The applicant line (name, email, mobile, SRN/PRN, semester,
+  course), domains, then either:
+  - `answers` present (S81 form): `AnswerGroups` walks `QUESTION_GROUPS` --
+    General, then each domain set in /join order -- showing only sets with an
+    answer, and inside the two merged domains the same branch sub-headings the
+    form shows ("Social Media" / "Design", "Operations / Logistics" /
+    "Sponsorship", S82B). Multi-selects are joined, an "Other" text is appended,
+    and a link answer becomes an `<a>` only when it starts with `https://`;
+  - `answers` NULL (pre-S81 row): the old Why join / Value add / Experience /
+    Portfolio block, unchanged.
+- **Bulk bar** -- sticky, only while `selected.size > 0`: count, status select,
+  APPLY, clear.
 
-**Why it exists.** Combines review (read the answers inline), triage (status +
-group in one place), and batch operations (bulk status, panel auto-assign) into
-one table so recruitment can move a cohort through the pipeline without leaving
-the page. The optimistic override maps avoid a full refetch on every single-row
-edit while still using `router.refresh()` for bulk changes.
+**Why it exists.** Review, triage and batch operations in one table so a cohort
+moves through the pipeline without leaving the page. Optimistic override maps
+avoid a refetch per single-row edit; bulk changes use `router.refresh()`.
 
 ## BootstrapAdminDashboard.tsx
 
 `src/components/admin/BootstrapAdminDashboard.tsx` -- the live event-day console
-for an active Bootstrap session (the largest admin component). It polls stall
-and volunteer state, lets admins override stalls, place pins on a map, manage
-two classes of volunteers, review feedback, and trigger a Gemini summary.
+for an active Bootstrap session, and the largest admin component (~2,100
+lines). It polls the session, lets admins add and remove stalls, override them,
+set group capacity live, watch occupants and queues, run the group distribution
+and the end-of-event sweep, manage volunteers and visitor groups (including the
+manual checklist), review feedback, trigger a Gemini summary, and place map pins.
 
-**Props.** `session: BootstrapSession`, `initialStalls: BootstrapStall[]`,
-`initialVolunteers: BootstrapVolunteer[]` -- the server seeds the first render;
-polling keeps them current thereafter.
+**Props.** `session`, `initialStalls`, `initialVolunteers` -- seed the first
+render; polling keeps them current. `isViewer` (default false) hides every write
+control (S47).
 
-**State.** `stalls`, `volunteers` (seeded from props, replaced by polls);
-`expandedId` (open stall card); `overrideStatus` and `overrideClaimedBy` (the
-manual-override form values for the expanded stall); `busy` (override in
-flight); `editingStall` (the stall whose pin the next map click sets);
-`feedback` (the feedback summary object, loaded on demand); `summaryOpen`,
-`summary`, `summaryMeta`, `summarizing`, `summaryError` (the Gemini summary
-modal); `origin` (set from `window.location.origin` after mount to avoid a
-hydration mismatch on the feedback URL line).
+**Polling.** `POLL_MS = 4000`: `GET /api/admin/bootstrap/sessions/${id}` replaces
+`stalls`, `volunteers` and (since S73G) `groups` -- the poll always returned groups;
+the dashboard used to throw them away. A `visibilitychange` listener pauses the
+interval while the tab is hidden and polls-then-restarts when it returns.
+Feedback is loaded on mount and on REFRESH only, never on the poll.
 
-**Polling.** `POLL_MS = 4000`. `poll()` GETs
-`/api/admin/bootstrap/sessions/${session.id}` and replaces `stalls` and
-`volunteers`. An effect starts a `setInterval(poll, 4000)`, and a
-`visibilitychange` listener stops the interval when the tab is hidden and
-polls-then-restarts when it returns, so a backgrounded tab does not hammer the
-API.
+**State (main groups).** Stalls / volunteers / groups from the poll; the override
+form (`expandedId`, `overrideStatus`, `overrideClaimedBy`, `busy`); add-stall form
+(`stallFormOpen`, `newStallName`, `newStallOcc`, `newStallGroups`, `stallBusy`,
+`stallError`); `capacityBusy` (live group-capacity edits, keyed by stall);
+manual checklist (`checklistGroup`, `checklistStalls`, `checklistLoading`,
+`checklistBusy`, `checklistError`); volunteer editor (`volEditId`, `volName`,
+`volPhone`, `volSrn`, `volBusy`, `volError`); pin placement (`editingStall`);
+feedback and the summary modal (`feedback`, `summaryOpen`, `summary`,
+`summaryMeta`, `summarizing`, `summaryError`, `elapsedMs` -- the Gemini round
+trip, shown in the footer); `origin` (set after mount, hydration-safe).
 
-**Key functions and endpoints.**
-
-- `expandStall(stall)` -- toggles the card open and seeds the override form from
-  the stall.
-- `applyOverride(stallId)` -- `PATCH /api/admin/bootstrap/stalls/${stallId}` with
-  `{ status, claimed_by }` (claimed_by is the comma-split, trimmed, rejoined
-  input); replaces the stall locally on success.
-- `handlePositionSet(stallId, x, y)` -- pin-drop:
-  `PATCH .../stalls/${stallId}/position` with `{ map_x, map_y }`, optimistic
-  local update, then deselects the stall.
-- `handleClearPosition(stallId)` -- same endpoint with nulls to clear a pin.
-- `unlock(volunteerId)` -- `PATCH .../volunteers/${volunteerId}/unlock`, then
-  `poll()`.
-- `deactivate()` -- confirms, then
-  `PATCH .../sessions/${session.id}/active` with `{ is_active: false }`, then
-  `router.refresh()` (which drops back to the session picker).
-- `suggest(volunteerId, stallId)` -- `PATCH .../volunteers/${volunteerId}/suggest`
-  with `{ stall_id }` (null clears), then `poll()`.
-- `loadFeedback()` -- GET `.../sessions/${session.id}/feedback`; loaded once on
-  mount and again on the manual REFRESH button, deliberately not on the 4s poll
-  since feedback is low-churn.
-- `handleSummarizeFeedback()` -- opens the modal and
-  `POST .../sessions/${session.id}/summarize`; stores the returned summary and
-  meta (responseCount, avgOverall, avgJoin) or an error.
-
-**Derived data.** `stallVolunteers` (role `"stall"`) and `groupVolunteers`
-(role `"lead"`, re-sorted by `group_number`, unassigned last); `longWaiters`
-(queued stalls waiting more than 15 minutes, computed from polled `queued_at`);
-`counts` (free/occupied/queued stall tallies and active-volunteer count); and a
-`stats` tuple array using the Bootstrap status palette.
+**Endpoints.** All under `/api/admin/bootstrap/`: `sessions/[id]` (poll),
+`sessions/[id]/stalls` (POST add / DELETE remove, S49), `stalls/[id]` (override),
+`stalls/[id]/max-groups` (S73B), `stalls/[id]/position` (pins),
+`sessions/[id]/distribute` (S73D), `sessions/[id]/sweep-visits` (S73C),
+`sessions/[id]/active` (deactivate), `sessions/[id]/groups/[groupId]/checklist`
+(S73G), `volunteers/[id]` (edit details), `volunteers/[id]/unlock`,
+`volunteers/[id]/reset-code`, `volunteers/[id]/suggest`, `volunteers/[id]/role`,
+`volunteers/[id]/switch-request` (approve / deny, S72C), `sessions/[id]/feedback`,
+`sessions/[id]/summarize`.
 
 **Render logic (top to bottom).**
 
-- Header with the session name and a DEACTIVATE SESSION button (whose `confirm`
-  warns that volunteers will be signed out of `/bootstrap`).
-- The shared feedback URL line.
-- Long-wait warning banners, one per `longWaiters` entry, showing who has waited
-  how many minutes.
-- A stats bar of the four counts.
-- A `StallGrid` of `StallCard`s; each card's expanded actions are a status
-  select, a claimed-by text input, and an "Apply override" button.
-- **Stall Volunteers** table (name, username, stall, phone, login code, status,
-  unlock action) and **Group Volunteers** table (adds group number, an IN CLASS
-  badge, and a "suggest stall" select alongside unlock). Login codes are shown
-  in plaintext by design, since these accounts only reach `/bootstrap`.
-- **Feedback** section: a REFRESH button, a SUMMARISE FEEDBACK button (disabled
-  when there are zero responses), stat tiles (avg overall /10, avg join /5,
-  response count), a per-stall average table, and a collapsible list of up to
-  five recent comments; a "No feedback yet" line when empty.
-- **Stall positions on map** in a native `<details>` (shown only while the
-  session is active): an inline `BootstrapMapSVG` plus a per-stall list with
-  PLACE PIN / PLACING... toggles, the current `(x%, y%)`, and a CLEAR action.
-- **Gemini summary modal** (when `summaryOpen`): a backdrop plus a centered
-  panel with a header (title + meta line), a body that shows "GENERATING
-  SUMMARY...", the error, or the summary (with `**bold**` markdown rendered as
-  styled spans), and a footer crediting "Gemini 3.5 Flash".
+- Header: **DISTRIBUTE GROUPS** (S73D -- advisory placements, it leads because it
+  runs during the event), **END ALL VISITS** (S73C -- closes open visits; it sits
+  before deactivating), and **DEACTIVATE SESSION** (confirm warns volunteers will be
+  signed out).
+- Long-wait alerts, one per waiting GROUP (S73B -- was one per stall), computed
+  from each queue entry's `queued_at` and refreshed by the poll.
+- Stats bar (free / occupied / queued / active volunteers).
+- Add / remove stalls (S49); an occupied stall cannot be deleted (409).
+- **Stall table**: volunteers behind each stall, the **live group-capacity**
+  override (S73B, 1--10, admins only), the groups AT the stall from open visit
+  rows (S73C), and the **queue** -- groups waiting, in order, including advisory
+  placements not yet accepted (S73B / S73D). Group names render through
+  `groupLabel` ("Group 1", S73K). Expanding a stall shows the status override.
+- **Visitor Groups** (S73G): one row per group -- Group, Lead, Checked in, and a
+  CHECKLIST action that opens `ManualChecklistPanel` -- the same panel the lead dashboard
+  uses -- to tick or clear stalls when automatic tracking missed a visit.
+- **Stall Volunteers** and **Group Volunteers** tables (S35): name, username,
+  stall / group number, phone, plaintext login code (by design -- these accounts
+  only reach /bootstrap), status, UNLOCK, RESET CODE, an inline details editor
+  (name / phone / SRN; phone filtered to digits on every keystroke, S76B --
+  this editor has no `<form>`, so a `pattern` would never run), suggest stall,
+  role change, an IN CLASS badge, and APPROVE / deny for pending switch requests.
+- **Feedback**: REFRESH, a SUMMARISE button (gated -- it spends paid Gemini quota),
+  stat tiles, per-stall averages, recent comments.
+- **Map setup** (native `<details>`): `BootstrapMapSVG` plus PLACE PIN / CLEAR per stall.
+- **Gemini summary modal**: the summary rendered with `react-markdown` (S46), the
+  rows Gemini worked from, and a footer with the model and timing. The route calls
+  `gemini-3.5-flash`.
 
-**Why it exists.** It is the single operational surface for a running Bootstrap
-day. The visibility-aware polling, on-demand (non-polled) feedback loads, and
-optimistic pin-drop are all deliberate choices to keep it live without wasting
-requests. Volunteer roles are baked in at self-registration (S35), so there is
-no role toggle here -- only unlock and stall suggestion.
+**Why it exists.** The single operational surface for a running Bootstrap day.
+Visibility-aware polling, on-demand feedback, optimistic pin-drop and
+per-field busy flags keep it live without wasting requests.
 
 ## BootstrapCreateSession.tsx
 
-`src/components/admin/BootstrapCreateSession.tsx` -- a two-step wizard for
-creating a Bootstrap session with its stalls, ending on a success screen that
-hands over the two self-registration links.
+`src/components/admin/BootstrapCreateSession.tsx` -- the two-step wizard for
+creating a Bootstrap session with its stalls, ending on a success screen with
+the registration links.
 
-**Props.** `onDone: () => void` -- called from the success screen's DONE button
-(the parent `BootstrapSessions` uses it to exit create mode and refresh).
+**Props.** `onDone: () => void` (exit create mode and refresh) and
+`sessions?: BootstrapSession[]` (S49 -- past sessions, so step 2 can import a
+stall list as a starting point).
 
-**State.** `step` (1 or 2); step-1 fields `name`, `maxGroupSize`, `groupCount`;
-step-2 stall builder `stalls` (a `StallDraft[]`), plus the in-progress
-`stallName`, `stallOcc` (1--3), `stallLeadsText`, and `stallError`; submission
-`busy`, `error`, `created` (success flag); `origin` (set after mount for the
-link display).
+**State.** `step`; step 1 `name`, `maxGroupSize`, `groupCount`; step 2 `stalls`
+(`StallDraft[]`) and the in-progress `stallName`, `stallOcc` (volunteer capacity
+1--4, S77), `stallGroups` (group capacity 1--3, S73B), `stallTimeLimit` (free-text
+minutes, `""` = no timer, S77), `stallLeadsText`, `stallError`; import
+(`importId`, `importing`, `importError`); submission `busy`, `error`, `created`,
+`autoAssigned`; `origin`.
 
 **Key functions and endpoints.**
 
-- `addStall()` -- parses lead names from the textarea (split on newlines/commas),
-  caps them at 3 (else sets `stallError`), pushes a `StallDraft`
-  (`stall_name`, `max_occupancy`, `lead_names`), and clears the inputs.
-- `moveStall(index, dir)` -- swaps a stall with its neighbor to reorder the list.
-- `submit()` -- `POST /api/admin/bootstrap/sessions` with
-  `{ name, stalls, group_count, max_group_size }`; on success sets `created`,
-  else surfaces the error.
+- `importStalls(sessionId)` -- reuses `GET /api/admin/bootstrap/sessions/${id}`
+  for an earlier session's stalls and turns them into editable drafts, clamping
+  legacy capacities into today's ranges. Nothing is written until CREATE.
+- `addStall()` -- lead names split on newlines/commas, capped at **4** (S78B);
+  the time limit must be blank or a positive whole number of minutes.
+- `moveStall(index, dir)` -- reorder.
+- `submit()` -- `POST /api/admin/bootstrap/sessions` with `{ name, stalls,
+  group_count, max_group_size }`; reads back `autoAssigned`.
 
 **Render logic.**
 
-- A step indicator (two segments) reads "Step N of 2".
-- **Step 1:** session name, a "Visitor groups" number (1--26) and a "Max visitors
-  per group" number, with a NEXT button gated on a non-empty name and a valid
-  group count.
-- **Step 2:** a stall-name input (Enter adds), a 1/2/3 segmented max-occupancy
-  picker, an ADD button, an optional stall-lead-names textarea (max 3, reference
-  only -- no accounts created), and the running stall list with up/down reorder
-  and remove controls; BACK and CREATE SESSION buttons (the latter disabled with
-  zero stalls).
-- **Success screen** (`created`): two copyable link boxes --
-  `/bootstrap/register/stall` and `/bootstrap/register/group` -- a note that
-  registration opens once the session is activated and that group numbers are
-  handed out first-come-first-served, and a DONE button calling `onDone`.
+- **Step 1:** session name, visitor groups (1--26), max visitors per group.
+- **Step 2:** the import picker, stall name, two clearly labelled
+  `SegmentedCount` pickers (S76G) -- volunteer capacity and group capacity -- an
+  optional time-limit field (S77; drives the group lead's countdown), lead names,
+  and the reorderable stall list.
+- **Success screen:** three copyable links -- `/bootstrap/register/stall` and
+  `/bootstrap/register/group` (open while the session is active) and
+  `/bootstrap/register/pool` (always open, S74B) -- plus how many pre-registered
+  pool volunteers were auto-assigned into the new session.
 
-**Why it exists.** The S35 redesign removed the old credential-CSV step:
-volunteers now self-register, so the wizard is two steps and the payoff is the
-pair of registration links rather than a downloadable file. Lead names are kept
-purely informational (shown on stall cards). `origin` is read after mount to
-keep the link display free of hydration mismatches.
+**Why it exists.** Volunteers self-register (S35), so the wizard ends on links,
+not a credentials file. Lead names are informational only.
 
 ## BootstrapSessions.tsx
 
 `src/components/admin/BootstrapSessions.tsx` -- the Bootstrap landing view when
-no session is active: lists sessions, activates/deletes them, and hosts the
-create wizard.
+no session is active: the session list, the create wizard, and the
+pre-registration pool.
 
-**Props.** `sessions: BootstrapSession[]` -- all sessions from the page.
+**Props.** `sessions: BootstrapSession[]`, `pool?: PoolVolunteer[]` (S49 -- volunteers
+with `session_id` NULL), and `isViewer?: boolean` (hides create / activate /
+delete and the write actions, including the Sheets button, S47).
 
-**State.** `creating` (boolean; when true it renders `BootstrapCreateSession`
-instead of the list); `busyId` (the session id with an action in flight).
+**State.** `creating`; `busyId`; session edit (`editingId`, `editName`,
+`editMaxGroup`, `editError`); pool assignment (`assignId`, `assignSessionId`,
+`assignStallId`, `assignStalls`, `assignLoading`, `assignError`); pool volunteer
+editor (`volEditId`, `volName`, `volPhone`, `volSrn`, `volError`); bulk wipe
+(`wipeOpen`, `wiping`, `wipeError`).
 
-**Key functions and endpoints.**
+**Endpoints.** `sessions/[id]/active` (ACTIVATE), `sessions/[id]` (DELETE, and
+PATCH to rename / change the visitor cap, S49), `sessions/[id]` GET (stalls for
+the assign picker), `volunteers/[id]` (PATCH edit / DELETE a pool row, S55 /
+S55B), `volunteers/[id]/reset-code`, `volunteers/[id]/assign` (S49),
+`volunteers/pool/delete-all` (S73K); the pool CSV
+(`GET volunteers/pool/export`) is a plain link and the Sheets export a
+`GoogleSheetsExportButton`.
 
-- `activate(id)` -- `PATCH /api/admin/bootstrap/sessions/${id}/active` with
-  `{ is_active: true }`, then `router.refresh()`.
-- `handleDelete(id, name)` -- confirms (warning that stalls and volunteer
-  accounts go too), then `DELETE /api/admin/bootstrap/sessions/${id}`; alerts on
-  failure, else refreshes.
-- `isStale(s)` -- derived: an inactive session created more than 7 days ago
-  (`created_at` is the only timestamp available), used to surface a cleanup
-  nudge.
+**Render logic.**
 
-**Render logic.** If `creating`, it delegates to `BootstrapCreateSession` with
-an `onDone` that exits create mode and refreshes. Otherwise: a header with a
-CREATE SESSION button and a table (name, created date, stall count, status dot,
-actions). Stale rows show a sub-line nudging deletion to clear volunteer
-accounts. Only inactive rows expose ACTIVATE and DELETE; the active session has
-no actions here (it is managed from the dashboard). An empty state prompts
-creating the first session.
+- `creating` -> `BootstrapCreateSession`.
+- **Sessions table**: name, created, stall count, status, and for inactive rows
+  ACTIVATE / edit / DELETE. Inactive sessions older than 7 days get a cleanup
+  nudge (self-registered accounts accumulate in old sessions).
+- **Pre-registration pool** (volunteers with `session_id` NULL): name, username
+  (SRN), phone, **Prefers** (preferred stall, or the LEAD role for a lead -- S74B
+  follow-up, so an admin does not mis-assign a lead to a stall), plaintext login
+  code, registered. Per row: ASSIGN (pick a session and stall, then CONFIRM),
+  edit details (phone digit-filtered, S76B), RESET CODE, delete.
+- **Bulk actions** (S73K, only when the pool is non-empty): EXPORT CSV, EXPORT TO
+  GOOGLE SHEETS, and DELETE ALL, which opens an inline `admin-danger-zone` confirm
+  naming the count with EXPORT FIRST beside DELETE ALL N -- a nudge, not a gate.
 
-**Why it exists.** Keeps session lifecycle (create, activate, delete) in one
-place, and the stale-session warning exists because self-registered volunteer
-accounts accumulate in old sessions and deletion is intentionally a manual
-click, never automated.
+**Why it exists.** Session lifecycle and the between-events pool in one place.
+The pool lives here, not on the dashboard, because the dashboard only renders
+while a session is active and the pool only matters when one is not.
 
 ## BulkImportTeam.tsx
 
@@ -497,7 +504,7 @@ photo_url }`.
 - `handleFiles(files)` -- builds the `matches` list with previews and initial
   auto-matches.
 - `handleUpload()` -- for every matched file (override wins over auto-match), it
-  runs a two-step call in parallel across files: `POST /api/admin/upload` with a
+  runs a two-step call in parallel across files: `uploadToR2` (S76E) with a
   timestamped `team/${memberId}-${Date.now()}.<ext>` key, then
   `PATCH /api/admin/team` with `{ id, photo_url }`. Failures are collected
   per-file; if none, it revokes the previews, clears state, and refreshes.
@@ -597,8 +604,8 @@ registration_form_url, logo_url, cover_image_url).
 - `slugify(text)` -- lowercases, trims, and collapses to a URL slug. In create
   mode, typing the title live-updates the slug; editing the slug re-slugifies
   it.
-- `uploadFile(file, path)` -- `POST /api/admin/upload` (multipart), returns the
-  stored URL.
+- Upload: `uploadToR2(file, path)` (src/lib/utils.ts, S76E) -- `POST /api/admin/upload`
+  (multipart), returns the stored URL; fails fast over 4 MB.
 - `handleSubmit(event)` -- validates the registration URL starts with
   `http(s)://` if present; uploads logo/cover under timestamped keys
   (`events/${slug}/logo-${Date.now()}.png`, `.../cover-....jpg`) only when a new
@@ -618,6 +625,11 @@ file was uploaded, because sending `""` would defeat the service's `COALESCE`
 and wipe the stored URL on edit. Known open item (CLAUDE.md): the `hackathons`
 category is offered here but the DB CHECK rejects it, causing a 500 on create --
 flagged, not fixed.
+
+**S82.** Optional `onSuccess?: () => void` -- SponsorForm's contract. With it, a
+successful save calls it instead of `router.push("/admin/events")`; `EventsTable`
+passes it from the slide-in panel. The create page and the full edit page pass
+nothing, so they behave as before.
 
 ## FileUploadField.tsx
 
@@ -670,7 +682,7 @@ YouTube-video add form.
   slug, snapshots the batch, then GETs `/api/admin/gallery` to compute a
   `baseOrder` (max existing `display_order` + 1) so new items sort after
   existing ones. It then loops the files sequentially: per file it
-  `POST`s to `/api/admin/upload` under a timestamped
+  uploads via `uploadToR2` (S76E) under a timestamped
   `gallery/${slug}/${Date.now()}-${filename}` key, then
   `POST`s to `/api/admin/gallery` with `{ event_id, event_label, type:"image",
   url, thumbnail_url, caption, display_order }`. Each file is in its own
@@ -728,7 +740,8 @@ domain, quote, linkedin_url, github_url, display_order, is_active, photo_url).
 
 **Key functions and endpoints.**
 
-- `uploadFile(file, path)` -- `POST /api/admin/upload`, returns the URL.
+- Upload: `uploadToR2(file, path)` (src/lib/utils.ts, S76E) -- `POST /api/admin/upload`,
+  returns the URL; fails fast over 4 MB.
 - `handleSubmit(event)` -- uploads the photo (if a new one was picked) under a
   timestamped `team/${tier}/${safeName}-${Date.now()}.jpg` key, then `POST`
   (create) or `PATCH` (edit) to `/api/admin/team` with the member fields. On
@@ -742,6 +755,10 @@ domain select), Profile (quote, LinkedIn, GitHub), Media (photo via
 **Why it exists.** Single form for both create and edit, mirroring `EventForm`.
 It applies the same COALESCE-safe rule: `photo_url` is only included when a new
 file was uploaded, so an edit never wipes an existing photo.
+
+**S82.** Optional `onSuccess?: () => void`, same contract as SponsorForm's:
+`TeamMembersTable` passes it from the slide-in panel; without it the form
+navigates to `/admin/team` as before.
 
 ## MilestonesTable.tsx
 
@@ -792,7 +809,7 @@ single member, used inline on the `/admin/team` list.
 
 **State.** `uploading` (in-flight guard); `error` (inline failure string).
 
-**Key functions and endpoints.** `handleFile(file)` -- `POST /api/admin/upload`
+**Key functions and endpoints.** `handleFile(file)` -- `uploadToR2` (S76E)
 under a timestamped `team/${memberId}-${Date.now()}.<ext>` key, then
 `PATCH /api/admin/team` with `{ id, photo_url }`, then `router.refresh()`;
 surfaces any error inline.
@@ -891,7 +908,8 @@ true); `logoFiles`; `saving`; `error`.
 
 **Key functions and endpoints.**
 
-- `uploadFile(file, path)` -- `POST /api/admin/upload`, returns the URL.
+- Upload: `uploadToR2(file, path)` (src/lib/utils.ts, S76E) -- `POST /api/admin/upload`,
+  returns the URL; fails fast over 4 MB.
 - `handleSubmit(event)` -- uploads the logo (if picked) under a timestamped
   `sponsors/${safeName}-${Date.now()}.png` key, then `POST` (create) or `PATCH`
   (edit) to `/api/admin/sponsors`; on success navigates to `/admin/sponsors`.
@@ -969,7 +987,9 @@ The dashboard stat tile (label, value, optional trend). Pairs with
 
 ### AdminProfileForm.tsx
 Form behind `/admin/profile`. Edits the signed-in admin's own record via
-`GET`/`PATCH /api/admin/accounts/me` -- display name, mobile number, password.
+`PATCH /api/admin/accounts/me` (the page reads the record server-side) --
+display name, mobile number, password. The mobile field is capped at 10 and
+filtered to digits on every keystroke (S73I, S76B).
 
 ### CommandPalette.tsx
 Keyboard-driven navigation over the admin routes.
@@ -982,7 +1002,7 @@ component; folding the other one in is an open cleanup.
 
 ### EventRegistrationsTable.tsx
 Per-event registration list with a status dropdown, backed by
-`PATCH`/`DELETE /api/admin/events/[id]/registrations/[regId]`. Takes the
+`PATCH /api/admin/events/[id]/registrations/[regId]` (there is no DELETE handler). Takes the
 optional `isViewer` prop, so write controls disappear for the read-only tier.
 
 ### PostForm.tsx
@@ -995,13 +1015,74 @@ Client component behind `/admin/qr`. Builds QR codes for the site's public
 routes from the shared `src/types/routes.ts` list. That list lives in
 `src/types/` and not in a service on purpose: a value import from
 `src/lib/services/*` would drag `lib/db.ts` and the Neon driver into the
-browser bundle, where db.ts's module-level `DATABASE_URL` check throws.
+browser bundle, where db.ts's module-level `DATABASE_URL` check throws. The list
+includes `/bootstrap/feedback` (S76D), and each code downloads as SVG or as a
+1024px PNG (S76F).
 
 ### SponsorsTable.tsx / TeamMembersTable.tsx
-Extracted list tables for sponsors and team members. `TeamMembersTable` carries
-drag-to-reorder within a tier, an inline active toggle, and a per-row quick
-photo upload. Both accept `isViewer` to hide write controls.
+Extracted list tables for sponsors and team members. Both accept `isViewer` to
+hide write controls, and EDIT opens the form in the shared `AdminEditPanel`
+(sponsors since S62, team since S82). `TeamMembersTable` also carries
+drag-to-reorder within a tier, an inline active toggle and a per-row quick photo
+upload. Its rows live in local state for those optimistic updates, so it resets
+them from the prop whenever `router.refresh()` delivers a new array (S82) --
+without that, a panel save or a quick photo upload looked like it did nothing
+until a full reload.
 
 ### StatefulButton.tsx
 Save button with idle / saving / saved states, wired into the admin save paths
 so a submit gives immediate feedback instead of appearing inert.
+
+## Components added since S72D (S73-S82)
+
+### AdminEditPanel.tsx
+The shared slide-in edit panel (S82), extracted from `SponsorsTable` (S62/D5) and
+`AnnouncementsTable`, which carried identical copies; also used by
+`TeamMembersTable` and `EventsTable`. Props: `open`, `onClose`, `label` (the small
+heading and the `<aside>`'s accessible name), `title`, `children` (the form). It
+owns the mechanics: Escape closes, body scroll locks while open, the backdrop
+renders only while open (a mounted fixed inset-0 element would swallow every
+click on the table), and the `<aside class="admin-panel">` stays mounted so it can
+slide both ways, with `inert` while closed to keep the off-screen form out of the
+tab order. Callers own `open` and the selected row, and keep the selection on
+close so the content does not blank mid-slide. Only "Edit" uses it; "Add" keeps
+its own page.
+
+### AnnouncementForm.tsx
+Create/edit form for the homepage announcement (S73E). Same shape as
+`SponsorForm` -- `uploadToR2`, `StatefulButton`, the `onSuccess`-or-navigate
+contract -- plus what SponsorForm cannot do: REMOVE buttons that clear an image.
+The service is read-then-write, so an absent field means "leave alone" and an
+explicit null clears. Separate desktop and mobile images so each is cropped for
+its own aspect ratio.
+
+### AnnouncementsTable.tsx
+The `/admin/announcements` list: title, active, order, which images are set, the
+CTA; EDIT opens `AnnouncementForm` in `AdminEditPanel`, `InlineDelete` hits the
+DELETE route, viewers get no actions. Two active rows are not prevented here --
+`getActiveAnnouncement`'s `LIMIT 1` is what makes only one show.
+
+### EventsTable.tsx
+The `/admin/events` list (S82), moved out of the server page so EDIT can open the
+panel -- the move S62 made for sponsors. Row actions: EDIT (`EventForm` in the
+panel), REGISTRATIONS (the full edit page, which keeps the registrations table and
+the permanent-delete Danger Zone), ARCHIVE (soft delete). The panel ends with an
+"open full page" link. Takes `rows: { event, dateLabel, formDate }[]`: both dates
+are formatted by the server page, because formatting a SQL DATE in the client
+uses the viewer's timezone while SSR uses the server's -- a hydration mismatch.
+
+### GoogleSheetsExportButton.tsx
+"Export to Google Sheets" beside a CSV download (S73K). One component for both
+surfaces (applications, volunteer pool); only `endpoint` differs. It POSTs, then
+shows an OPEN SHEET link to the exported tab, or the error inline. The CSV link
+beside it is independent -- this failing, or Google being unconfigured, never
+affects it. Hidden for viewers (the routes are viewer-guarded).
+
+### SegmentedCount.tsx
+The 1/2/3 segmented number tiles (S73B), extracted when `max_groups` would
+otherwise have made four copies. Props: `value`, `onChange`, `max` (default 3),
+`label` (the group's accessible name). Used by `BootstrapCreateSession` and the
+dashboard's add-stall row, for volunteer capacity (`max` 4 since S77) and group
+capacity. Deliberately NOT used for the live 1--10 capacity override, where ten
+tiles would be a worse control than a number input.
+

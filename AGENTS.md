@@ -4,7 +4,7 @@ This file is read by AI coding assistants (Copilot, Cursor, Codex, etc).
 Follow these rules exactly. Do not improvise structure.
 CLAUDE.md at the repo root (untracked, local clones only) is the source of
 truth - on any conflict with this file, CLAUDE.md wins.
-(Last synced: 2026-08-12, revamp Session 72D.)
+(Last synced: 2026-10-05, Session 82C.)
 
 If said AI Agent cannot find the CLAUDE.md from repo (as it is untracked), ask user who cloned repository to contact repo owner and send them their CLAUDE.md project file.
 
@@ -17,6 +17,8 @@ If said AI Agent cannot find the CLAUDE.md from repo (as it is untracked), ask u
 - Neon Postgres via @neondatabase/serverless
 - Cloudflare R2 via @aws-sdk/client-s3
 - NextAuth v5 beta (credentials; DB multi-admin + env godfather account)
+- googleapis (Google Sheets export, service account)
+- Vitest for the pure modules in src/lib/utils/ and src/lib/maze/
 - Deployed on Vercel
 
 ## Commands
@@ -25,6 +27,7 @@ If said AI Agent cannot find the CLAUDE.md from repo (as it is untracked), ask u
 - `npm run build` - must pass with 0 errors before any change is "done"
 - `npm run lint`
 - `npx tsc --noEmit`
+- `npm test` - Vitest, no DB and no network
 
 ## Live production - read before touching data
 
@@ -35,10 +38,11 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 - Seed scripts in scripts/ hit the live database - never run unprompted.
 - Migrations are numbered files in migrations/ applied to Neon MANUALLY
   by the owner. Never auto-apply; write the file, flag it, stop.
-  Status as of S76D: migrations now run through 028. 024-028 are
-  confirmed applied, verified directly against Neon by the owner during
-  S76D, as is 020, which the owner applied in the same session after it
-  was found to be the cause of a live bug. The
+  Status as of S82C: migrations run through 031, and the owner confirms
+  001-031 are ALL applied (030 and 031 were re-checked on both Neon
+  branches in S82B). History worth keeping: 024-028 were verified
+  against Neon in S76D, and 020 was applied then too, after it was found
+  to be the cause of a live bug. The
   `INSERT INTO site_settings (key, value) VALUES ('f1_enabled', 'true')`
   seed is applied.
 - S72D's note here read "001-025 are ALL confirmed applied. Nothing is
@@ -56,42 +60,59 @@ The Neon DB and R2 bucket are LIVE PRODUCTION. There is no staging.
 src/
   app/
     (public)/         # public routes: /, about, events (incl.
-                      # [slug]/register), posts, f1, gallery, crew,
+                      # [slug]/register), posts, f1, projects (kart,
+                      # maze-solver, combat-bot), gallery, crew,
                       # sponsors, join, legal
     (admin)/          # admin panel routes (AdminShell chrome)
+    (docs)/docs/      # the password-gated docs (renders docs/wiki/*.md)
+    docs/login/       # the docs login page (outside (docs) on purpose)
     admin/            # PUBLIC token-gated pages, no AdminShell:
                       #   invite/[name]/[token]/  (named admin invite)
                       #   register/               (open viewer invite)
                       #   [username]/credentials/[token]/  (password reset)
-    bootstrap/        # volunteer stall dashboard (own cookie auth)
+    bootstrap/        # volunteer dashboard (own cookie auth), register/
+                      # {stall,group,pool}, checkin/[token],
+                      # checklist/[id], feedback
     maintenance/      # static maintenance page
     api/              # API routes only (public, /api/admin/*, /api/bootstrap/*)
   components/
     layout/           # Navbar, Footer, PageTransition, RacingCursor
-    home/             # Home page sections, KartGame (404 game)
+    home/             # Home page sections (incl. AnnouncementBanner,
+                      # ProjectsTeaser), KartGame (404 game)
     about/            # About page sections
     events/           # Event cards, filters, media lightbox
     gallery/          # Masonry, lightbox
     crew/             # Member cards
     sponsors/         # Marquee, sponsor cards
     join/             # 4-step application form
-    admin/            # Admin UI panels, tables, forms
+    posts/, f1/, legal/, docs/  # per-section components
+    projects/         # MazeSolver, MazeGrid, useMazeSolver
+    admin/            # Admin UI panels, tables, forms, AdminEditPanel
+                      # (the one shared slide-in edit panel)
     bootstrap/        # StallCard/Grid, dashboards, login, campus map SVG
     ui/               # Shared primitives
   lib/
     db.ts             # Neon connection only
     r2.ts             # R2 client only
     auth.ts           # NextAuth config only
-    utils.ts          # Shared utilities
+    utils.ts          # Shared utilities, incl. uploadToR2 (the single
+                      # upload path for every admin form, 4 MB cap)
+    utils/            # Pure, client-safe, Vitest-tested helpers:
+                      # joinQuestions (single source of truth for
+                      # /join and /api/join), phone, srn, codeHostLink,
+                      # driveLink, exportTables, group
+    maze/             # maze solver logic (BFS, directions), tested
+    docs-config.ts    # /docs nav; a new wiki file must be registered here
     services/         # ALL database query logic lives here:
                       # events, team, gallery, sponsors, applications,
-                      # settings, admin, about, bootstrap, posts, f1
-                      # (f1.ts is the one service that holds no SQL - it
-                      #  wraps the external Jolpica API instead)
+                      # settings, admin, about, bootstrap, posts,
+                      # announcements, f1, googleExport
+                      # (f1.ts and googleExport.ts hold no SQL - they
+                      #  wrap the external Jolpica and Google Sheets APIs)
   types/              # TypeScript interfaces only, PLUS any constant a
                       # client component needs to share with a service
                       # (see the client-bundle rule below)
-  middleware.ts       # Maintenance rewrite + admin route protection
+  middleware.ts       # Maintenance rewrite, /docs gate, admin route protection
 
 migrations/           # Numbered SQL, applied manually (gitignored)
 
@@ -111,7 +132,7 @@ migrations/           # Numbered SQL, applied manually (gitignored)
   after the isAdmin check:
 
       if (session.user.isViewer) {
-        return NextResponse.json({ error: "Read-only account" }, { status: 403 });
+        return NextResponse.json({ error: "Viewers cannot modify data" }, { status: 403 });
       }
 
   There are three roles: godfather | admin | viewer. `isAdmin` means "may
@@ -160,8 +181,8 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 - Admin API routes without an in-route session check.
 - A mutating admin route without a viewer guard.
 - A value import from src/lib/services/* inside a "use client" file.
-- New outbound network calls. TWO deliberate egress points already exist
-  and a THIRD needs approval:
+- New outbound network calls. THREE deliberate egress points already
+  exist and a FOURTH needs approval:
   (1) src/lib/services/f1.ts -> Jolpica (api.jolpi.ca): one jolpica()
       helper, null on failure, long revalidate windows, DB kill switch.
       Copy this shape if a new one is ever approved.
@@ -169,6 +190,10 @@ migrations/           # Numbered SQL, applied manually (gitignored)
       Google Gemini (generativelanguage.googleapis.com). Predates f1.ts,
       lives in a route rather than a service, so it has no kill switch
       and returns 502 rather than null. Exception, not a pattern.
+  (3) src/lib/services/googleExport.ts -> Google Sheets (googleapis,
+      service account; S73K/S74A). Runs only when an admin presses an
+      export button, reports "not configured" when its env vars are
+      missing, and the CSV exports never depend on it.
 - Unbounded SELECT queries without LIMIT.
 - `<img>` tags - always next/image.
 - Emoji in UI text.
@@ -186,7 +211,9 @@ migrations/           # Numbered SQL, applied manually (gitignored)
 
 ## Rendering Strategy
 
-- ISR revalidate:60-120 - /, /about, /events, /gallery, /crew, /sponsors
+- ISR revalidate:60-120 - /, /about, /events, /gallery, /crew, /sponsors,
+  /legal
+- ISR revalidate:3600 - /projects and the project pages
 - ISR - /posts (300, reports dynamic because it reads searchParams),
   /posts/[slug] (600)
 - All /f1 pages are revalidate 60. That is NOT a data-freshness number:
@@ -195,7 +222,9 @@ migrations/           # Numbered SQL, applied manually (gitignored)
   separately by the per-fetch windows inside services/f1.ts (6h/1h/24h),
   so a re-render inside those windows costs nothing upstream. Do not
   raise the 60.
-- SSR (no cache) - /join, /events/[slug], /admin/*, /bootstrap
+- SSR (no cache) - /join, /events/[slug], /admin/*, /bootstrap and its
+  session-dependent pages (/bootstrap/register/pool is static on purpose:
+  it never waits on a Neon cold start)
 - Static - /maintenance, 404, error pages
 - Middleware runs on all non-static paths: NEXT_PUBLIC_MAINTENANCE_MODE
   ="true" rewrites public routes to /maintenance; token-gated public
