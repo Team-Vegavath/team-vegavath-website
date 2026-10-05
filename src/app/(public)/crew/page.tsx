@@ -1,19 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getMembers } from "@/lib/services/team";
+import { countActiveMembers, getMembers } from "@/lib/services/team";
 import type { TeamMember } from "@/types/member";
 
-export const metadata: Metadata = {
-  title: "The Crew",
-  description:
-    "Meet the 47 active members of Team Vegavath across Automotives, Robotics, Coding, Operations, Sponsorship and Design & Social Media.",
-  alternates: { canonical: "/crew" },
-  openGraph: {
-    title: "Crew | Team Vegavath",
-    description: "47 active members across six engineering and operations domains.",
-  },
-};
+// S82D: the member count is live (countActiveMembers), so the descriptions are
+// built per render; on a failed count they simply omit the number.
+export async function generateMetadata(): Promise<Metadata> {
+  const count = await countActiveMembers().catch(() => 0);
+  const members = count > 0 ? `${count} active members` : "active members";
+  return {
+    title: "The Crew",
+    description: `Meet the ${members} of Team Vegavath across Automotives, Robotics, Coding, Operations, Sponsorship and Design & Social Media.`,
+    alternates: { canonical: "/crew" },
+    openGraph: {
+      title: "Crew | Team Vegavath",
+      description: `${count > 0 ? members : "Active members"} across six engineering and operations domains.`,
+    },
+  };
+}
 
 export const revalidate = 120;
 

@@ -3,22 +3,24 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { NumberTicker } from "@/components/ui/number-ticker";
 
-const STATS = [
-  { value: "2", label: "MAJOR EVENTS" },
-  { value: "47", label: "MEMBERS" },
-  { value: "6", label: "DOMAINS" },
-] as const;
-
-export function StatsTicker() {
+/** S82D: `memberCount` comes from countActiveMembers() on the server (this is a
+ *  client component, so it cannot query). 0 means the count failed or is empty,
+ *  and the MEMBERS slide is dropped rather than showing a wrong number. */
+export function StatsTicker({ memberCount }: { memberCount: number }) {
+  const stats = [
+    { value: 2, label: "MAJOR EVENTS" },
+    ...(memberCount > 0 ? [{ value: memberCount, label: "MEMBERS" }] : []),
+    { value: 6, label: "DOMAINS" },
+  ];
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setIndex((i) => (i + 1) % STATS.length), 3000);
+    const t = setInterval(() => setIndex((i) => (i + 1) % stats.length), 3000);
     return () => clearInterval(t);
-  }, []);
+  }, [stats.length]);
 
-  // index is always kept in [0, STATS.length) by the modulo in setInterval
-  const stat = STATS[index] ?? STATS[0];
+  // index is always kept in [0, stats.length) by the modulo in setInterval
+  const stat = stats[index] ?? stats[0]!;
 
   return (
     <div style={{
@@ -44,11 +46,11 @@ export function StatsTicker() {
           {/* S58: NumberTicker counts up on view. It sits INSIDE AnimatePresence,
               so the AnimatePresence key remounts it on every rotation and it
               re-counts each cycle -- deliberate for a ticker, and it keeps the
-              value and the label swapping as one unit. Every STATS value is a
-              plain integer string; a non-numeric one (e.g. "6+") would need to
-              stay a plain span. */}
+              value and the label swapping as one unit. Every stats value is a
+              plain integer; a non-numeric one (e.g. "6+") would need to stay a
+              plain span. */}
           <NumberTicker
-            value={Number(stat.value)}
+            value={stat.value}
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: "clamp(1.6rem, 4vw, 2.2rem)",
@@ -69,7 +71,7 @@ export function StatsTicker() {
       </AnimatePresence>
       {/* Progress dots */}
       <div style={{ display: "flex", gap: "4px", marginLeft: "0.75rem" }}>
-        {STATS.map((_, i) => (
+        {stats.map((_, i) => (
           <div key={i} style={{
             width: "5px", height: "5px",
             background: i === index ? "var(--accent)" : "var(--text-muted)",

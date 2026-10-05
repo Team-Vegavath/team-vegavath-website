@@ -157,6 +157,10 @@ a filter rather than concatenating a dynamic WHERE.
 
 ### team_members
 
+"Active members" on /, /about and /crew (S82D) is `countActiveMembers()`:
+`is_active = true AND tier IN ('core', 'crew')` -- what /crew shows outside its
+Legacy section. `is_active = false` hides a member from the site.
+
 Purpose: team roster (core / crew / legacy / faculty) grouped by domain, shown on the crew page.
 
 Created: 001. Modified: 013 (added `github_url`; expanded `tier` CHECK to include 'faculty').

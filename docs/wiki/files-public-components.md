@@ -519,16 +519,21 @@ removed deliberately.
 **Purpose.** Client component: a small rotating stats carousel (one stat at a
 time) shown on the home page.
 
-**Props.** None (exported as named `StatsTicker`).
+**Props.** `memberCount: number` (exported as named `StatsTicker`) -- the
+live `countActiveMembers()` from the home page (S82D). This is a client
+component, so it cannot query; 0 means unknown.
 
 **State.**
 - `index: number` -- which stat is currently shown.
 
-`STATS` is a module constant: `2 MAJOR EVENTS`, `85 MEMBERS`, `6 DOMAINS`.
+`stats` is built per render: `2 MAJOR EVENTS`, `{memberCount} MEMBERS`, `6 DOMAINS`.
+When `memberCount` is 0 the MEMBERS slide is dropped rather than showing a
+wrong number. Before S82D all three were a hardcoded module constant.
 
 **Key functions.** A mount effect sets a 3-second `setInterval` that advances
-`index` modulo `STATS.length`; cleared on unmount. `stat` reads the current
-entry with an `?? STATS[0]` guard. No API calls.
+`index` modulo `stats.length` (re-run if the length changes); cleared on
+unmount. `stat` reads the current entry with an `?? stats[0]` guard. No API
+calls.
 
 **Render logic.** A bordered horizontal bar. `AnimatePresence` in `mode="wait"`
 swaps the current stat with a vertical slide/fade keyed on `index` (value in

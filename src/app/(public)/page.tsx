@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getActiveAnnouncement } from "@/lib/services/announcements";
 import { getUpcomingEvents, getPastEvents } from "@/lib/services/events";
 import { getActiveSponsors } from "@/lib/services/sponsors";
+import { countActiveMembers } from "@/lib/services/team";
 import { AnnouncementBanner } from "@/components/home/AnnouncementBanner";
 import { DomainGrid } from "@/components/home/DomainGrid";
 import { StatsTicker } from "@/components/home/StatsTicker";
@@ -27,13 +28,15 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [upcomingEvents, pastEvents, sponsors, announcement] = await Promise.all([
+  const [upcomingEvents, pastEvents, sponsors, announcement, memberCount] = await Promise.all([
     getUpcomingEvents(3).catch(() => []),
     getPastEvents(3).catch(() => []),
     getActiveSponsors().catch(() => []),
     // Same .catch fallback as its siblings: a DB hiccup degrades to no
     // announcement section, not a broken homepage.
     getActiveAnnouncement().catch(() => null),
+    // S82D: 0 = unknown; the ticker and the join line then omit the number.
+    countActiveMembers().catch(() => 0),
   ]);
 
   return (
@@ -130,7 +133,7 @@ export default async function HomePage() {
           it these would all fire at once on page load. THE BUILD and Domains
           sections keep <Reveal> instead; nothing is wrapped in both. */}
       <BlurFade inView delay={0.1}>
-        <StatsTicker />
+        <StatsTicker memberCount={memberCount} />
       </BlurFade>
 
       {/* Projects teaser.
@@ -217,7 +220,7 @@ export default async function HomePage() {
               JOIN THE TEAM
             </h2>
             <p style={{ marginTop: "1rem", fontSize: "1.05rem", color: "rgba(10, 10, 10, 0.75)" }}>
-              Build karts, ship code, and run the biggest events on campus, with 47 students who take it seriously.
+              Build karts, ship code, and run the biggest events on campus, with {memberCount > 0 ? `${memberCount} ` : ""}students who take it seriously.
             </p>
             {/* S70/C2: the same InteractiveHoverButton mechanic as the hero, in
                 its inverted colour mapping. S60 left this a plain Link because

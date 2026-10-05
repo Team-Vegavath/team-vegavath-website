@@ -26,6 +26,18 @@ export async function getMembers(options?: {
   return rows as TeamMember[];
 }
 
+/** S82D: the "active members" number on /, /about and /crew -- exactly the people
+ *  /crew shows outside its Legacy section. is_active = false means hidden from the
+ *  site, so those never count; legacy (alumni) never counts even when shown; and
+ *  faculty, a valid tier that /crew never renders, is left out too. A count, not
+ *  getMembers().length, so pages that only need the number skip loading the rows. */
+export async function countActiveMembers(): Promise<number> {
+  const rows = await sql`
+    SELECT count(*)::int AS n FROM team_members
+    WHERE is_active = true AND tier IN ('core', 'crew')`;
+  return (rows[0] as { n: number } | undefined)?.n ?? 0;
+}
+
 export async function getMembersByTier(
   tier: "core" | "crew" | "legacy"
 ): Promise<TeamMember[]> {

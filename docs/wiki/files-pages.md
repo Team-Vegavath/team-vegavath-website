@@ -136,35 +136,41 @@ File: src/app/(public)/page.tsx
 - **Data.** `Promise.all` of `getUpcomingEvents(3)`,
   `getPastEvents(3)` (both `@/lib/services/events`),
   `getActiveSponsors()` (`@/lib/services/sponsors`), and
-  `getActiveAnnouncement()` (`@/lib/services/announcements`, S73E); the
-  lists `.catch` to `[]`, the announcement to `null`.
+  `getActiveAnnouncement()` (`@/lib/services/announcements`, S73E) and
+  `countActiveMembers()` (`@/lib/services/team`, S82D); the lists `.catch`
+  to `[]`, the announcement to `null`, the count to `0`.
 - **Auth.** Public.
 - **Metadata.** `title: "Team Vegavath | Karts, Code & Innovation at
   PESU ECC"`.
 - **Renders.** Hero (JOIN / VIEW EVENTS CTAs), `AnnouncementBanner`
-  (renders nothing when no row is active), `StatsTicker`,
+  (renders nothing when no row is active), `StatsTicker` (passed
+  `memberCount`),
   `KartModelWrapper` (3D kart), `DomainGrid`, `EventsPreview` (fed
   slimmed upcoming/past event objects), `ProjectsTeaser`,
   `SponsorMarquee` (only when sponsors exist), and a Join CTA section.
 - **Notable.** Event objects are projected down to just
   `{slug, title, category, event_date, cover_image_url}` before being
-  handed to `EventsPreview`.
+  handed to `EventsPreview`. The Join CTA line reads "with N students who
+  take it seriously" from the live count (S82D), and drops the number
+  when the count is 0.
 
 ## /about
 File: src/app/(public)/about/page.tsx
 
 - **Route.** `/about`.
 - **Rendering mode.** ISR (120s).
-- **Data.** `getActiveSponsors()` and `getMilestones()`
-  (`@/lib/services/about`).
+- **Data.** `getActiveSponsors()`, `getMilestones()`
+  (`@/lib/services/about`) and `countActiveMembers()` (S82D, `.catch` to 0).
 - **Auth.** Public.
 - **Renders.** `AboutHeroImage`, mission pull-quote, `DomainGrid`,
   a stats grid, a milestones timeline, a values grid (inline
   `ValueShape` SVGs), and `SponsorMarquee` when sponsors exist.
 - **Notable.** Ships a `TIMELINE_FALLBACK` constant (three hardcoded
   milestones) used when `getMilestones()` throws or returns empty, so
-  the timeline never renders blank pre-migration-010. `STATS` and
-  `VALUES` are hardcoded in-file.
+  the timeline never renders blank pre-migration-010. The stats grid
+  is built per render: Major Events (2) and Domains (6) are hardcoded,
+  Active Members is the live count (S82D) and is left out when the count
+  is 0. `VALUES` is hardcoded in-file.
 
 ## /crew
 File: src/app/(public)/crew/page.tsx
@@ -174,7 +180,10 @@ File: src/app/(public)/crew/page.tsx
 - **Data.** `getMembers()` (`@/lib/services/team`); on throw falls back
   to `[]`.
 - **Auth.** Public.
-- **Metadata.** `title: "The Crew | Team Vegavath"`.
+- **Metadata.** `generateMetadata` (S82D): `title: "The Crew | Team
+  Vegavath"`, and the description and OpenGraph description carry the
+  live `countActiveMembers()` number ("Meet the N active members..."),
+  dropping the number when the count is 0.
 - **Renders.** In-file components `PhotoOrInitial`, `LinkedInLink`,
   `GitHubLink`, `MemberInfo`, `SectionHeading`. Members are filtered to
   `is_active !== false` then split into three tiers -- `core`, `crew`,

@@ -8,6 +8,7 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { Reveal } from "@/components/ui/Reveal";
 import { getMilestones, type Milestone } from "@/lib/services/about";
 import { getActiveSponsors } from "@/lib/services/sponsors";
+import { countActiveMembers } from "@/lib/services/team";
 
 export const metadata: Metadata = {
   title: "About",
@@ -22,12 +23,6 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 120;
-
-const STATS = [
-  { number: "2", label: "Major Events" },
-  { number: "47", label: "Active Members" },
-  { number: "6", label: "Domains" },
-] as const;
 
 // Fallback so the page never breaks before migration 010 runs; once the
 // milestones table is populated, the live data takes over.
@@ -84,6 +79,13 @@ export default async function AboutPage() {
   const sponsors = await getActiveSponsors().catch(() => []);
   const milestonesFromDb = await getMilestones().catch(() => TIMELINE_FALLBACK);
   const milestones = milestonesFromDb.length > 0 ? milestonesFromDb : TIMELINE_FALLBACK;
+  // S82D: live count (0 = unknown, and the stat is dropped rather than wrong).
+  const memberCount = await countActiveMembers().catch(() => 0);
+  const stats = [
+    { number: 2, label: "Major Events" },
+    ...(memberCount > 0 ? [{ number: memberCount, label: "Active Members" }] : []),
+    { number: 6, label: "Domains" },
+  ];
 
   return (
     <main style={{ background: "var(--bg-base)", color: "var(--text-primary)" }}>
@@ -166,13 +168,13 @@ export default async function AboutPage() {
                 that class to NumberTicker instead would put Tailwind utilities up
                 against an unlayered globals.css rule, which they lose. Unlike the
                 homepage StatsTicker there is no AnimatePresence here, so these
-                count once and stay put. Every STATS number is a plain integer
-                string; a non-numeric one would have to stay plain text. */}
+                count once and stay put. Every stats number is a plain integer;
+                a non-numeric one would have to stay plain text. */}
             <div className="stats-grid">
-              {STATS.map(({ number, label }) => (
+              {stats.map(({ number, label }) => (
                 <div key={label}>
                   <p className="stat-number">
-                    <NumberTicker value={Number(number)} />
+                    <NumberTicker value={number} />
                   </p>
                   <p className="stat-label">{label}</p>
                 </div>
